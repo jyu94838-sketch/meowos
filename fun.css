@@ -6375,135 +6375,9 @@ body.dark .desk-done {
   color: var(--text-main);
 }
 
-/* ═════════ 第二页起：和第一页一样的卡片风格 ═════════ */
-.desk-apps-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 9px;
-  padding: 11px;
-  border: 1px solid var(--line);
-  border-radius: 22px;
-  background: var(--bg-card);
-  box-shadow: 0 3px 14px -6px rgba(0, 0, 0, 0.06);
-}
-body.dark .desk-apps-grid {
-  box-shadow: var(--shadow-card);
-}
-.desk-pager:not(.is-editing) .desk-apps-grid:empty {
-  display: none;
-}
-.desk-apps-grid .desk-app.app-nora {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 4px;
-  min-width: 0;
-  min-height: 70px;
-  padding: 10px 11px 9px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--bg-card);
-  color: var(--text-main);
-  text-align: left;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  transition: transform 0.15s ease;
-}
-body.dark .desk-apps-grid .desk-app.app-nora {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-.desk-apps-grid .desk-app.app-nora:active {
-  transform: scale(0.96);
-}
-.desk-apps-grid .desk-app.app-nora strong {
-  display: block;
-  max-width: 100%;
-  margin-top: auto;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding-right: 2px;
-}
-.desk-apps-grid .desk-app.app-nora .app-nora-k {
-  max-width: calc(100% - 22px);
-  white-space: nowrap;
-  overflow: hidden;
-}
-/* 编辑模式：整张卡片轻轻抖 */
-.desk-pager.is-editing .desk-apps-grid .desk-app.app-nora {
-  animation: desk-jiggle 0.28s ease-in-out infinite;
-}
-.desk-pager.is-editing .desk-apps-grid .desk-app.app-nora:nth-child(even) {
-  animation-delay: -0.14s;
-}
-.desk-ghost.app-nora {
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--bg-card);
-  color: var(--text-main);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 10px 11px 9px;
-  min-height: 70px;
-  box-sizing: border-box;
-}
-
-/* ═════════ 桌面图标大小（--mx-ico，由「桌面图标」设置） ═════════ */
-html .app-nora > i,
-html .app-nora-mini > i,
-html .desk-apps-grid .desk-app.app-nora > i {
-  font-size: var(--mx-ico, 1rem);
-}
-html .app-nora > img.home-app-icon,
-html .app-nora-mini > img.home-app-icon,
-html .desk-apps-grid .desk-app.app-nora > img.home-app-icon {
-  width: var(--mx-ico, 1.05rem);
-  height: var(--mx-ico, 1.05rem);
-  border-radius: calc(var(--mx-ico, 16px) * 0.28);
-  object-fit: cover;
-}
-.desk-apps-grid .desk-app.app-nora > i,
-.desk-apps-grid .desk-app.app-nora > img.home-app-icon {
-  position: absolute;
-  right: 10px;
-  top: 10px;
-  opacity: 0.88;
-}
-.desk-apps-grid .desk-app.app-nora > img.home-app-icon {
-  opacity: 1;
-}
-.desk-apps-grid .desk-app.app-nora {
-  position: relative;
-  min-height: max(70px, calc(var(--mx-ico, 16px) + 50px));
-}
-.desk-apps-grid .desk-app.app-nora .app-nora-k {
-  max-width: calc(100% - var(--mx-ico, 16px) - 6px);
-}
-html .app-nora {
-  min-height: max(70px, calc(var(--mx-ico, 16px) + 50px));
-}
-html .app-nora-mini {
-  min-height: max(64px, calc(var(--mx-ico, 16px) + 44px));
-}
-
 /* 「桌面图标」设置页 */
 .ico-m {
   padding: 18px 16px 40px;
-}
-.ico-size {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 10px 0 6px;
-}
-.ico-size input[type="range"] {
-  flex: 1;
-  accent-color: var(--text-main);
-}
-.ico-size span {
-  min-width: 44px;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 0.8rem;
 }
 .ico-preview,
 .ico-grid {
@@ -6526,9 +6400,6 @@ html .app-nora-mini {
   color: var(--text-main);
   cursor: pointer;
   margin-left: auto;
-}
-html .app-nora-main {
-  min-height: max(86px, calc(var(--mx-ico, 16px) + 60px));
 }
 
 /* 资源站：分类 + 批量上传 */
@@ -6773,6 +6644,48 @@ html .app-nora-main {
 }
 .ms-cast .fun-chip-btn {
   display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ═════════ 第二页起：方形图标 + 第一页的配色 ═════════ */
+.desk-apps-grid {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px 6px;
+}
+.desk-app-ico {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  overflow: hidden;
+  font-size: 1.55rem;
+  color: var(--text-main);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  box-shadow: 0 3px 14px -6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+body.dark .desk-app-ico {
+  color: var(--text-main);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+/* 自定义图标：铺满整个方块 */
+.desk-app-ico.has-img {
+  border-color: transparent;
+}
+.desk-app-ico > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.desk-app-name {
+  font-size: 0.68rem;
+  color: var(--text-main);
+}
+.desk-ghost {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 6px;
 }

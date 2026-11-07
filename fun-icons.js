@@ -47,9 +47,7 @@
   }
 
   function tile(a, src, extra) {
-    return `<button type="button" class="desk-app app-nora ico-tile${src ? " has-home-app-icon" : ""}" ${extra || ""}><span class="app-nora-k">${esc(a.kicker)}</span><strong>${esc(a.name)}</strong>${
-      src ? `<img class="home-app-icon" src="${src}" alt="" />` : `<i class="ph ${a.icon}"></i>`
-    }</button>`;
+    return `<button type="button" class="desk-app ico-tile" ${extra || ""}><span class="desk-app-ico${src ? " has-img" : ""}">${src ? `<img src="${src}" alt="" />` : `<i class="ph ${a.icon}"></i>`}</span><span class="desk-app-name">${esc(a.name)}</span></button>`;
   }
 
   function render() {

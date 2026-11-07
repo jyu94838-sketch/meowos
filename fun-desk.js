@@ -113,12 +113,11 @@
   dots.className = "desk-dots";
   phone.appendChild(dots);
 
-  // 和第一页一样的卡片样式：英文小标 + 斜体名字 + 右上角线条图标
+  // 方形图标（第一页的配色）；自定义图标铺满整个方块
   const iconHtml = (k) => {
-    const [name, icon, , kicker] = APPS[k];
+    const [name, icon] = APPS[k];
     const img = icons[k];
-    const ico = img ? `<img class="home-app-icon" src="${img}" alt="" />` : `<i class="ph ${icon}"></i>`;
-    return `<button type="button" class="desk-app app-nora${img ? " has-home-app-icon" : ""}" data-k="${k}"><span class="app-nora-k">${kicker}</span><strong>${name}</strong>${ico}</button>`;
+    return `<button type="button" class="desk-app" data-k="${k}"><span class="desk-app-ico${img ? " has-img" : ""}">${img ? `<img src="${img}" alt="" />` : `<i class="ph ${icon}"></i>`}</span><span class="desk-app-name">${name}</span></button>`;
   };
 
   function render() {
@@ -296,7 +295,7 @@
         drag.started = true;
         const r = drag.el.getBoundingClientRect();
         const g = drag.el.cloneNode(true);
-        g.className = "desk-app app-nora desk-ghost";
+        g.className = "desk-app desk-ghost";
         g.style.cssText += `;left:${r.left}px;top:${r.top}px;width:${r.width}px`;
         document.body.appendChild(g);
         drag.ghost = g;
