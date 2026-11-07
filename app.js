@@ -2478,6 +2478,45 @@ function readGlobalUiTypoFromKv() {
   return normalizeGlobalUiTypo(D ? D.getKv(D.K.GLOBAL_UI_TYPO) : undefined);
 }
 
+/** 预设改名（各种预设通用）：改 list 里 id 对应那一项的 name */
+function mxRenamePreset(readFn, writeFn, id, oldName, after) {
+  const v = window.prompt("给这个预设改个名字", String(oldName || ""));
+  if (v == null) return;
+  const name = String(v).trim().slice(0, 40);
+  if (!name) {
+    showToast("名字不能空着");
+    return;
+  }
+  const arr = readFn();
+  let hit = false;
+  const next = (Array.isArray(arr) ? arr : []).map((x) => {
+    if (x && String(x.id || "").trim() === String(id)) {
+      hit = true;
+      return { ...x, name };
+    }
+    return x;
+  });
+  if (!hit) {
+    showToast("找不到这个预设了");
+    return;
+  }
+  writeFn(next);
+  if (typeof after === "function") after(name);
+  showToast(`已改名为「${name}」`);
+}
+function mxPresetRenameBtn(onClick) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "chip ghost chip-xs";
+  b.textContent = "改名";
+  b.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick();
+  });
+  return b;
+}
+
 function readGlobalUiTypoPresetsFromKv() {
   const D = window.XXJ_DB;
   if (!D) return [];
@@ -2569,7 +2608,10 @@ function renderGlobalUiTypoPresetListInto(containerId) {
       renderGlobalUiTypoPresetListInto("ward-typo-presets");
       showToast("已删除");
     });
-    actions.append(useBtn, delBtn);
+    const renBtn = mxPresetRenameBtn(() =>
+      mxRenamePreset(readGlobalUiTypoPresetsFromKv, writeGlobalUiTypoPresetsToKv, id, name, () => renderGlobalUiTypoPresetListInto(containerId))
+    );
+    actions.append(useBtn, renBtn, delBtn);
     row.append(lab, actions);
     root.appendChild(row);
   }
@@ -7629,7 +7671,9 @@ function renderImageGenPresetList() {
         del.setAttribute("data-imgen-preset-del", p.id);
         del.setAttribute("aria-label", `删除预设 ${p.name}`);
         del.textContent = "删除";
+        const ren = mxPresetRenameBtn(() => mxRenamePreset(readImageGenPresets, writeImageGenPresets, p.id, p.name, () => renderImageGenPresetList()));
         row.appendChild(name);
+        row.appendChild(ren);
         row.appendChild(del);
         list.appendChild(row);
       }
@@ -9756,7 +9800,16 @@ function renderSettingsTheaterCustomList() {
       syncChatTheaterPanelFromLog();
       showToast("已删除");
     });
+    const ren = mxPresetRenameBtn(() =>
+      mxRenamePreset(readCustomTheaterPresetsFromKv, writeCustomTheaterPresetsToKv, p.id, p.name, () => {
+        chatTheaterRerollPicksKey = "";
+        refreshSettingsTheaterPanel();
+        syncChatDetailTheaterPresetUi();
+        syncChatTheaterPanelFromLog();
+      })
+    );
     li.appendChild(meta);
+    li.appendChild(ren);
     li.appendChild(del);
     ul.appendChild(li);
   }
@@ -36437,7 +36490,16 @@ function renderChatUiCssPresetListInto(containerId, opts) {
       mountChatSurfaceCssLayers();
       showToast("已删除");
     });
-    actions.append(useBtn, delBtn);
+    const renBtn = mxPresetRenameBtn(() =>
+      mxRenamePreset(
+        surface === "offline" ? readOfflineThreadUiCssPresetsFromKv : readThreadUiCssPresetsFromKv,
+        surface === "offline" ? writeOfflineThreadUiCssPresetsToKv : writeThreadUiCssPresetsToKv,
+        id,
+        name,
+        () => refreshChatUiCssPresetLists()
+      )
+    );
+    actions.append(useBtn, renBtn, delBtn);
     row.append(lab, actions);
     root.appendChild(row);
   }
@@ -63065,6 +63127,23 @@ document.getElementById("chat-offline-prose-save-preset")?.addEventListener("cli
 document.getElementById("chat-offline-prose-delete-preset")?.addEventListener("click", () => {
   deleteSelectedOfflineDmProsePresetFlow();
 });
+(function mountOfflineProseRenameBtn() {
+  const del = document.getElementById("chat-offline-prose-delete-preset");
+  if (!del || document.getElementById("chat-offline-prose-rename-preset")) return;
+  const b = mxPresetRenameBtn(() => {
+    const sel = document.getElementById("chat-offline-prose-global-preset");
+    const id = sel instanceof HTMLSelectElement ? sel.value : "";
+    if (!id) {
+      showToast("先在下拉框里选一个预设");
+      return;
+    }
+    const cur = readOfflineDmProsePresetsFromKv().find((x) => x && String(x.id || "").trim() === id);
+    mxRenamePreset(readOfflineDmProsePresetsFromKv, writeOfflineDmProsePresetsToKv, id, cur?.name || "", () => syncChatOfflineProseGlobalPresetSelect(id));
+  });
+  b.id = "chat-offline-prose-rename-preset";
+  b.textContent = "改名所选预设";
+  del.insertAdjacentElement("beforebegin", b);
+})();
 
 document.getElementById("chat-offline-prose-import")?.addEventListener("click", () => {
   document.getElementById("chat-offline-prose-import-file")?.click();
