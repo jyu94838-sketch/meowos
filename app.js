@@ -17145,6 +17145,52 @@ function syncChatDetailFaceLockSelect(th) {
   if (sel instanceof HTMLSelectElement) sel.value = threadFaceLockLevel(th);
   const av = document.getElementById("chat-detail-hide-avatars-toggle");
   if (av) av.setAttribute("aria-pressed", th && th.hideAvatars ? "true" : "false");
+  ensureChatDetailMusicShareUi();
+  const mu = document.getElementById("chat-detail-music-share-toggle");
+  if (mu) mu.setAttribute("aria-pressed", isThreadMomentsMusicShareOn(th) ? "true" : "false");
+}
+/** 聊天设置：「分享音乐到朋友圈」开关 + 「现在分享一首」 */
+function ensureChatDetailMusicShareUi() {
+  if (document.getElementById("chat-detail-music-share-field")) return;
+  const anchor =
+    document.getElementById("chat-detail-char-moments-proactive-field") ||
+    document.getElementById("chat-detail-char-proactive-toggle")?.closest(".chat-detail-field");
+  if (!anchor) return;
+  const field = document.createElement("div");
+  field.className = "chat-detail-field chat-detail-field--switch";
+  field.id = "chat-detail-music-share-field";
+  field.setAttribute("data-chat-detail-dm-only", "1");
+  field.innerHTML =
+    '<span class="chat-detail-field-k">分享音乐到朋友圈</span>' +
+    '<button type="button" class="chat-detail-switch" id="chat-detail-music-share-toggle" aria-pressed="false"><span class="visually-hidden">分享音乐到朋友圈</span></button>' +
+    '<p class="chat-detail-lead chat-detail-lead--compact mx-hint">开启后，TA 发朋友圈时有时会分享一首歌，并配一句应景的文案（看你们最近聊了什么、TA 的心情）。朋友圈里点歌曲卡片就能去「音乐」里听。要配合上面的「主动发朋友圈」一起开。</p>' +
+    '<div class="chat-detail-actions"><button type="button" class="chip ghost chip-xs" id="chat-detail-music-share-now">让 TA 现在分享一首</button></div>';
+  anchor.insertAdjacentElement("afterend", field);
+  document.getElementById("chat-detail-music-share-toggle")?.addEventListener("click", (e) => {
+    const th = readActiveThread();
+    if (!th) return;
+    if (th.kind === "group") return showToast("群聊不支持");
+    const on = !isThreadMomentsMusicShareOn(th);
+    patchActiveThread((t) => {
+      if (on) t.momentsMusicShare = true;
+      else delete t.momentsMusicShare;
+    });
+    e.currentTarget.setAttribute("aria-pressed", on ? "true" : "false");
+    showToast(on ? "已开启：TA 发朋友圈时会分享音乐" : "已关闭音乐分享");
+  });
+  document.getElementById("chat-detail-music-share-now")?.addEventListener("click", async (e) => {
+    const th = readActiveThread();
+    const cid = String(th?.charId || "").trim();
+    if (!th || th.kind === "group" || !cid) return showToast("只有单聊能用");
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const ok = await publishCharMomentFromAi(cid, { threadId: th.id, maskId: getActiveMaskIdForInbox(), musicShare: true, notifySuccess: true });
+      if (ok) showToast("TA 分享了一首歌，去朋友圈看看吧");
+    } finally {
+      btn.disabled = false;
+    }
+  });
 }
 /** 聊天设置「隐藏头像」：给聊天界面加 class */
 function applyChatHideAvatarsClass(th) {
@@ -21719,7 +21765,7 @@ function insertCharMomentForMask(maskId, charId, payload) {
     .map((x) => String(x || "").trim().slice(0, 500))
     .filter(Boolean)
     .slice(0, MOMENTS_CHAR_POST_MAX_IMAGES);
-  if (!text && !images.length && !imageDescCards.length) return null;
+  if (!text && !images.length && !imageDescCards.length && !(payload?.music && payload.music.title)) return null;
   const preferredThreadId = String(payload?.threadId || "").trim();
   const th = pickThreadForCharMoment(mid, cid, preferredThreadId);
   const threadId = th ? String(th.id || "").trim() : preferredThreadId;
@@ -21745,6 +21791,12 @@ function insertCharMomentForMask(maskId, charId, payload) {
     comments: []
   };
   if (imageDescCards.length) row.imageDescCards = imageDescCards;
+  if (payload?.music && payload.music.title) {
+    row.music = {
+      title: String(payload.music.title).slice(0, 60),
+      artist: String(payload.music.artist || "").slice(0, 60)
+    };
+  }
   if (threadId) row.threadId = threadId;
   if (threadRemark) row.threadRemark = threadRemark;
   if (postPersona === "alt") row.postPersona = "alt";
@@ -22007,8 +22059,93 @@ async function enqueuePublishCharMomentFromAiAfterChat(charId, opts) {
  * @param {string} charId
  * @param {{ switchToMoments?: boolean, threadId?: string, quiet?: boolean, proactive?: boolean, momentHint?: string, maskId?: string, forcePost?: boolean, directText?: string, notifySuccess?: boolean }} [opts]
  */
+/** 聊天设置「分享音乐到朋友圈」：TA 选一首真实存在的歌 + 配一句应景的文案 */
+function isThreadMomentsMusicShareOn(th) {
+  return !!(th && typeof th === "object" && th.momentsMusicShare === true);
+}
+async function publishCharMusicMomentFromAi(charId, opts) {
+  const cid = String(charId || "").trim();
+  const maskId = String(opts?.maskId || getActiveMaskIdForInbox() || "").trim();
+  const ai = window.RP_AI;
+  if (!cid || !maskId || !ai?.chatCompletions) return false;
+  const th = pickThreadForCharMoment(maskId, cid, String(opts?.threadId || "").trim());
+  const tid = th ? String(th.id || "").trim() : "";
+  const ident = resolveMomentsCharIdentity(maskId, cid, tid, String(opts?.personaSlot || ""));
+  const name = ident.displayName || "角色";
+  const personaBits = [ident.persona.summary, ident.persona.boundaries].filter(Boolean).join("\n").slice(0, 1200);
+  let recent = "";
+  try {
+    const log = tid ? readChatLogForMaskThread(maskId, tid) : [];
+    recent = log
+      .slice(-14)
+      .filter((m) => m && (m.role === "user" || m.role === "assistant"))
+      .map((m) => `${m.role === "user" ? "对方" : name}：${htmlToPlainTextForPrompt(String(m.content || "")).replace(/\|\|\|/g, " ").slice(0, 160)}`)
+      .join("\n");
+  } catch (_) {
+    recent = "";
+  }
+  if (!opts?.quiet) showToast(`${name} 正在挑歌…`);
+  let parsed = null;
+  try {
+    const data = await ai.chatCompletions({
+      messages: [
+        {
+          role: "system",
+          content: `你是「${name}」。${personaBits ? "人设：\n" + personaBits + "\n" : ""}你要在朋友圈分享一首歌。根据你的性格、最近和对方的聊天、现在的心情，选一首**真实存在**的歌（中文或外文都行，歌名和歌手要准确），再配一句应景的朋友圈文案（像真人发的，可以暗戳戳和对方有关，但别直接复述聊天原话，40 字以内）。只输出 JSON：{"song":"歌名","artist":"歌手","text":"文案"}`
+        },
+        { role: "user", content: recent ? `最近的聊天：\n${recent}\n\n选歌并写文案。` : "选歌并写文案。" }
+      ],
+      max_tokens: 300,
+      temperature: 0.9
+    });
+    const raw = String(readChatCompletionChoiceText(data) || "").replace(/<think>[\s\S]*?<\/think>/gi, "");
+    const mJson = raw.match(/\{[\s\S]*\}/);
+    parsed = mJson ? JSON.parse(mJson[0]) : null;
+  } catch (e) {
+    console.warn("[moments] music share failed", e);
+    parsed = null;
+  }
+  const song = String(parsed?.song || "").trim();
+  if (!song) {
+    if (!opts?.quiet) showToast("这次没选出歌来，再试一次吧");
+    return false;
+  }
+  const newId = insertCharMomentForMask(maskId, cid, {
+    text: String(parsed?.text || "").trim().slice(0, 500),
+    images: [],
+    imageDescCards: [],
+    threadId: tid,
+    persona: ident.slot,
+    music: { title: song, artist: String(parsed?.artist || "").trim() }
+  });
+  if (!newId) return false;
+  flushChatInboxKvPersist();
+  try {
+    if (tid) maybePushMomentsFeedNotify(maskId, cid, tid, `🎵 分享了《${song}》`, { force: opts?.notifySuccess === true });
+    else if (!opts?.quiet) showToast(`${name} 分享了一首歌`);
+    renderMomentsFeed();
+    scheduleMomentsFeedRender(true);
+  } catch (_) {
+    /* ignore */
+  }
+  return true;
+}
+
 async function publishCharMomentFromAi(charId, opts) {
   if (momentsCharPostBusy) return false;
+  // 开了「分享音乐到朋友圈」：自动发圈时有一定概率改成分享一首歌
+  if (opts?.musicShare === true || (!opts?.forcePost && !String(opts?.directText || "").trim() && Math.random() < 0.4)) {
+    const mid0 = String(opts?.maskId || getActiveMaskIdForInbox() || "").trim();
+    const th0 = mid0 ? pickThreadForCharMoment(mid0, String(charId || "").trim(), String(opts?.threadId || "").trim()) : null;
+    if (opts?.musicShare === true || isThreadMomentsMusicShareOn(th0)) {
+      momentsCharPostBusy = true;
+      try {
+        return await publishCharMusicMomentFromAi(charId, opts);
+      } finally {
+        momentsCharPostBusy = false;
+      }
+    }
+  }
   const cid = String(charId || "").trim();
   if (!cid) return false;
   const ai = window.RP_AI;
@@ -27025,7 +27162,38 @@ function getMomentAvatarUrl(m) {
   return String(it?.avatar || "").trim();
 }
 
+/** 朋友圈里的音乐分享卡片：点一下去「音乐」里搜这首歌 */
+function buildMomentsMusicCard(host, mm) {
+  const mu = mm && mm.music;
+  if (!mu || !mu.title) return;
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "moments-music-card";
+  const cover = document.createElement("span");
+  cover.className = "moments-music-cover";
+  cover.textContent = "♪";
+  const info = document.createElement("span");
+  info.className = "moments-music-info";
+  const t = document.createElement("b");
+  t.textContent = mu.title;
+  const a = document.createElement("small");
+  a.textContent = mu.artist ? `${mu.artist} · 点击去听` : "点击去听";
+  info.append(t, a);
+  const play = document.createElement("span");
+  play.className = "moments-music-play";
+  play.textContent = "▶";
+  card.append(cover, info, play);
+  card.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const q = `${mu.title} ${mu.artist || ""}`.trim();
+    if (window.XXJ_MUSIC?.search) window.XXJ_MUSIC.search(q);
+    else if (typeof window.openFunApp === "function") window.openFunApp("音乐");
+  });
+  host.appendChild(card);
+}
+
 function buildMomentsPostMedia(host, mm) {
+  buildMomentsMusicCard(host, mm);
   const descCards = getMomentPostImageDescCards(mm);
   const imgs = (Array.isArray(mm.images) ? mm.images : [])
     .map((x) => sanitizeMomentImageUrl(String(x || "").trim()))

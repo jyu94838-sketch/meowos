@@ -1288,7 +1288,11 @@
     prev: () => step(-1),
     progress: () => (Number.isFinite(audio.duration) && audio.duration > 0 ? audio.currentTime / audio.duration : 0),
     subscribe: (fn) => (musicSubs.add(fn), () => musicSubs.delete(fn)),
-    ready: () => loadTracks()
+    ready: () => loadTracks(),
+    /** 打开搜歌（朋友圈音乐卡片、让 TA 选歌用） */
+    search: (q) => {
+      void loadTracks().then(() => openSearch(q || ""));
+    }
   };
   window.closeFunScreen = closeFunScreen;
 })();
