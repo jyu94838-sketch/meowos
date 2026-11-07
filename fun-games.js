@@ -20,7 +20,8 @@
     { key: "真心话大冒险", icon: "🍾", name: "真心话大冒险", desc: "转瓶子，敢不敢" },
     { key: "你画我猜", icon: "🎨", name: "你画我猜", desc: "画给 TA 猜 / 猜 TA 的词" },
     { key: "喵了个喵", icon: "🐱", name: "喵了个喵", desc: "叠叠乐消除，凑 3 张就消" },
-    { key: "钢琴块", icon: "🎹", name: "钢琴块", desc: "只点黑块，越弹越快" }
+    { key: "钢琴块", icon: "🎹", name: "钢琴块", desc: "只点黑块，越弹越快" },
+    { key: "换装小屋", icon: "👗", name: "换装小屋", desc: "给自己和 TA 的小人换装" }
   ];
 
   const needKey = () => {
@@ -225,7 +226,7 @@
       T = null;
       const s = await setupPage(root, {
         ...opt,
-        extra: `<label class="fun-field"><span>尺度</span><select id="td-level"><option>温和日常</option><option>心动暧昧</option><option>刺激大胆（不涉黄）</option></select></label>`
+        extra: `<label class="fun-field"><span>尺度</span><select id="td-level"><option>温和日常</option><option>心动暧昧</option><option>刺激大胆</option></select></label>`
       });
       if (!root) return;
       const level = root.querySelector("#td-level").value;
