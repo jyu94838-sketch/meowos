@@ -22,7 +22,7 @@
   wrap.id = "boot-cat";
   wrap.setAttribute("aria-hidden", "true");
   wrap.style.cssText =
-    "position:fixed;inset:0;z-index:10060;background:#0b0b0e;transition:opacity .6s ease;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation";
+    "position:fixed;inset:0;z-index:10060;box-shadow:0 0 0 400px #0b0b0e;background:#0b0b0e;transition:opacity .6s ease;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation";
   var cv = document.createElement("canvas");
   cv.style.cssText = "width:100%;height:100%;display:block";
   wrap.appendChild(cv);

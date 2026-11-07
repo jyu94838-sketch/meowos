@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <!-- 开屏小猫出来之前先盖一层黑底，避免闪一下浅色桌面 -->
-  <style>html.mx-boot,html.mx-boot body{background:#0b0b0e!important}html.mx-boot body::before{content:"";position:fixed;inset:0;z-index:10059;background:#0b0b0e}</style>
+  <style>html.mx-boot,html.mx-boot body{background:#0b0b0e!important}html.mx-boot body::before{content:"";position:fixed;inset:0;z-index:10059;background:#0b0b0e;box-shadow:0 0 0 400px #0b0b0e}html.mx-boot #phone{visibility:hidden}</style>
   <script>document.documentElement.classList.add("mx-boot");setTimeout(function(){document.documentElement.classList.remove("mx-boot")},30000);</script>
   <script src="oauth-bootstrap.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
@@ -223,7 +223,7 @@
       <p class="boot-splash-hint" id="boot-splash-hint">正在准备桌面与数据…</p>
     </div>
   </div>
-  <script src="boot-cat.js?v=7"></script>
+  <script src="boot-cat.js?v=8"></script>
   <script>
     /* 开屏时序（不等 app.js）；点击关闭由 db.js 内加载器接管 */
     (function () {
