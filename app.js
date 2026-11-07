@@ -6509,6 +6509,57 @@ function threadFaceLockLevel(thread) {
 function faceLockNaiStrength(level) {
   return level === "light" ? 0.68 : level === "strong" || level === "force" ? 0.36 : 0.52;
 }
+/** 这张图浏览器能不能打开（坏图 / HEIC 之类打不开的，送给生图也锁不了脸） */
+const faceRefDecodeCache = new Map();
+function imageUrlDecodes(url) {
+  const u = String(url || "").trim();
+  if (!u || !(/^data:image\//i.test(u) || /^https?:\/\//i.test(u) || /^blob:/i.test(u))) return Promise.resolve(false);
+  const key = u.length + ":" + u.slice(0, 64) + u.slice(-64);
+  if (faceRefDecodeCache.has(key)) return faceRefDecodeCache.get(key);
+  const pr = new Promise((ok) => {
+    const im = new Image();
+    const t = setTimeout(() => ok(false), 8000);
+    im.onload = () => {
+      clearTimeout(t);
+      ok(im.naturalWidth > 8 && im.naturalHeight > 8);
+    };
+    im.onerror = () => {
+      clearTimeout(t);
+      ok(false);
+    };
+    im.src = u;
+  });
+  faceRefDecodeCache.set(key, pr);
+  return pr;
+}
+let faceRefWarnAt = 0;
+/** 锁脸参考图：本密谈的 → 角色档案立绘 → 角色头像，用第一张真的能打开的 */
+async function ensureUsableFaceRef(thread, ref) {
+  const cands = [String(ref || "").trim()];
+  const cid = thread && thread.kind !== "group" ? String(thread.charId || "").trim() : "";
+  const it = cid ? getCharPersonaItemById(cid) : null;
+  if (it && typeof it.charImageRefDataUrl === "string") cands.push(it.charImageRefDataUrl.trim());
+  if (it && typeof it.avatar === "string" && /^(data:image\/|https?:)/i.test(it.avatar)) cands.push(it.avatar.trim());
+  const seen = new Set();
+  for (let i = 0; i < cands.length; i++) {
+    const c = cands[i];
+    if (!c || seen.has(c)) continue;
+    seen.add(c);
+    if (await imageUrlDecodes(c)) {
+      if (i > 0 && Date.now() - faceRefWarnAt > 60000) {
+        faceRefWarnAt = Date.now();
+        showToast(i === 1 ? "这个聊天设的参考立绘打不开，已改用角色档案里的立绘锁脸。可以去卷宗「清除」那张坏图" : "参考立绘打不开，先用角色头像锁脸");
+      }
+      return c;
+    }
+  }
+  if (Date.now() - faceRefWarnAt > 60000) {
+    faceRefWarnAt = Date.now();
+    showToast("参考立绘打不开（图片坏了或格式不支持），这张没法锁脸。去卷宗「清除」后重新选一张 JPG / PNG");
+  }
+  return "";
+}
+
 /** 按锁脸程度决定这张图要不要带参考立绘 */
 function resolveFaceLockRef(thread, planAllows, plan) {
   const lv = threadFaceLockLevel(thread);
@@ -21466,6 +21517,7 @@ async function resolveMomentsCharPostImagesInner(imagePlan, candidates, thread, 
   let refDataUrl = "";
   if (thread && typeof thread === "object") {
     refDataUrl = resolveFaceLockRef(thread, imageGenPlanAllowsThreadRef(imgPlan), imgPlan);
+    if (refDataUrl) refDataUrl = await ensureUsableFaceRef(thread, refDataUrl);
   }
   const r = await executeImageGenRequestToDataUrl(cfg, prompt, {
     ...(refDataUrl ? { refDataUrl, faceLock: threadFaceLockLevel(thread) } : {}),
@@ -54127,6 +54179,7 @@ async function runDeferredSessionImageGenForLogIndex(msgIdx, msgAtSnapshot, thre
     let refDataUrl = "";
     if (m.role !== "user" && thread && typeof thread === "object") {
       refDataUrl = resolveFaceLockRef(thread, imageGenPlanAllowsThreadRef(plan), plan);
+      if (refDataUrl) refDataUrl = await ensureUsableFaceRef(thread, refDataUrl);
     }
     const r = await executeImageGenRequestToDataUrl(cfg, prompt, {
       ...(refDataUrl ? { refDataUrl, faceLock: threadFaceLockLevel(thread) } : {}),
@@ -66458,6 +66511,24 @@ function syncChatDetailImageRefTestUi(th) {
   if (block) block.hidden = !ref;
   if (thumb instanceof HTMLImageElement) {
     if (ref) {
+      let warn = document.getElementById("chat-detail-image-ref-bad");
+      if (!warn) {
+        warn = document.createElement("p");
+        warn.id = "chat-detail-image-ref-bad";
+        warn.className = "chat-detail-lead chat-detail-lead--compact";
+        warn.style.color = "#d9534f";
+        warn.textContent = "⚠ 这张参考立绘打不开（图片坏了或是 iPhone 的 HEIC 格式），锁脸会用不上它。请点上面的「清除」，再重新选一张（截图或 JPG / PNG 都行）。";
+        thumb.insertAdjacentElement("afterend", warn);
+      }
+      warn.hidden = true;
+      thumb.onerror = () => {
+        warn.hidden = false;
+        thumb.hidden = true;
+      };
+      thumb.onload = () => {
+        warn.hidden = true;
+        thumb.hidden = false;
+      };
       thumb.src = ref;
       thumb.hidden = false;
     } else {
@@ -66564,6 +66635,10 @@ document.getElementById("chat-detail-image-ref-file")?.addEventListener("change"
   if (!f) return;
   try {
     const data = await readImageFileAsChatEmbeddedDataUrl(f);
+    if (!(await imageUrlDecodes(data))) {
+      showToast("这张图读不出来（可能是 HEIC 格式），截个图再选，或者换一张 JPG / PNG");
+      return;
+    }
     if (
       !patchActiveThread((th) => {
         th.chatImageRefDataUrl = data;
