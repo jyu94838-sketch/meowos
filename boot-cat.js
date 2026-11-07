@@ -210,7 +210,7 @@
       ctx.font = "italic 700 " + Math.round(S * 0.19) + 'px "Times New Roman","Songti SC",serif';
       ctx.fillText("Meow OS", W / 2, cy + S * 1.2);
       var lab = document.getElementById("boot-splash-load-label");
-      var status = ready ? "轻触进入" : (lab && lab.textContent.trim()) || "正在准备…";
+      var status = ready ? "轻触进入" : wantEnter ? "马上就好，加载完会自动进入…" : (lab && lab.textContent.trim()) || "正在准备…";
       ctx.font = Math.round(S * 0.05) + 'px ui-monospace, Menlo, "PingFang SC", monospace';
       ctx.globalAlpha = ta * (ready ? 0.55 + 0.35 * Math.abs(Math.sin(t * 2)) : 0.45);
       ctx.fillText("· · ·  " + status + "  · · ·", W / 2, cy + S * 1.34);

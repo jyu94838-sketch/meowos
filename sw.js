@@ -1,4 +1,4 @@
-const CACHE_NAME = "xxj-pwa-v273";
+const CACHE_NAME = "xxj-pwa-v274";
 const KEEPALIVE_PERIODIC_TAG = "xxj-keepalive";
 const SCHEDULE_IDB = "xxj_sw_schedule";
 const SCHEDULE_STORE = "due";
@@ -62,7 +62,7 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((k) => k !== CACHE_NAME)
+            .filter((k) => k !== CACHE_NAME && k !== ASSET_CACHE)
             .map((k) => caches.delete(k))
         )
       )
@@ -84,39 +84,34 @@ self.addEventListener("fetch", (event) => {
     path !== "/sw.js" &&
     !path.endsWith("/sw.js");
 
-  /* db / app 等须网络优先，避免旧缓存导致「修了仍丢数据」 */
+  /*
+   * 提速：
+   * 1) 带版本号（?v=）的 js / css、vendor 里的字体库：文件名变了才算新文件 → 直接用手机里存的（秒开）
+   * 2) db.js、首页、其他文件：先问服务器，最多等 3 秒，等不到就先用手机里存的（后台照样更新）
+   */
+  const isImmutable =
+    (url.searchParams.has("v") && /\.(js|css)$/.test(path) && !/\/db\.js$/.test(path)) ||
+    path.includes("/vendor/");
+  if (isImmutable) {
+    event.respondWith(cacheFirst(req));
+    return;
+  }
+
   if (isBootScript) {
-    event.respondWith(
-      fetch(req, { cache: "no-cache" }) /* 绕过 GitHub Pages 的 10 分钟缓存，有更新马上拿到 */
-        .then((res) => {
-          if (res && res.status === 200 && res.type === "basic") {
-            const copy = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match(req))
-    );
+    event.respondWith(netFirstWithTimeout(req, fetch(req, { cache: "no-cache" }), 3000));
     return;
   }
 
   if (isDocument) {
     event.respondWith(
-      fetch(req.url, { cache: "no-cache", credentials: "same-origin" })
-        .then((res) => {
+      netFirstWithTimeout(
+        req,
+        fetch(req.url, { cache: "no-cache", credentials: "same-origin" }).then((res) =>
           // 地址少了结尾的 / 时服务器会跳转：交给浏览器重新打开，避免 Safari 拒绝
-          if (res.redirected) return Response.redirect(res.url, 302);
-          if (res && res.status === 200 && res.type === "basic") {
-            const copy = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() =>
-          caches
-            .match(req)
-            .then((hit) => hit || caches.match("./index.html"))
-        )
+          res.redirected ? Response.redirect(res.url, 302) : res
+        ),
+        3500
+      ).then((res) => res || caches.match("./index.html"))
     );
     return;
   }
@@ -454,3 +449,37 @@ self.addEventListener("notificationclick", (event) => {
     })
   );
 });
+
+
+/* 带版本号的静态文件：长期缓存，同一路径只留最新一个版本 */
+const ASSET_CACHE = "meowos-assets-v1";
+async function cacheFirst(req) {
+  const cache = await caches.open(ASSET_CACHE);
+  const hit = await cache.match(req);
+  if (hit) return hit;
+  const res = await fetch(req);
+  if (res && res.status === 200 && res.type === "basic") {
+    const copy = res.clone();
+    const path = new URL(req.url).pathname;
+    cache.keys().then((keys) => {
+      for (const k of keys) if (new URL(k.url).pathname === path && k.url !== req.url) cache.delete(k);
+      cache.put(req, copy);
+    });
+  }
+  return res;
+}
+
+/* 先问服务器，超时就先用缓存（网络那边继续跑，拿到了就更新缓存，下次就是新的） */
+function netFirstWithTimeout(req, netPromise, ms) {
+  const net = netPromise.then((res) => {
+    if (res && res.status === 200 && res.type === "basic") {
+      const copy = res.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+    }
+    return res;
+  });
+  const timeout = new Promise((r) => setTimeout(() => r(null), ms));
+  return Promise.race([net.catch(() => null), timeout]).then(
+    (res) => res || caches.match(req).then((hit) => hit || net.catch(() => caches.match(req)))
+  );
+}

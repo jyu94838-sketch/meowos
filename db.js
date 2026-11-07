@@ -1781,7 +1781,7 @@
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
     "fun-widgets.js?v=3", "fun-icons.js?v=5", "mx-chatsearch.js?v=1", "fun-mimi.js?v=3", "mx-choose.js?v=3", "fun-yuzu.js?v=1", "fun-names.js?v=1",
-    "changelog.js?v=27",
+    "changelog.js?v=28",
     "share-config.js?v=3", "st-gate.js?v=1",
     "fun-share.js?v=7"
   ];
@@ -2223,6 +2223,20 @@
       return;
     }
     window.__xxjMainScriptsScheduled = true;
+    // 提速：所有脚本先一起开始下载（preload），下面再按顺序执行，不用一个下完再下一个
+    try {
+      const all = [PRECHAIN[0], PRECHAIN[1], PRECHAIN[3], PRECHAIN[4], FFLATE_LOCAL, MAIN_APP, INLINE_HTML_MODULE, GROUP_MODULE, RELATION_MODULE, RELATION_INTERACT_MODULE, RELATION_AI_MODULE, CHECKUP_MODULE, CHECKUP_REVERSE_MODULE, ROAM_MODULE, FORUM_MODULE, ROLEPLAY_MODULE, ...FUN_MODULES];
+      for (const src of all) {
+        if (document.querySelector('link[rel="preload"][href="' + src + '"]')) continue;
+        const l = document.createElement("link");
+        l.rel = "preload";
+        l.as = "script";
+        l.href = src;
+        document.head.appendChild(l);
+      }
+    } catch (_) {
+      /* ignore */
+    }
     void (async () => {
       try {
         await loadScript(PRECHAIN[0]);
