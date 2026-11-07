@@ -2751,3 +2751,297 @@
   color: #fff;
   font-size: 0.6rem;
 }
+
+/* ═════════ Pocket Town ═════════ */
+.pt-root,
+.pt {
+  height: 100%;
+}
+.pt {
+  display: flex;
+  flex-direction: column;
+}
+.pt-clock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 4px;
+}
+.pt-time {
+  font-family: "Times New Roman", "Songti SC", serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.pt-tabs {
+  padding-top: 2px;
+}
+.pt-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 14px 30px;
+}
+.pt-map {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 10px;
+  border-radius: 24px;
+  background: linear-gradient(160deg, #e8f5e3, #fdf6e3);
+  transition: background 0.5s;
+}
+.pt-map--1 {
+  background: linear-gradient(160deg, #fff6d6, #e6f4ff);
+}
+.pt-map--2 {
+  background: linear-gradient(160deg, #ffe9d6, #f3e6ff);
+}
+.pt-map--3 {
+  background: linear-gradient(160deg, #1f2340, #3a2f55);
+}
+.pt-place {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px 8px;
+  min-height: 92px;
+  border: 0;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #17191c;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
+}
+.pt-map--3 .pt-place {
+  background: rgba(255, 255, 255, 0.12);
+  color: #eef;
+}
+.pt-place-ico {
+  font-size: 1.6rem;
+}
+.pt-place strong {
+  font-size: 0.78rem;
+}
+.pt-place-avs {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+}
+.pt-place-avs .fun-av {
+  width: 22px;
+  height: 22px;
+  font-size: 0.6rem;
+  margin-left: -5px;
+  border: 1.5px solid #fff;
+}
+.pt-place-avs .fun-av:first-child {
+  margin-left: 0;
+}
+.pt-place-avs em {
+  font-style: normal;
+  font-size: 0.66rem;
+  margin-left: 2px;
+}
+.pt-tip {
+  text-align: center;
+  margin-top: 12px;
+}
+.pt-sep {
+  margin: 16px 0 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-sub);
+}
+.pt-life {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pt-life > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pt-life small {
+  font-size: 0.7rem;
+  color: var(--text-sub);
+}
+.pt-life small b {
+  color: var(--text-main);
+}
+.pt-life > span > span {
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+.pt-event {
+  margin: 10px 0;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(242, 183, 5, 0.16), rgba(var(--tint-rgb), 0.08));
+  border: 1px solid rgba(242, 183, 5, 0.35);
+}
+.pt-event strong {
+  font-size: 0.95rem;
+}
+.pt-event p:not(.fun-kicker) {
+  margin: 4px 0;
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+.pt-event-who {
+  display: flex;
+  gap: 4px;
+}
+.pt-mayor {
+  margin: 8px 0;
+  font-size: 0.78rem;
+  color: var(--text-sub);
+  text-align: center;
+}
+.pt-res-list {
+  display: flex;
+  flex-direction: column;
+}
+.pt-res {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pt-res > span {
+  display: flex;
+  flex-direction: column;
+}
+.pt-res strong {
+  font-size: 0.9rem;
+}
+.pt-res small {
+  font-size: 0.72rem;
+  color: var(--text-sub);
+}
+.pt-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 6px 0 12px;
+}
+.pt-person {
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.pt-person strong {
+  font-size: 0.76rem;
+}
+.pt-person small {
+  font-size: 0.64rem;
+  color: var(--text-sub);
+  text-align: center;
+  line-height: 1.2;
+}
+.pt-person.is-away {
+  opacity: 0.5;
+}
+.pt-hist .pt-life {
+  cursor: default;
+}
+.pt-prof {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+.pt-mem {
+  margin: 4px 0 10px;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text-sub);
+}
+.pt-office textarea,
+.pt-office input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-card);
+  color: var(--text-main);
+  margin-bottom: 8px;
+  outline: none;
+  resize: none;
+}
+.pt-office .fun-kicker {
+  display: block;
+  margin-top: 16px;
+}
+.pt-chat-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.pt-chat-head div {
+  display: flex;
+  flex-direction: column;
+}
+.pt-chat-head small {
+  font-size: 0.74rem;
+  color: var(--text-sub);
+}
+.pt-chat-log {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+}
+.pt-chat-log p {
+  margin: 0;
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 4px 16px 16px 16px;
+  background: rgba(var(--tint-rgb), 0.08);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  align-self: flex-start;
+}
+.pt-chat-log p.is-me {
+  align-self: flex-end;
+  border-radius: 16px 4px 16px 16px;
+  background: var(--text-main);
+  color: var(--bg-card);
+}
+.pt-chat-log p.fun-note {
+  background: none;
+  max-width: 100%;
+}

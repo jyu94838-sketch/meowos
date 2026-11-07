@@ -1773,6 +1773,7 @@
     "fun-games.js?v=2",
     "fun-ludo.js?v=2",
     "fun-bubble.js?v=2",
+    "fun-town.js?v=1",
     "share-config.js?v=2",
     "fun-share.js?v=2"
   ];
