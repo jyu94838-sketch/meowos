@@ -84,27 +84,6 @@
     c.stroke();
     c.restore();
   }
-  // 圆眼睛：平时是空的，眨眼时被噪点填上；左上角留一点噪点当高光
-  function inEye(x, y) {
-    var e = [
-      [41, 31],
-      [59, 31]
-    ];
-    for (var i = 0; i < 2; i++) {
-      var hx = x - (e[i][0] - 1.4),
-        hy = y - (e[i][1] - 1.6);
-      if (hx * hx + hy * hy <= 1.6) return false; // 高光
-      var dx = (x - e[i][0]) / 4.4,
-        dy = (y - e[i][1]) / 4.8;
-      if (dx * dx + dy * dy <= 1) return true;
-    }
-    return false;
-  }
-  // 鼻子小三角也留空
-  function inNose(x, y) {
-    return y > 37 && y < 40.5 && Math.abs(x - 50) < (40.5 - y) * 0.9;
-  }
-
   function sample() {
     var size = Math.min(W, H) * 0.62;
     S = size;
@@ -153,9 +132,9 @@
         k: kind
       });
     };
+    // 背影：不画眼睛和鼻子
     body.forEach(function (p) {
-      if (inNose(p[0], p[1])) return;
-      push(p, inEye(p[0], p[1]) ? "eye" : "body");
+      push(p, "body");
     });
     tail.forEach(function (p) {
       push(p, "tail");

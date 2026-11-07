@@ -5101,3 +5101,127 @@ body.dark .mm-dimg {
   border-color: #e60026 !important;
   color: #fff !important;
 }
+
+/* ═════════ 桌面翻页 + 第二页全部应用 ═════════ */
+.desk-pager {
+  grid-row: 3;
+  min-height: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.desk-pager::-webkit-scrollbar {
+  display: none;
+}
+.desk-pager > .desk-page {
+  flex: 0 0 100%;
+  min-width: 100%;
+  box-sizing: border-box;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.desk-pager > .layout-shell {
+  grid-row: auto;
+  height: 100%;
+}
+.desk-apps {
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 14px 18px calc(30px + env(safe-area-inset-bottom, 0px));
+}
+.desk-apps::-webkit-scrollbar {
+  display: none;
+}
+.desk-apps-k {
+  margin: 10px 4px 10px;
+  font-family: "Space Mono", ui-monospace, monospace;
+  font-size: 0.56rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-sub);
+}
+.desk-apps-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px 6px;
+  margin-bottom: 8px;
+}
+.desk-app {
+  --h: 220;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--text-main);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.desk-app-ico {
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  font-size: 1.65rem;
+  color: hsl(var(--h) 38% 32%);
+  background: linear-gradient(150deg, hsl(var(--h) 80% 95%), hsl(var(--h) 55% 85%));
+  box-shadow: 0 6px 16px hsl(var(--h) 40% 50% / 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transition: transform 0.15s ease;
+}
+body.dark .desk-app-ico {
+  color: hsl(var(--h) 70% 82%);
+  background: linear-gradient(150deg, hsl(var(--h) 25% 26%), hsl(var(--h) 22% 18%));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.desk-app:active .desk-app-ico {
+  transform: scale(0.9);
+}
+.desk-app-name {
+  font-size: 0.68rem;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 76px;
+}
+.desk-dots {
+  position: absolute;
+  left: 50%;
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+.desk-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 6px;
+  background: var(--text-sub);
+  opacity: 0.35;
+  cursor: pointer;
+  transition: width 0.2s, opacity 0.2s;
+}
+.desk-dots i.is-on {
+  width: 16px;
+  opacity: 0.8;
+  background: var(--text-main);
+}
+.desk-pager {
+  position: relative;
+  z-index: 2;
+}
+.desk-apps {
+  position: relative;
+}
