@@ -6627,3 +6627,152 @@ html .app-nora-main {
   color: var(--text-sub);
   cursor: pointer;
 }
+
+/* ═════════ 情侣扫雷 ═════════ */
+.ms {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 30px;
+}
+.ms-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ms-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.ms-side.is-me {
+  justify-content: flex-end;
+  text-align: right;
+}
+.ms-side.is-turn {
+  border-color: #ff6b8b;
+  box-shadow: 0 0 0 3px rgba(255, 107, 139, 0.15);
+}
+.ms-side span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ms-side strong {
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ms-side small,
+.ms-vs small {
+  font-size: 0.64rem;
+  color: var(--text-sub);
+}
+.ms-vs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 700;
+}
+.ms-mini,
+.ms-mainboard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.ms-board {
+  display: grid;
+  grid-template-columns: repeat(var(--n), 1fr);
+  gap: 3px;
+  width: min(100%, 300px);
+}
+.ms-mini .ms-board {
+  width: min(56%, 170px);
+  gap: 2px;
+}
+.ms-cell {
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 7px;
+  background: linear-gradient(160deg, #ffd6e2, #f4a9c0);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.08);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-main);
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.ms-mini .ms-cell {
+  border-radius: 4px;
+  font-size: 0.55rem;
+  background: linear-gradient(160deg, #d9e4ff, #a9bdf0);
+  cursor: default;
+}
+.ms-cell:disabled {
+  cursor: default;
+}
+.ms-board.is-mine:not(.is-live) .ms-cell:not(.is-open):not(.is-boom) {
+  opacity: 0.65;
+}
+.ms-cell.is-open {
+  background: var(--bg-card);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.ms-cell.is-boom {
+  background: #ff4d6d;
+}
+.ms-cell.is-mine-show {
+  background: rgba(255, 77, 109, 0.25);
+}
+.ms-cell.n1 { color: #3b82f6; }
+.ms-cell.n2 { color: #16a34a; }
+.ms-cell.n3 { color: #e11d48; }
+.ms-cell.n4 { color: #7c3aed; }
+.ms-cell.n5,
+.ms-cell.n6,
+.ms-cell.n7,
+.ms-cell.n8 { color: #b45309; }
+.ms-board.is-live .ms-cell:not(.is-open):active {
+  transform: scale(0.92);
+}
+.ms-log {
+  max-height: 150px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ms-turn {
+  margin: 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  min-height: 1em;
+}
+.ms-act:empty {
+  display: none;
+}
+.ms-cast {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ms-cast .fun-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
