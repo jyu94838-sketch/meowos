@@ -246,6 +246,7 @@
     clearInterval(poll);
     wrap.style.opacity = "0";
     wrap.style.pointerEvents = "none";
+    document.documentElement.classList.remove("mx-boot");
     setTimeout(function () {
       wrap.remove(); // hideOld 留着：原开屏自己会在淡出后移除
     }, 650);
