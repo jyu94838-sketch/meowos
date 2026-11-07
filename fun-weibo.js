@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * 微博：热搜榜（小世界里的时事 + 娱乐）/ 首页信息流 / 超话（CP 超话 + 个人超话）/ 我的
+ * 喵博（原「微博」）：热搜榜（小世界里的时事 + 娱乐）/ 首页信息流 / 超话（CP 超话 + 个人超话）/ 我的
  * 新闻是 AI 按角色们所在的世界编的，不是真实新闻。
  */
 (function () {
@@ -185,12 +185,12 @@
   }
 
   function renderHome(p) {
-    p.innerHTML = `<div class="wb-compose-btn"><button type="button" class="fun-btn ghost sm" data-a="compose">✏️ 发微博</button><button type="button" class="fun-btn solid sm" data-a="refresh" ${busy ? "disabled" : ""}>${busy ? "刷新中…" : "刷新"}</button></div>
+    p.innerHTML = `<div class="wb-compose-btn"><button type="button" class="fun-btn ghost sm" data-a="compose">✏️ 发喵博</button><button type="button" class="fun-btn solid sm" data-a="refresh" ${busy ? "disabled" : ""}>${busy ? "刷新中…" : "刷新"}</button></div>
       ${S.feed.length ? S.feed.map((x) => postHtml(x, "feed")).join("") : `<div class="sh-empty"><div class="sh-empty-ico">📰</div><p>首页还没有内容</p><small>点「刷新」看看大家在发什么</small></div>`}`;
   }
 
   function renderHot(p) {
-    p.innerHTML = `<div class="wb-hot-head"><span>🔥 微博热搜${S.hotAt ? ` · 更新于${ago(S.hotAt)}` : ""}</span><button type="button" class="fun-btn solid sm" data-a="hot" ${busy ? "disabled" : ""}>${busy ? "刷新中…" : "刷新热搜"}</button></div>
+    p.innerHTML = `<div class="wb-hot-head"><span>🔥 喵博热搜${S.hotAt ? ` · 更新于${ago(S.hotAt)}` : ""}</span><button type="button" class="fun-btn solid sm" data-a="hot" ${busy ? "disabled" : ""}>${busy ? "刷新中…" : "刷新热搜"}</button></div>
       ${
         S.hot.length
           ? `<ol class="wb-hot">${S.hot.map((h, i) => `<li data-hid="${h.id}"><span class="wb-rank r${i < 3 ? i + 1 : ""}">${i + 1}</span><span class="wb-ht">${esc(h.title)}</span><small>${fmtN(h.heat)}</small>${h.tag ? `<em class="wb-hot-tag t-${esc(h.tag)}">${esc(h.tag)}</em>` : ""}</li>`).join("")}</ol>`
@@ -348,7 +348,7 @@
       `<textarea class="wb-ta" id="wb-ctext" rows="4" maxlength="300" placeholder="${topic ? `在 ${esc(topicName(topic))} 发帖…` : "分享新鲜事…"}"></textarea>
        <div class="sv-c-img"><button type="button" class="fun-btn ghost sm" data-a="img">🖼 配图</button><img hidden alt="" /></div><input type="file" accept="image/*" hidden />
        <div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-a="send">发送</button></div>`,
-      { title: topic ? topicName(topic) : "发微博" }
+      { title: topic ? topicName(topic) : "发喵博" }
     );
     const fi = sh.body.querySelector("input[type=file]");
     fi.onchange = async () => {
@@ -419,8 +419,8 @@
     const mine = [...S.feed, ...S.topics.flatMap((t) => t.posts)].filter((x) => x.kind === "me").sort((a, b) => b.at - a.at);
     const likes = mine.reduce((s, x) => s + x.likes, 0);
     p.innerHTML = `<div class="wb-me">${avHtml(user, "fun-av sv-prof-av")}<strong>${esc(user.name)}</strong>
-        <div class="sv-prof-stats"><span><b>${mine.length}</b>微博</span><span><b>${S.topics.length}</b>超话</span><span><b>${fmtN(likes)}</b>获赞</span></div></div>
-      ${mine.map((x) => postHtml(x, "me")).join("") || `<p class="fun-note cp-center">还没发过微博</p>`}`;
+        <div class="sv-prof-stats"><span><b>${mine.length}</b>喵博</span><span><b>${S.topics.length}</b>超话</span><span><b>${fmtN(likes)}</b>获赞</span></div></div>
+      ${mine.map((x) => postHtml(x, "me")).join("") || `<p class="fun-note cp-center">还没发过喵博</p>`}`;
   }
 
   function onPostOp(e) {
@@ -438,7 +438,7 @@
       return true;
     }
     if (op === "repost") {
-      const text = `转发微博 //@${p.author}: ${p.text.slice(0, 80)}`;
+      const text = `转发喵博 //@${p.author}: ${p.text.slice(0, 80)}`;
       S.feed.unshift({ id: uid(), author: user.name, kind: "me", v: false, text, at: Date.now(), likes: 0, reposts: 0, liked: false, comments: [] });
       p.reposts++;
       save();
@@ -461,7 +461,7 @@
     if (a === "compose") return compose(null);
     if (a === "newtopic") return void createTopic();
     if (a === "world") {
-      const sh = F.openSheet(`<p class="fun-note">比如：「现代都市，江城」「仙侠世界，青云宗」「末日废土基地」。热搜和微博会按这个世界来写。</p><textarea class="wb-ta" rows="3" maxlength="200">${esc(S.world)}</textarea><div class="fun-sheet-actions"><button type="button" class="fun-btn solid">保存</button></div>`, { title: "世界设定" });
+      const sh = F.openSheet(`<p class="fun-note">比如：「现代都市，江城」「仙侠世界，青云宗」「末日废土基地」。热搜和喵博会按这个世界来写。</p><textarea class="wb-ta" rows="3" maxlength="200">${esc(S.world)}</textarea><div class="fun-sheet-actions"><button type="button" class="fun-btn solid">保存</button></div>`, { title: "世界设定" });
       sh.body.querySelector("button").onclick = () => {
         S.world = sh.body.querySelector("textarea").value.trim();
         save();
@@ -500,8 +500,8 @@
   }
 
   F.register("微博", {
-    title: "微博",
-    kicker: "WEIBO",
+    title: "喵博",
+    kicker: "MEOWBO",
     async mount(body) {
       root = document.createElement("div");
       root.className = "wb-root";

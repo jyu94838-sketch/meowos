@@ -67,7 +67,7 @@
     couple: ["情侣小屋", "ph-house-simple", 335, "Couple", fun("情侣小屋")],
     music: ["音乐", "ph-music-notes", 260, "Music", fun("音乐")],
     video: ["刷刷", "ph-film-strip", 0, "Shorts", fun("短视频")],
-    weibo: ["微博", "ph-fire", 22, "Trend", fun("微博")],
+    weibo: ["喵博", "ph-fire", 22, "Trend", fun("微博")],
     sprout: ["Sprout", "ph-plant", 120, "Notes", fun("Sprout")],
     forum: ["论坛", "ph-newspaper", 205, "Square", call("openForumScreen")],
     mart: ["Meow Mart", "ph-shopping-bag", 18, "Shop", fun("Meow Mart")],

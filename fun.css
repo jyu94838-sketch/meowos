@@ -8045,3 +8045,36 @@ img.cp-pet-img.is-sleepy { filter: brightness(0.85) saturate(0.8); }
 }
 .sv-reel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0, 0, 0, 0.28), transparent 22%, transparent 62%, rgba(0, 0, 0, 0.55)); pointer-events: none; }
 .sv-genning { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 0.8rem; white-space: nowrap; }
+
+/* ═════════ 柚子：周期设定 + 女性健康 ═════════ */
+.yz-stats button { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-radius: 14px; border: 0; background: #fff6f1; font: inherit; font-size: 0.66rem; color: #a57a68; cursor: pointer; }
+.yz-stats button em { font-style: normal; font-size: 0.6rem; color: #e8673a; opacity: 0.75; margin-top: 2px; }
+.yz-tabs { display: flex; gap: 6px; padding: 4px; border-radius: 999px; background: color-mix(in srgb, #e8673a 10%, transparent); margin-bottom: 12px; }
+.yz-tabs button { flex: 1; padding: 8px 0; border-radius: 999px; border: 0; background: none; color: var(--text-sub); font: inherit; font-size: 0.86rem; cursor: pointer; }
+.yz-tabs button.is-on { background: #ef8f62; color: #fff; font-weight: 600; }
+.yz-mode { display: flex; gap: 6px; }
+.yz-mode button { flex: 1; padding: 9px 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.yz-mode button.is-on { border-color: #ef8f62; background: color-mix(in srgb, #ef8f62 14%, var(--bg-card)); color: #d0602f; font-weight: 600; }
+.yz-step { display: grid; grid-template-columns: 70px 40px 52px 40px 1fr; align-items: center; gap: 6px; margin: 12px 0; }
+.yz-step span { font-weight: 600; font-size: 0.86rem; }
+.yz-step button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); font-size: 1.2rem; cursor: pointer; }
+.yz-step b { text-align: center; font-size: 1.5rem; color: #e8673a; }
+.yz-step small { color: var(--text-sub); font-size: 0.7rem; }
+.yz-phase ul, .yz-doc ul { margin: 6px 0 0; padding-left: 18px; font-size: 0.84rem; line-height: 1.75; }
+.yz-doc { border-color: color-mix(in srgb, #e85a5a 35%, var(--line)) !important; }
+.yz-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.yz-pick button { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.yz-pick button.is-on { border-color: #ef8f62; background: color-mix(in srgb, #ef8f62 16%, var(--bg-card)); color: #d0602f; }
+.yz-moods button { font-size: 1.3rem; padding: 4px 10px; }
+.yz-daysum { padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, #ef8f62 9%, transparent); font-size: 0.84rem; margin-bottom: 8px; }
+.yz-dlist { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.yz-dlist button { display: flex; gap: 10px; align-items: baseline; text-align: left; padding: 6px 4px; border: 0; border-bottom: 1px dashed var(--line); background: none; color: var(--text-main); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.yz-dlist small { flex-shrink: 0; color: var(--text-sub); width: 48px; }
+.yz-top { display: flex; flex-wrap: wrap; gap: 6px; }
+.yz-top span { padding: 5px 10px; border-radius: 12px; background: color-mix(in srgb, #ef8f62 10%, transparent); font-size: 0.8rem; }
+.yz-top b { margin-left: 6px; color: #d0602f; font-weight: 600; }
+.yz-know { border-bottom: 1px dashed var(--line); padding: 8px 0; }
+.yz-know summary { cursor: pointer; font-weight: 600; font-size: 0.88rem; }
+.yz-know p { margin: 6px 0 0; font-size: 0.82rem; line-height: 1.7; color: var(--text-sub); }
+.yz-d.has-log { position: relative; }
+.yz-d.has-log::after { content: ""; position: absolute; left: 50%; bottom: 4px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: #b38cf0; }
