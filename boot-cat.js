@@ -1,6 +1,6 @@
 /**
  * Meow OS 开场动画：白色噪点小猫
- * 黑底雪花 → 噪点聚成一只坐着的小猫 → 眨眼、摇尾巴 → 「Meow OS」→ 淡出到原开屏
+ * 黑底雪花 → 噪点聚成一团毛茸茸、若隐若现的小猫轮廓 → 淡出到原开屏
  * 点击任意处跳过；系统开启「减少动态效果」时不播放。
  */
 (function () {
@@ -141,6 +141,8 @@
         sx: Math.random() * W,
         sy: Math.random() * H,
         d: Math.random() * 0.55, // 每个点的出发延迟
+        cap: Math.random() < 0.2 ? 0.55 + Math.random() * 0.35 : 1, // 大部分点聚成轮廓，约两成散在外面形成毛茸茸的边
+        ph: Math.random() * Math.PI * 2,
         a: 0.55 + Math.random() * 0.45,
         r: (0.9 + Math.random() * 1.1) * DPR,
         k: kind
@@ -185,14 +187,12 @@
 
     // 2) 噪点聚成小猫
     var gather = (t - 0.7) / 1.6; // 0.7s 开始聚拢，约 2.3s 成形
-    var blink = (t > 3.0 && t < 3.16) || (t > 3.34 && t < 3.46); // 眨两下
-    var sway = Math.sin(t * 2.6) * 0.18 * ease((t - 2.2) / 0.6);
+    var sway = Math.sin(t * 2.2) * 0.12 * ease((t - 1.4) / 0.6);
     var cs = Math.cos(sway),
       sn = Math.sin(sway);
     for (var j = 0; j < pts.length; j++) {
       var p = pts[j];
-      if (p.k === "eye" && !blink && t > 2.4) continue;
-      var e = ease((gather - p.d) / (1 - 0.55));
+      var e = ease((gather - p.d) / (1 - 0.55)) * p.cap;
       var tx = p.tx,
         ty = p.ty;
       if (p.k === "tail") {
@@ -201,29 +201,16 @@
         tx = tailBase.x + dx * cs - dy * sn;
         ty = tailBase.y + dx * sn + dy * cs;
       }
-      var x = p.sx + (tx - p.sx) * e + (Math.random() - 0.5) * 1.4 * DPR;
-      var y = p.sy + (ty - p.sy) * e + (Math.random() - 0.5) * 1.4 * DPR;
+      // 没完全聚拢的点继续缓缓飘动
+      var drift = (1 - e) * 6 * DPR;
+      var x = p.sx + (tx - p.sx) * e + Math.sin(t * 1.3 + p.ph) * drift + (Math.random() - 0.5) * 1.4 * DPR;
+      var y = p.sy + (ty - p.sy) * e + Math.cos(t * 1.1 + p.ph) * drift + (Math.random() - 0.5) * 1.4 * DPR;
       var flick = 0.75 + Math.random() * 0.25;
       ctx.fillStyle = "rgba(255,255,255," + (p.a * flick).toFixed(3) + ")";
       ctx.fillRect(x, y, p.r, p.r);
     }
 
-    // 3) 标题
-    var ta = ease((t - 2.6) / 0.7);
-    if (ta > 0) {
-      ctx.save();
-      ctx.globalAlpha = ta;
-      ctx.fillStyle = "#fff";
-      ctx.textAlign = "center";
-      ctx.font = "italic 700 " + Math.round(S * 0.2) + 'px "Times New Roman","Songti SC",serif';
-      ctx.fillText("Meow OS", W / 2, cy + S * 1.22);
-      ctx.font = Math.round(S * 0.055) + "px ui-monospace, Menlo, monospace";
-      ctx.globalAlpha = ta * 0.55;
-      ctx.fillText("· · ·  tap to skip  · · ·", W / 2, cy + S * 1.34);
-      ctx.restore();
-    }
-
-    if (t > 4.3) return finish();
+    if (t > 3.5) return finish();
     requestAnimationFrame(frame);
   }
 
