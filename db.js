@@ -1781,9 +1781,9 @@
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
     "fun-widgets.js?v=3",
-    "changelog.js?v=12",
+    "changelog.js?v=13",
     "share-config.js?v=3",
-    "fun-share.js?v=3"
+    "fun-share.js?v=4"
   ];
   const PRECHAIN = [
     "media-blob.js?v=" + ASSET_V,

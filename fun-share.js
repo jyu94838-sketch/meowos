@@ -756,6 +756,7 @@
 
   function openDetail(r, grid) {
     const mine = !!myTokens()[r.id];
+    const unlocked = () => mine || liked.has(r.id); // 自己上传的不用点赞
     const sh = F.openSheet(
       `<div class="sh-detail">
         <img src="${esc(publicUrl(r.file_path))}" alt="" />
@@ -763,9 +764,10 @@
         ${r.description ? `<p class="sh-desc">${esc(r.description)}</p>` : ""}
         <div class="fun-sheet-actions">
           <button type="button" class="fun-btn ghost" data-a="like">${liked.has(r.id) ? "♥ 已赞" : "♡ 点赞"} ${r.likes || 0}</button>
-          <button type="button" class="fun-btn ghost" data-a="dl">下载 PNG</button>
-          <button type="button" class="fun-btn solid" data-a="import">导入</button>
+          <button type="button" class="fun-btn ghost${unlocked() ? "" : " is-locked"}" data-a="dl">${unlocked() ? "" : "🔒 "}下载 PNG</button>
+          <button type="button" class="fun-btn solid${unlocked() ? "" : " is-locked"}" data-a="import">${unlocked() ? "" : "🔒 "}导入</button>
         </div>
+        ${unlocked() ? "" : `<p class="fun-note sh-like-tip">先点个赞支持一下作者，才能下载和导入哦</p>`}
         <div class="sh-detail-foot">${mine ? `<button type="button" class="sh-link" data-a="del">删除我的上传</button>` : `<button type="button" class="sh-link" data-a="report">举报</button>`}</div>
       </div>`,
       { title: r.title }
@@ -788,6 +790,21 @@
           localStorage.setItem("mx_share_liked", JSON.stringify([...liked]));
           r.likes = (r.likes || 0) + 1;
           e.target.closest("button").textContent = `♥ 已赞 ${r.likes}`;
+          sh.body.querySelectorAll(".is-locked").forEach((x) => {
+            x.classList.remove("is-locked");
+            x.textContent = x.textContent.replace("🔒 ", "");
+          });
+          sh.body.querySelector(".sh-like-tip")?.remove();
+          toast("点赞成功，现在可以导入啦");
+          const card = grid?.querySelector?.(`[data-id="${CSS.escape(r.id)}"]`);
+          if (card) card.classList.add("is-liked");
+        }
+        if ((a === "dl" || a === "import") && !unlocked()) {
+          toast("要先点赞才能" + (a === "dl" ? "下载" : "导入") + "哦 ♡");
+          const lb = sh.body.querySelector('[data-a="like"]');
+          lb?.classList.add("sh-pulse");
+          setTimeout(() => lb?.classList.remove("sh-pulse"), 900);
+          return;
         }
         if (a === "dl") downloadBlob(await fetchBlob(), safeName(r.title) + ".png");
         if (a === "import") {
@@ -1039,5 +1056,53 @@
     }
   });
 
-  window.XXJ_MXCARD = { embedPayload, extractPayload, drawCard, applyImport, makeCard };
+  /* ───── 世界书 / 角色 / 装扮页里的「导入 Meow OS 卡」按钮 ───── */
+  const KIND_WANT_NAME = { char: "角色卡", worldbook: "世界书", look: "美化" };
+  let pngPicker = null;
+  async function importPngFor(want) {
+    if (!pngPicker) {
+      pngPicker = document.createElement("input");
+      pngPicker.type = "file";
+      pngPicker.accept = "image/png";
+      pngPicker.hidden = true;
+      document.body.appendChild(pngPicker);
+    }
+    const file = await new Promise((res) => {
+      pngPicker.value = "";
+      pngPicker.onchange = () => res(pngPicker.files[0] || null);
+      pngPicker.click();
+    });
+    if (!file) return;
+    try {
+      const payload = await extractPayload(file);
+      if (!payload) {
+        toast("这张图里没有 Meow OS 资源数据（可能不是资源卡，或被聊天软件压缩过，请要原图）");
+        return;
+      }
+      const m = KIND_META[payload.kind] || {};
+      if (payload.kind !== want) {
+        if (!(await confirmSheet(`这是一张「${m.name || "资源"}」卡，不是${KIND_WANT_NAME[want]}。还要导入吗？`))) return;
+      }
+      if (payload.kind === "look" && !(await confirmSheet(`导入「${payload.title || "美化"}」会覆盖你现在的装扮（壁纸、图标、字体、聊天样式等），继续吗？`))) return;
+      toast(await applyImport(payload));
+      try {
+        if (payload.kind === "worldbook" || payload.kind === "char") {
+          if (typeof renderWorldBookList === "function") renderWorldBookList();
+          if (typeof renderCharRoster === "function") renderCharRoster();
+        }
+      } catch (_) {
+        /* ignore */
+      }
+    } catch (err) {
+      toast("导入失败：" + err.message);
+    }
+  }
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest?.("[data-mxpng]");
+    if (!b) return;
+    e.preventDefault();
+    void importPngFor(b.dataset.mxpng);
+  });
+
+  window.XXJ_MXCARD = { embedPayload, extractPayload, drawCard, applyImport, makeCard, importPngFor };
 })();

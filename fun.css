@@ -6301,3 +6301,22 @@ body.dark .wg-t-couple {
 body.dark .desk-done {
   color: #111;
 }
+
+/* 资源站：点赞后解锁导入 */
+.sh-detail .fun-btn.is-locked {
+  opacity: 0.5;
+}
+.sh-like-tip {
+  text-align: center;
+  margin-top: 8px;
+}
+@keyframes sh-pulse {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.12); }
+  60% { transform: scale(0.96); }
+}
+.sh-pulse {
+  animation: sh-pulse 0.8s ease;
+  border-color: #ff4d6d !important;
+  color: #ff4d6d !important;
+}
