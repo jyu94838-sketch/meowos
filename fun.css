@@ -7783,3 +7783,137 @@ html body #chat-screen#chat-screen.mx-hide-av .chat-msg-avatar-col {
   color: #e72d2c;
   vertical-align: 2px;
 }
+
+/* 聊天字体大小 */
+.mx-fs-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.mx-fs-row input[type="range"] { flex: 1; accent-color: var(--text-main); }
+.mx-fs-a { font-weight: 600; color: var(--text-sub); }
+.mx-fs-a.sm { font-size: 0.72rem; }
+.mx-fs-a.lg { font-size: 1.1rem; }
+.mx-fs-reset { border: 1px solid var(--line); background: none; color: var(--text-sub); border-radius: 99px; padding: 3px 10px; font: inherit; font-size: 0.72rem; cursor: pointer; }
+#mx-chat-fs-val { font-weight: 500; color: var(--text-sub); margin-left: 4px; }
+
+/* 更新公告：卡片不超过屏幕，里面可以滚动看完整 */
+.mx-cl-card {
+  max-height: calc(100% - 96px);
+  max-height: calc(100dvh - 120px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+}
+.mx-cl { grid-template-rows: minmax(0, auto); align-content: center; }
+.mx-cl-list { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+/* 高的弹层（超话、搜歌…）再高一点，内容看得更全 */
+.fun-sheet--tall .fun-sheet-card { height: 88%; max-height: 92%; }
+.fun-sheet-body > * { flex-shrink: 0; }
+
+/* 音乐 / 情侣小屋小组件：自定义背景图 */
+.wg.wg-has-bg {
+  background: linear-gradient(rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.42)), var(--wg-bg) center / cover no-repeat !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+.wg.wg-has-bg .wg-couple small,
+.wg.wg-has-bg .wg-couple b,
+.wg.wg-has-bg .wg-couple span,
+.wg.wg-has-bg .wg-music-meta small,
+.wg.wg-has-bg .wg-music-meta span {
+  color: #fff !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+.wge-bg { aspect-ratio: 2 / 1; }
+.wge-bg img { width: 100%; height: 100%; object-fit: cover; }
+
+/* 角色档案底部：导入 / 导出 Meow 卡和上面两个按钮一样大 */
+.char-roster-footer .mx-png-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+.char-roster-footer .mx-png-row .mx-png-import {
+  flex: 1;
+  width: auto;
+  margin: 0 !important;
+}
+.char-roster-footer .mx-png-row .mx-png-import i {
+  font-size: 1rem;
+  opacity: 0.85;
+}
+
+/* ═════════ 网易云账号 / 扫码登录 / 歌单 ═════════ */
+.ne-bar { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 8px 10px; border-radius: 12px; background: rgba(231, 45, 44, 0.07); font-size: 0.8rem; }
+.ne-bar > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ne-bar button { border: 1px solid rgba(231, 45, 44, 0.45); background: none; color: #e72d2c; border-radius: 99px; padding: 4px 10px; font: inherit; font-size: 0.74rem; cursor: pointer; }
+.ne-bar[hidden] { display: none; }
+.ne-qr { width: 200px; height: 200px; margin: 6px auto 0; display: grid; place-items: center; background: #fff; border-radius: 14px; padding: 8px; box-sizing: border-box; border: 1px solid var(--line); }
+.ne-qr svg { width: 100%; height: 100%; display: block; }
+.ne-qr-status { text-align: center; font-size: 0.82rem; margin: 8px 0 4px; color: var(--text-main); }
+.ne-steps { margin: 6px 0 10px; padding-left: 20px; font-size: 0.78rem; line-height: 1.7; color: var(--text-sub); }
+.ne-manual { margin: 4px 0 8px; font-size: 0.8rem; }
+.ne-manual summary { cursor: pointer; color: var(--text-sub); }
+.ne-manual textarea { width: 100%; box-sizing: border-box; margin: 8px 0; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-main, transparent); color: var(--text-main); padding: 8px; font: inherit; font-size: 0.78rem; }
+.ne-acct { display: flex; align-items: center; gap: 12px; margin: 6px 0 10px; }
+.ne-acct img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; }
+.ne-acct strong { display: block; font-size: 1rem; }
+.ne-acct small { color: var(--text-sub); font-size: 0.78rem; }
+.ne-pls { display: flex; flex-direction: column; gap: 6px; }
+.ne-pl { display: flex; align-items: center; gap: 10px; padding: 6px; border: 0; border-radius: 12px; background: none; color: var(--text-main); text-align: left; font: inherit; cursor: pointer; }
+.ne-pl:active { background: rgba(0, 0, 0, 0.05); }
+.ne-pl img { width: 46px; height: 46px; border-radius: 8px; object-fit: cover; background: var(--line); flex-shrink: 0; }
+.ne-pl strong { display: block; font-size: 0.88rem; }
+.ne-pl small { color: var(--text-sub); font-size: 0.72rem; }
+
+/* ═════════ 联机 ═════════ */
+.net { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+.net-lobby { padding: 8px 4px; display: flex; flex-direction: column; gap: 12px; }
+.net-hero { text-align: center; padding: 14px 8px 4px; }
+.net-hero > span { font-size: 2.6rem; }
+.net-hero h3 { margin: 6px 0; font-size: 1.15rem; }
+.net-hero p { margin: 0; color: var(--text-sub); font-size: 0.84rem; line-height: 1.6; }
+.net-join { display: flex; gap: 8px; }
+.net-join input { flex: 1; min-width: 0; padding: 10px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 1rem; letter-spacing: 0.25em; text-transform: uppercase; text-align: center; }
+.net-room { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.net-head { flex-shrink: 0; }
+.net-top { display: flex; align-items: center; gap: 8px; }
+.net-top > div { flex: 1; min-width: 0; }
+.net-top strong { display: block; font-size: 1.02rem; }
+.net-st { font-size: 0.72rem; color: var(--text-sub); }
+.net-st.online::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #3ac569; margin-right: 5px; vertical-align: 1px; }
+.net-st.reconnecting::before, .net-st.connecting::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f0b429; margin-right: 5px; vertical-align: 1px; }
+.net-mems { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0 6px; scrollbar-width: none; }
+.net-mem { display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0; max-width: 64px; cursor: pointer; }
+.net-mem b { font-size: 0.68rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 64px; }
+.net-mem i { font-style: normal; font-size: 0.6rem; color: var(--text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 64px; }
+.net-charbar { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 14px; background: color-mix(in srgb, var(--text-main) 5%, transparent); font-size: 0.78rem; }
+.net-charbar > span { flex: 1; min-width: 0; }
+.net-charbar button { border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); border-radius: 99px; padding: 4px 10px; font: inherit; font-size: 0.74rem; cursor: pointer; white-space: nowrap; }
+.net-auto { display: flex; align-items: center; gap: 3px; font-size: 0.7rem; color: var(--text-sub); white-space: nowrap; }
+.net-game { flex-shrink: 0; margin-top: 8px; padding: 10px 12px; border-radius: 16px; background: linear-gradient(135deg, #fff4e0, #ffe6ee); color: #3a2a20; display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; }
+.net-game[hidden] { display: none; }
+body.dark .net-game { background: linear-gradient(135deg, #3a2f22, #3a2430); color: #f3e6da; }
+.net-gh { display: flex; width: 100%; align-items: center; justify-content: space-between; }
+.net-gh button { border: 0; background: rgba(0, 0, 0, 0.08); color: inherit; border-radius: 99px; padding: 3px 10px; font: inherit; font-size: 0.72rem; cursor: pointer; }
+.net-dice { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.net-dice span { display: flex; flex-direction: column; align-items: center; padding: 4px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.6); font-size: 0.7rem; min-width: 52px; }
+body.dark .net-dice span { background: rgba(0, 0, 0, 0.2); }
+.net-dice b { font-size: 1.4rem; line-height: 1.2; }
+.net-bomb { font-size: 1.1rem; }
+.net-bomb b { font-size: 1.8rem; }
+.net-guess { display: flex; gap: 6px; }
+.net-guess input { width: 90px; padding: 6px 10px; border-radius: 99px; border: 1px solid rgba(0, 0, 0, 0.15); font: inherit; text-align: center; }
+.net-td p { margin: 6px 0 0; font-size: 0.9rem; font-weight: 600; }
+.net-list { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 0; display: flex; flex-direction: column; gap: 10px; }
+.net-sys { align-self: center; max-width: 90%; margin: 0; padding: 5px 12px; border-radius: 12px; background: color-mix(in srgb, var(--text-main) 6%, transparent); color: var(--text-sub); font-size: 0.74rem; line-height: 1.5; text-align: center; }
+.net-msg { display: flex; gap: 8px; align-items: flex-start; max-width: 86%; }
+.net-msg.me { align-self: flex-end; flex-direction: row-reverse; }
+.net-msg small { display: block; font-size: 0.68rem; color: var(--text-sub); margin: 0 2px 3px; }
+.net-msg.me small { text-align: right; }
+.net-msg small em { font-style: normal; margin-left: 4px; padding: 0 5px; border-radius: 5px; background: color-mix(in srgb, #b07cff 18%, transparent); color: #8a5ad8; }
+.net-msg p { margin: 0; padding: 8px 12px; border-radius: 4px 16px 16px 16px; background: var(--bg-card); border: 1px solid var(--line); font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.net-msg.me p { border-radius: 16px 4px 16px 16px; background: var(--text-main); color: var(--bg-card); border-color: transparent; }
+.net-msg.char p { background: color-mix(in srgb, #b07cff 10%, var(--bg-card)); }
+.net-bar { flex-shrink: 0; display: flex; gap: 8px; align-items: center; padding: 8px 0 calc(4px + env(safe-area-inset-bottom, 0px)); }
+.net-bar input { flex: 1; min-width: 0; padding: 10px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 0.92rem; }
+.net-ico { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--bg-card); font-size: 1.15rem; cursor: pointer; flex-shrink: 0; }
+.net-games { display: flex; flex-direction: column; gap: 8px; }
+.net-games button { display: grid; grid-template-columns: 44px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; text-align: left; padding: 12px; border-radius: 16px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); font: inherit; cursor: pointer; }
+.net-games button span { grid-row: span 2; font-size: 1.8rem; text-align: center; }
+.net-games button small { color: var(--text-sub); font-size: 0.74rem; }
+.net { padding: 0 14px; box-sizing: border-box; }

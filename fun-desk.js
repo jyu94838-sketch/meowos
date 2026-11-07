@@ -78,6 +78,7 @@
     yuzu: ["柚子", "ph-drop", 15, "Cycle", fun("柚子")],
     names: ["名字生成器", "ph-feather", 40, "Names", fun("名字生成器")],
     mimi: ["弥弥", "ph-cat", 0, "Butler", fun("弥弥")],
+    net: ["联机", "ph-globe-hemisphere-east", 200, "Online", fun("联机")],
     news: ["更新公告", "ph-megaphone", 40, "News", call("openChangelog")]
   };
   const DEFAULT = [Object.keys(APPS)];

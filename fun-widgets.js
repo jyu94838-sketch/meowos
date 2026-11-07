@@ -139,7 +139,8 @@
   }
 
   async function widgetHtml(w, editing) {
-    return `<div class="wg wg-${w.size} wg-t-${w.type}" data-wid="${w.id}">${await widgetInner(w)}${editing ? `<button type="button" class="wg-del" data-del="${w.id}">✕</button>` : ""}</div>`;
+    const bg = (w.type === "music" || w.type === "couple") && w.data && w.data.bg ? String(w.data.bg) : "";
+    return `<div class="wg wg-${w.size} wg-t-${w.type}${bg ? " wg-has-bg" : ""}" data-wid="${w.id}"${bg ? ` style="--wg-bg:url('${esc(bg)}')"` : ""}>${await widgetInner(w)}${editing ? `<button type="button" class="wg-del" data-del="${w.id}">✕</button>` : ""}</div>`;
   }
 
   /* ───── 桌面：位置交给 fun-desk.js，这里只负责画内容 ───── */
@@ -235,7 +236,7 @@
           <div class="wgm-prev">${await widgetHtml(w, false)}</div>
           <div class="wgm-info"><strong>${TYPES[w.type].icon} ${TYPES[w.type].name}</strong>
             <div class="wgm-sizes">${TYPES[w.type].sizes.map((s) => `<button type="button" class="${w.size === s ? "is-on" : ""}" data-size="${w.id}:${s}">${SIZE_NAME[s]}</button>`).join("")}</div>
-            <div class="wgm-ops"><button type="button" data-up="${i}" ${i ? "" : "disabled"}>↑</button><button type="button" data-down="${i}" ${i < widgets.length - 1 ? "" : "disabled"}>↓</button>${["photo", "note", "countdown", "char", "couple"].includes(w.type) ? `<button type="button" data-cfg="${w.id}">设置</button>` : ""}<button type="button" class="is-del" data-rm="${w.id}">删除</button></div>
+            <div class="wgm-ops"><button type="button" data-up="${i}" ${i ? "" : "disabled"}>↑</button><button type="button" data-down="${i}" ${i < widgets.length - 1 ? "" : "disabled"}>↓</button>${["photo", "note", "countdown", "char", "couple", "music"].includes(w.type) ? `<button type="button" data-cfg="${w.id}">设置</button>` : ""}<button type="button" class="is-del" data-rm="${w.id}">删除</button></div>
           </div></div>`
       )
     );
@@ -300,8 +301,20 @@
     if (w.type === "char" || w.type === "couple")
       body = `<p class="fun-kicker">选择角色</p><div class="mm-to">${cast.map((c) => `<button type="button" class="pt-person${d.charId === c.id ? " is-on" : ""}" data-char="${esc(c.id)}">${avHtml(c, "fun-av")}<strong>${esc(c.name)}</strong></button>`).join("") || `<p class="fun-note">角色库里还没有角色</p>`}</div>
         ${w.type === "char" ? `<label class="fun-field"><span>想显示的一句话（选填，不填就用人设第一句）</span><input id="wge-line" maxlength="40" value="${esc(d.line || "")}" /></label>` : `<p class="fun-note">不选就显示情侣小屋里当前的恋人。</p>`}`;
+    if (w.type === "music" || w.type === "couple")
+      body += `<p class="fun-kicker">背景图（选填）</p><div class="wge-photo wge-bg">${d.bg ? `<img src="${esc(d.bg)}" alt="" />` : `<span>默认背景</span>`}</div>
+        <div class="ww-row"><button type="button" class="fun-btn ghost sm" data-pickbg>选择背景图</button><button type="button" class="fun-btn ghost sm" data-clearbg>恢复默认</button></div><input type="file" accept="image/*" hidden data-bgfile />
+        <p class="fun-note">图片会自动加一层暗色，保证上面的字看得清。</p>`;
     const sh = F.openSheet(`${body}<div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-ok>${isNew ? "添加到桌面" : "保存"}</button></div>`, { title: `${t.icon} ${t.name}` });
-    const fi = sh.body.querySelector("input[type=file]");
+    const fi = sh.body.querySelector("input[type=file]:not([data-bgfile])");
+    const bgfi = sh.body.querySelector("input[data-bgfile]");
+    if (bgfi)
+      bgfi.onchange = async () => {
+        const f = bgfi.files?.[0];
+        if (!f) return;
+        d.bg = await compress(f, 1000);
+        sh.body.querySelector(".wge-bg").innerHTML = `<img src="${esc(d.bg)}" alt="" />`;
+      };
     if (fi)
       fi.onchange = async () => {
         const f = fi.files?.[0];
@@ -311,6 +324,11 @@
       };
     sh.body.addEventListener("click", (e) => {
       if (e.target.closest("[data-pick]")) fi?.click();
+      if (e.target.closest("[data-pickbg]")) bgfi?.click();
+      if (e.target.closest("[data-clearbg]")) {
+        delete d.bg;
+        sh.body.querySelector(".wge-bg").innerHTML = `<span>默认背景</span>`;
+      }
       const col = e.target.closest("[data-color]");
       if (col) {
         d.color = col.dataset.color;

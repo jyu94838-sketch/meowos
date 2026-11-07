@@ -38,20 +38,20 @@ body.dark #chat-screen .chat-messages { background: #111 !important; }
 #chat-screen .chat-msg--user .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing) {
   background: #95ec69 !important;
 }
-#chat-screen .chat-msg-bubble-stack > .chat-msg-bubble:first-child:not(.chat-msg-bubble--sticker)::before {
+#chat-screen .chat-msg-bubble-stack > .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing)::before {
   content: ""; position: absolute; top: 13px; width: 0; height: 0;
   border: 6px solid transparent;
 }
-#chat-screen .chat-msg--assistant .chat-msg-bubble-stack > .chat-msg-bubble:first-child:not(.chat-msg-bubble--sticker)::before {
+#chat-screen .chat-msg--assistant .chat-msg-bubble-stack > .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing)::before {
   left: -11px; border-right-color: #fff;
 }
-#chat-screen .chat-msg--user .chat-msg-bubble-stack > .chat-msg-bubble:first-child:not(.chat-msg-bubble--sticker)::before {
+#chat-screen .chat-msg--user .chat-msg-bubble-stack > .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing)::before {
   right: -11px; border-left-color: #95ec69;
 }
 body.dark #chat-screen .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing) { background: #2c2c2c !important; color: #e6e6e6 !important; }
 body.dark #chat-screen .chat-msg--user .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing) { background: #3eb575 !important; color: #111 !important; }
-body.dark #chat-screen .chat-msg--assistant .chat-msg-bubble-stack > .chat-msg-bubble:first-child::before { border-right-color: #2c2c2c; }
-body.dark #chat-screen .chat-msg--user .chat-msg-bubble-stack > .chat-msg-bubble:first-child::before { border-left-color: #3eb575; }
+body.dark #chat-screen .chat-msg--assistant .chat-msg-bubble-stack > .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing)::before { border-right-color: #2c2c2c; }
+body.dark #chat-screen .chat-msg--user .chat-msg-bubble-stack > .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing)::before { border-left-color: #3eb575; }
 
 /* 头像：方形小圆角（聊天设置里开了「隐藏头像」就不显示） */
 #chat-screen .chat-msg-avatar { display: grid !important; width: 40px !important; height: 40px !important; border-radius: 5px !important; border: none !important; box-shadow: none !important; background: #c9d6e8; color: #fff; }
@@ -265,6 +265,25 @@ body.dark #chat-screen .chat-composer .chat-input-ruled { background: #2c2c2c !i
 body.dark #chat-screen .mx-chat-title,
 body.dark #chat-screen .chat-composer .chat-input { color: #e6e6e6 !important; }
 `;
+  // 每条气泡都带头像 + 引用块在浅色 / 深色下都看得清
+  const perBubble = (o) => `
+#chat-screen .chat-msg-bubble-stack { position: relative; }
+#chat-screen .mx-av-rep { position: absolute !important; top: 0; margin: 0 !important; pointer-events: auto; }
+#chat-screen .chat-msg--assistant .mx-av-rep { left: calc(-10px - var(--mx-av, 40px)); }
+#chat-screen .chat-msg--user .mx-av-rep { right: calc(-10px - var(--mx-av, 40px)); }
+#chat-screen.mx-hide-av .mx-av-rep { display: none !important; }
+#chat-screen .chat-msg--user .chat-msg-bubble--composer-quote .chat-msg-bubble-quote { color: ${o.uq} !important; border-bottom-color: ${o.uqLine} !important; opacity: 1 !important; }
+#chat-screen .chat-msg--assistant .chat-msg-bubble--composer-quote .chat-msg-bubble-quote { color: #7d7d7d !important; border-bottom-color: rgba(0,0,0,.1) !important; opacity: 1 !important; }
+#chat-screen .chat-msg--user .chat-msg-bubble--composer-quote .chat-msg-bubble-body { color: ${o.ut} !important; }
+#chat-screen .chat-msg--assistant .chat-msg-bubble--composer-quote .chat-msg-bubble-body { color: #191919 !important; }
+body.dark #chat-screen .chat-msg--user .chat-msg-bubble--composer-quote .chat-msg-bubble-quote { color: ${o.duq} !important; border-bottom-color: ${o.duqLine} !important; }
+body.dark #chat-screen .chat-msg--user .chat-msg-bubble--composer-quote .chat-msg-bubble-body { color: ${o.dut} !important; }
+body.dark #chat-screen .chat-msg--assistant .chat-msg-bubble--composer-quote .chat-msg-bubble-quote { color: #a8a8a8 !important; border-bottom-color: rgba(255,255,255,.12) !important; }
+body.dark #chat-screen .chat-msg--assistant .chat-msg-bubble--composer-quote .chat-msg-bubble-body { color: #e6e6e6 !important; }
+#chat-screen .chat-msg-bubble-quote-who { color: inherit !important; font-weight: 600; }
+`;
+  CSS.wechat += perBubble({ uq: "rgba(0,0,0,.55)", uqLine: "rgba(0,0,0,.14)", ut: "#111", duq: "rgba(0,0,0,.62)", duqLine: "rgba(0,0,0,.18)", dut: "#111" });
+  CSS.qq += perBubble({ uq: "rgba(255,255,255,.82)", uqLine: "rgba(255,255,255,.3)", ut: "#fff", duq: "rgba(255,255,255,.82)", duqLine: "rgba(255,255,255,.3)", dut: "#fff" });
   CSS.wechat += frame({ bg: "#ededed", top: "#ededed", bar: "#f7f7f7", line: "#e0e0e0", input: "#fff", inputRadius: "6px", text: "#191919", ph: "#b2b2b2", icon: "#181818", send: "#07c160", sendRadius: "6px", dbg: "#111", dbar: "#1e1e1e" });
   CSS.qq += frame({ bg: "#f1f4f9", top: "#ffffffee", bar: "#f5f7fa", line: "#e3e8f0", input: "#fff", inputRadius: "18px", text: "#1f1f1f", ph: "#a9b2bf", icon: "#4a5568", send: "linear-gradient(135deg, #3fb2ff, #1888ff)", sendRadius: "17px", dbg: "#17181c", dbar: "#1c1d21" });
 
@@ -315,6 +334,7 @@ body.dark #chat-screen .chat-composer .chat-input { color: #e6e6e6 !important; }
     keepLast();
     document.documentElement.dataset.mxChatSkin = chat;
     if (chat !== "default") decorateList();
+    if (typeof decorateBubbles === "function") setTimeout(decorateBubbles, 0);
   }
 
   /* 微信 / QQ 风格：聊天列表加头像 */
@@ -346,6 +366,93 @@ body.dark #chat-screen .chat-composer .chat-input { color: #e6e6e6 !important; }
       btn.insertBefore(av, btn.firstChild);
     });
   }
+  /* 每条气泡旁边都放一个头像（复制第一条的头像，点它一样能看心声） */
+  const repRO = window.ResizeObserver ? new ResizeObserver((ents) => ents.forEach((en) => placeReps(en.target))) : null;
+  function placeReps(stack) {
+    stack.querySelectorAll(":scope > .mx-av-rep").forEach((rep) => {
+      const b = rep.__for;
+      if (!b || !b.isConnected) return rep.remove();
+      rep.style.top = b.offsetTop + "px";
+    });
+  }
+  function decorateBubbles() {
+    const scr = document.getElementById("chat-screen");
+    if (!scr) return;
+    const on = get(KEY_CHAT, "default") !== "default";
+    if (!on) {
+      scr.querySelectorAll(".mx-av-rep").forEach((n) => n.remove());
+      return;
+    }
+    scr.querySelectorAll(".chat-msg--assistant > .chat-msg-inner, .chat-msg--user > .chat-msg-inner").forEach((inner) => {
+      const av = inner.querySelector(":scope > .chat-msg-avatar");
+      const stack = inner.querySelector(":scope > .chat-msg-bubble-stack");
+      if (!av || !stack) return;
+      const items = [...stack.children].filter(
+        (c) => (c.classList.contains("chat-msg-bubble") || c.classList.contains("chat-msg-card")) && !c.classList.contains("chat-msg-bubble--typing")
+      );
+      const have = new Set([...stack.querySelectorAll(":scope > .mx-av-rep")].map((r) => r.__for));
+      items.slice(1).forEach((b) => {
+        if (have.has(b)) return;
+        const rep = av.cloneNode(true);
+        rep.removeAttribute("id");
+        rep.classList.add("mx-av-rep");
+        rep.setAttribute("aria-hidden", "true");
+        rep.__for = b;
+        stack.appendChild(rep);
+      });
+      placeReps(stack);
+      if (repRO && !stack.__mxRO) {
+        stack.__mxRO = 1;
+        repRO.observe(stack);
+      }
+    });
+  }
+  let decoT = 0;
+  const chatScr = document.getElementById("chat-screen");
+  if (chatScr && window.MutationObserver) {
+    new MutationObserver((muts) => {
+      if (muts.every((m) => [...m.addedNodes].every((n) => n.nodeType === 1 && n.classList?.contains("mx-av-rep")))) return;
+      clearTimeout(decoT);
+      decoT = setTimeout(decorateBubbles, 60);
+    }).observe(chatScr, { childList: true, subtree: true });
+  }
+
+  /* 聊天字体大小（所有聊天通用） */
+  const FS_KEY = "meowos_chat_fs";
+  function applyFs() {
+    const v = Math.min(150, Math.max(80, Number(localStorage.getItem(FS_KEY)) || 100));
+    let st = document.getElementById("mx-chat-fs-style");
+    if (v === 100) {
+      st?.remove();
+    } else {
+      if (!st) {
+        st = document.createElement("style");
+        st.id = "mx-chat-fs-style";
+        document.head.appendChild(st);
+      }
+      const k = v / 100;
+      st.textContent = (`html body #chat-screen .chat-msg-bubble,html body #chat-screen .chat-msg-bubble-body,html body #chat-screen .chat-msg-bubble-text,html body #chat-screen .chat-msg-bubble p{font-size:calc(${(0.95 * k).toFixed(3)}rem) !important;line-height:1.5 !important}
+html body #chat-screen .chat-msg-bubble-quote{font-size:calc(${(0.76 * k).toFixed(3)}rem) !important}
+html body #chat-screen{--mx-av:${Math.round(40 * Math.min(k, 1.25))}px}
+html body #chat-screen .chat-msg-avatar{width:${Math.round(40 * Math.min(k, 1.25))}px !important;height:${Math.round(40 * Math.min(k, 1.25))}px !important}
+html body #chat-screen .chat-input{font-size:calc(${(1 * Math.min(k, 1.3)).toFixed(3)}rem) !important}`).replace(/#chat-screen/g, "#chat-screen#chat-screen#chat-screen");
+      if (st.parentNode !== document.body) document.body.appendChild(st);
+    }
+    const r = document.getElementById("mx-chat-fs");
+    const lab = document.getElementById("mx-chat-fs-val");
+    if (r) r.value = String(v);
+    if (lab) lab.textContent = v + "%";
+  }
+  document.getElementById("mx-chat-fs")?.addEventListener("input", (e) => {
+    localStorage.setItem(FS_KEY, e.target.value);
+    applyFs();
+  });
+  document.getElementById("mx-chat-fs-reset")?.addEventListener("click", () => {
+    localStorage.removeItem(FS_KEY);
+    applyFs();
+  });
+  applyFs();
+
   /* 微信 / QQ 风格：顶栏中间显示角色名字，点名字看心声 */
   function syncTitle() {
     const eb = document.getElementById("chat-meta-eyebrow");
@@ -455,5 +562,5 @@ body.dark #chat-screen .chat-composer .chat-input { color: #e6e6e6 !important; }
       if (inject() || ++n > 120) clearInterval(t);
     }, 500);
   }
-  window.XXJ_SKINS = { apply, css: CSS };
+  window.XXJ_SKINS = { apply: () => (apply(), applyFs()), css: CSS };
 })();

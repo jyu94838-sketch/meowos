@@ -127,7 +127,7 @@
   <!-- 图标字体放在自己的仓库里：国内（尤其安卓）连不上 jsdelivr 时图标会全白 -->
   <link rel="stylesheet" href="vendor/phosphor/regular/style.css?v=1">
   <link rel="stylesheet" href="vendor/phosphor/fill/style.css?v=1">
-  <link rel="stylesheet" href="fun.css?v=31">
+  <link rel="stylesheet" href="fun.css?v=32">
 </head>
 <body>
   <div class="boot-splash" id="boot-splash" aria-live="polite" aria-busy="true" aria-label="Meow OS · 开屏画面，请稍后点击进入">
@@ -3117,14 +3117,16 @@
                   <i class="ph ph-file-arrow-up" aria-hidden="true"></i>
                   导入 SillyTavern 卡
                 </button>
-                <button type="button" class="chip ghost chip-xs mx-png-import" data-mxpng="char">
-                  <i class="ph ph-cat" aria-hidden="true"></i>
-                  导入 PNG
-                </button>
-                <button type="button" class="chip ghost chip-xs mx-png-import" data-mxpng-export="char">
-                  <i class="ph ph-export" aria-hidden="true"></i>
-                  导出为 PNG
-                </button>
+                <div class="mx-png-row">
+                  <button type="button" class="chip ghost chip-xs char-roster-tavern-import mx-png-import" data-mxpng="char">
+                    <i class="ph ph-cat" aria-hidden="true"></i>
+                    导入 Meow 卡
+                  </button>
+                  <button type="button" class="chip ghost chip-xs char-roster-tavern-import mx-png-import" data-mxpng-export="char">
+                    <i class="ph ph-export" aria-hidden="true"></i>
+                    导出 Meow 卡
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -3192,6 +3194,16 @@
                   <div class="settings-api-field">
                     <label class="settings-api-field-k" for="char-display-name">显示名</label>
                     <input id="char-display-name" class="settings-api-input" type="text" placeholder="例如：黎川" autocomplete="off" spellcheck="false">
+                  </div>
+                  <div class="settings-api-field">
+                    <label class="settings-api-field-k" for="char-gender">性别</label>
+                    <select id="char-gender" class="settings-api-input mx-gender">
+                      <option value="">不设定</option>
+                      <option value="男">男</option>
+                      <option value="女">女</option>
+                      <option value="非二元">非二元</option>
+                      <option value="其他">其他（写在人设里）</option>
+                    </select>
                   </div>
                   <div class="settings-api-field">
                     <label class="settings-api-field-k" for="char-aliases">别名 / 称呼</label>
@@ -3634,6 +3646,16 @@
                       autocomplete="off"
                       spellcheck="false"
                     >
+                  </div>
+                  <div class="settings-api-field">
+                    <label class="settings-api-field-k" for="user-mask-gender">性别</label>
+                    <select id="user-mask-gender" class="settings-api-input mx-gender">
+                      <option value="">不设定</option>
+                      <option value="男">男</option>
+                      <option value="女">女</option>
+                      <option value="非二元">非二元</option>
+                      <option value="其他">其他（写在人设里）</option>
+                    </select>
                   </div>
                   <div class="settings-api-field">
                     <label class="settings-api-field-k" for="user-mask-persona">人设</label>
@@ -4624,6 +4646,11 @@
                         <span class="visually-hidden">隐藏头像</span>
                       </button>
                       <p class="chat-detail-lead chat-detail-lead--compact mx-hint">聊天里不显示你和 TA 的头像，只留气泡。只对这个聊天生效。</p>
+                    </div>
+                    <div class="chat-detail-field" id="mx-chat-fs-field">
+                      <span class="chat-detail-field-k">聊天字体大小 <b id="mx-chat-fs-val">100%</b></span>
+                      <div class="mx-fs-row"><span class="mx-fs-a sm">A</span><input type="range" id="mx-chat-fs" min="80" max="150" step="5" value="100" /><span class="mx-fs-a lg">A</span><button type="button" class="mx-fs-reset" id="mx-chat-fs-reset">还原</button></div>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">气泡里的字和头像一起放大缩小，所有聊天通用。</p>
                     </div>
                     <div class="chat-detail-field chat-detail-field--switch">
                       <span class="chat-detail-field-k">时间感知</span>
@@ -8652,7 +8679,7 @@
       </div>
 
   <!-- app.js / ai-api 由 db.js 在 #phone 就绪后注入；图标字体需尽早加载 -->
-  <script src="fun-desk.js?v=15"></script>
-  <script src="mx-skins.js?v=5"></script>
+  <script src="fun-desk.js?v=16"></script>
+  <script src="mx-skins.js?v=6"></script>
 </body>
 </html>

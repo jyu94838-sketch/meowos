@@ -434,7 +434,7 @@
       <label class="fun-field"><span>艺名</span><input id="bb-name" maxlength="16" value="${esc(i.name)}" /></label>
       <label class="fun-field"><span>团名 / 公司（选填）</span><input id="bb-group" maxlength="20" value="${esc(i.group)}" placeholder="比如：SOLO / 某某娱乐" /></label>
       <label class="fun-field"><span>粉丝名（选填）</span><input id="bb-fandom" maxlength="12" value="${esc(i.fandom)}" placeholder="比如：小星星" /></label>
-      <label class="fun-field"><span>你的人设</span><textarea id="bb-persona" rows="3" maxlength="300" placeholder="比如：舞台上很A私下很憨的主唱，喜欢吃辣，养了一只橘猫">${esc(i.persona)}</textarea></label>
+      <label class="fun-field"><span>你的人设</span><textarea id="bb-persona" rows="6" placeholder="比如：舞台上很A私下很憨的主唱，喜欢吃辣，养了一只橘猫">${esc(i.persona)}</textarea></label>
       ${editing ? "" : `<label class="fun-field"><span>粉丝人数</span><select id="bb-n"><option value="6">6 位</option><option value="10" selected>10 位</option><option value="14">14 位</option></select></label>`}
       ${F.hasApiKey() ? "" : `<p class="fun-note warn">没有填 API Key：会先用预设粉丝，但粉丝回复需要 API。</p>`}
       <div class="fun-setup-btns">${editing ? `<button type="button" class="fun-btn ghost" id="bb-clear">清空聊天记录</button>` : ""}<button type="button" class="fun-btn solid" id="bb-go">${editing ? "保存" : "开始营业"}</button></div></div>`;

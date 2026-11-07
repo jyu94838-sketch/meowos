@@ -6510,11 +6510,24 @@ function faceLockNaiStrength(level) {
   return level === "light" ? 0.68 : level === "strong" || level === "force" ? 0.36 : 0.52;
 }
 /** 按锁脸程度决定这张图要不要带参考立绘 */
-function resolveFaceLockRef(thread, planAllows) {
+function resolveFaceLockRef(thread, planAllows, plan) {
   const lv = threadFaceLockLevel(thread);
   if (lv === "off") return "";
-  if (!planAllows && lv !== "force") return "";
-  return resolveThreadCharImageRefDataUrl(thread);
+  // 没单独设参考立绘时，用角色头像兜底（不然锁脸完全不生效）
+  let ref = resolveThreadCharImageRefDataUrl(thread);
+  if (!ref && thread && thread.kind !== "group") {
+    const it = getCharPersonaItemById(String(thread.charId || "").trim());
+    const av = it && typeof it.avatar === "string" ? it.avatar.trim() : "";
+    if (/^data:image\//i.test(av) || /^https?:\/\//i.test(av)) ref = av;
+  }
+  if (!ref) return "";
+  if (lv === "force") return ref;
+  if (planAllows) return ref;
+  const sub = plan && typeof plan === "object" ? plan.subject : "";
+  // 中 / 强：只要画面里有 TA（哪怕模型拿不准）就参考
+  if (lv !== "light" && (sub === "char" || sub === "both" || (plan && plan.includeCharStrong))) return ref;
+  if (lv === "strong" && plan && (plan.includeCharWeak || sub === "other")) return ref;
+  return "";
 }
 
 /** 视频通话立绘：内置情绪 + 可自定义情绪（charCallIllustCustomMoods / chatCallIllustCustomMoods） */
@@ -7927,7 +7940,9 @@ function buildImageGenOpenAiEditsUrl(cfg) {
 function openAiImageModelSupportsReferenceEdits(model) {
   const m = String(model || "").trim().toLowerCase();
   if (isGptImageModelId(m)) return true;
-  return m === "dall-e-2";
+  if (m === "dall-e-2") return true;
+  // 中转站常见的「能吃参考图」的模型：走 /images/edits 把立绘带上
+  return /nano-?banana|gemini[\w.-]*image|seedream|seededit|kontext|qwen[\w.-]*image[\w.-]*edit|gpt-4o-image|image-?edit|imagen[\w.-]*edit|flux[\w.-]*(kontext|redux)|jimeng|doubao[\w.-]*(seedream|seededit)/i.test(m);
 }
 
 /** gpt-image-1 / 1.5：input_fidelity=high 利于保留脸部 */
@@ -21450,7 +21465,7 @@ async function resolveMomentsCharPostImagesInner(imagePlan, candidates, thread, 
   });
   let refDataUrl = "";
   if (thread && typeof thread === "object") {
-    refDataUrl = resolveFaceLockRef(thread, imageGenPlanAllowsThreadRef(imgPlan));
+    refDataUrl = resolveFaceLockRef(thread, imageGenPlanAllowsThreadRef(imgPlan), imgPlan);
   }
   const r = await executeImageGenRequestToDataUrl(cfg, prompt, {
     ...(refDataUrl ? { refDataUrl, faceLock: threadFaceLockLevel(thread) } : {}),
@@ -44275,6 +44290,7 @@ function buildChatSystemPrompt(opts) {
           promptLog
         })),
     char.summary ? `[角色设定 · 摘要]\n${stRepl(String(char.summary))}` : "",
+    String(char.gender || "").trim() ? `[角色设定 · 性别]\n${String(char.gender).trim()}` : "",
     String(char.aliases || "").trim()
       ? `[角色设定 · 称呼与别名]\n${stRepl(String(char.aliases).trim())}`
       : "",
@@ -44338,6 +44354,8 @@ function buildChatSystemPrompt(opts) {
       const legacy = stRepl(legacyRaw);
       const parts = [];
       const body = persona || legacy;
+      const g = String(mask.gender || "").trim();
+      if (g) parts.push(`[主控面具 · 性别]\n${g}`);
       if (body) parts.push(`[主控面具 · 人设]\n${body}`);
       if (personaRaw && legacyRaw && legacyRaw !== personaRaw) {
         parts.push(`[主控面具 · 一句话补充]\n${legacy}`);
@@ -49984,6 +50002,7 @@ function renderUserMaskRosterInner() {
 function emptyCharPersona() {
   return {
     displayName: "",
+    gender: "",
     aliases: "",
     summary: "",
     tags: "",
@@ -50024,6 +50043,7 @@ function emptyUserMask() {
   return {
     displayName: "",
     avatar: "",
+    gender: "",
     persona: "",
     summary: "",
     voice: "",
@@ -50091,6 +50111,7 @@ function pickUserMaskBody(x) {
   return {
     displayName: String(x.displayName ?? ""),
     avatar: String(x.avatar ?? ""),
+    gender: String(x.gender ?? ""),
     persona: String(x.persona ?? ""),
     summary: String(x.summary ?? ""),
     voice: String(x.voice ?? ""),
@@ -50434,6 +50455,7 @@ function pickCharPersonaBody(x) {
   );
   return {
     displayName: x.displayName,
+    gender: x.gender != null ? String(x.gender) : "",
     aliases: x.aliases,
     summary: x.summary,
     tags: x.tags,
@@ -50895,6 +50917,7 @@ function applyCharFieldsToForm() {
   const p = readCharPersona();
   const map = [
     ["char-display-name", p.displayName],
+    ["char-gender", p.gender],
     ["char-aliases", p.aliases],
     ["char-summary", p.summary],
     ["char-tags", p.tags],
@@ -50964,6 +50987,7 @@ function applyUserMaskFieldsToForm() {
   }
   const umap = [
     ["user-mask-display-name", u.displayName],
+    ["user-mask-gender", u.gender],
     ["user-mask-persona", u.persona],
     ["user-mask-summary", u.summary],
     ["user-mask-voice", u.voice],
@@ -51025,6 +51049,7 @@ function collectCharPersonaFromForm() {
       : "";
   return {
     displayName: val("char-display-name"),
+    gender: val("char-gender"),
     aliases: val("char-aliases"),
     summary: val("char-summary"),
     tags: val("char-tags"),
@@ -53172,8 +53197,10 @@ async function executeImageGenRequestToDataUrl(cfg, prompt, extras) {
       }
       return { ok: true, dataUrl };
     }
+    const fl = extras && typeof extras === "object" ? String(extras.faceLock || "") : "";
+    // 强 / 强制锁脸：不认识的模型也先试一次带参考图（失败会自动退回普通生图）
     const useOpenAiEdits =
-      Boolean(refDataUrl) && openAiImageModelSupportsReferenceEdits(cfg.model);
+      Boolean(refDataUrl) && (openAiImageModelSupportsReferenceEdits(cfg.model) || fl === "strong" || fl === "force");
     // 锁脸程度：轻 → 低保真，其余 → 高保真
     if (useOpenAiEdits && extras && extras.faceLock) cfg = { ...cfg, openaiInputFidelity: extras.faceLock === "light" ? "low" : "high" };
     let parsed = useOpenAiEdits
@@ -54011,7 +54038,7 @@ async function runDeferredSessionImageGenForLogIndex(msgIdx, msgAtSnapshot, thre
     });
     let refDataUrl = "";
     if (m.role !== "user" && thread && typeof thread === "object") {
-      refDataUrl = resolveFaceLockRef(thread, imageGenPlanAllowsThreadRef(plan));
+      refDataUrl = resolveFaceLockRef(thread, imageGenPlanAllowsThreadRef(plan), plan);
     }
     const r = await executeImageGenRequestToDataUrl(cfg, prompt, {
       ...(refDataUrl ? { refDataUrl, faceLock: threadFaceLockLevel(thread) } : {}),
@@ -54751,6 +54778,7 @@ function collectUserMaskFromForm() {
   return {
     displayName: val("user-mask-display-name"),
     avatar,
+    gender: val("user-mask-gender"),
     persona: val("user-mask-persona"),
     summary: val("user-mask-summary"),
     voice: val("user-mask-voice"),

@@ -632,17 +632,57 @@
       URL.revokeObjectURL(music.objUrl);
       music.objUrl = "";
     }
+    const neId = !t.blob ? String(t.neId || neteaseId(t.url) || "") : "";
+    const tok = (music.playTok = (music.playTok || 0) + 1);
     if (t.blob) {
       music.objUrl = URL.createObjectURL(t.blob);
       audio.src = music.objUrl;
     } else {
+      // 网易云歌：先用官方外链马上开始（免费歌能直接放），同时去拿真正的播放地址（会员歌、更高音质）
+      music.neResolving = neId && neApiBase() ? tok : 0;
       audio.src = t.url;
     }
     if (autoplay !== false) {
       audio.play().catch((err) => {
         if (err && err.name === "NotAllowedError") return;
+        if (music.neResolving === tok) return; // 等真正的地址
         toast("这首歌放不了：链接失效或格式不支持");
       });
+    }
+    if (neId && neApiBase()) {
+      void neFetchLyric(t, neId);
+      if (music.neResolving === tok)
+        void neResolveUrl(neId)
+          .then((r) => {
+            if (music.playTok !== tok) return;
+            music.neResolving = 0;
+            if (!r.url) {
+              if (audio.error || audio.networkState === 3) openInNetease(t, true);
+              return;
+            }
+            if (r.trial && !neCanPlayVip()) toast("这首只拿到试听片段，登录网易云会员可以听完整版");
+            const wasPlaying = !audio.paused || autoplay !== false;
+            const at = audio.error ? 0 : audio.currentTime || 0;
+            if (audio.src === r.url) return;
+            audio.src = r.url;
+            if (at > 1) {
+              const seekOnce = () => {
+                audio.removeEventListener("loadedmetadata", seekOnce);
+                try {
+                  audio.currentTime = at;
+                } catch (_) {
+                  /* ignore */
+                }
+              };
+              audio.addEventListener("loadedmetadata", seekOnce);
+            }
+            if (wasPlaying) audio.play().catch(() => {});
+          })
+          .catch(() => {
+            if (music.playTok !== tok) return;
+            music.neResolving = 0;
+            if (audio.error) openInNetease(t, true);
+          });
     }
     music.lrc = parseLrc(t.lrc);
     music.lrcIdx = -1;
@@ -790,34 +830,262 @@
       );
   }
 
-  /* ───── 网易云曲库（站长部署的 Supabase 函数 netease 代理搜索；播放用官方外链） ───── */
+  /* ───── 网易云曲库：站长部署的 Supabase 函数 netease（见 NETEASE-SETUP.md） ─────
+   * 播放地址每次现取（会过期）；登录了自己的网易云账号，会员能听的歌这里也能听完整版。
+   * 登录态（MUSIC_U）只存在这台手机上，只发给自己部署的函数。 */
+  const NE_COOKIE_KEY = "meowos_ne_cookie";
+  const neCookie = () => {
+    try {
+      return localStorage.getItem(NE_COOKIE_KEY) || "";
+    } catch (_) {
+      return "";
+    }
+  };
+  let neMe = null; // { login, nickname, avatar, vip, playlists }
   function neApiBase() {
     const c = window.MX_SHARE_CONFIG || {};
     return c.url ? String(c.url).replace(/\/+$/, "") + "/functions/v1/netease" : "";
   }
-  async function neteaseSearch(term) {
+  async function neCall(type, params, ms) {
     const base = neApiBase();
     if (!base) throw Object.assign(new Error("网易云曲库还没设置"), { neDown: true });
     const c = window.MX_SHARE_CONFIG || {};
+    const qs = new URLSearchParams({ type, ...(params || {}) }).toString();
+    const headers = {};
+    if (c.anonKey) headers.apikey = c.anonKey;
+    const ck = neCookie();
+    if (ck) headers["x-ne-cookie"] = ck;
     const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 12000);
+    const timer = setTimeout(() => ctl.abort(), ms || 12000);
     let res;
     try {
-      res = await fetch(`${base}?type=search&limit=40&s=${encodeURIComponent(term)}`, {
-        headers: c.anonKey ? { apikey: c.anonKey } : {},
-        signal: ctl.signal
-      });
+      res = await fetch(`${base}?${qs}`, { headers, signal: ctl.signal });
     } catch (e) {
-      throw Object.assign(new Error(e?.name === "AbortError" ? "网易云搜索超时，检查一下网络" : "连不上网易云曲库"), { neDown: e?.name !== "AbortError" });
+      throw Object.assign(new Error(e?.name === "AbortError" ? "网易云超时，检查一下网络" : "连不上网易云曲库"), { neDown: e?.name !== "AbortError" });
     } finally {
       clearTimeout(timer);
     }
-    if (res.status === 404 || res.status === 401) throw Object.assign(new Error("网易云曲库还没部署好"), { neDown: true });
-    if (!res.ok) throw new Error("网易云搜索失败（" + res.status + "）");
-    const d = await res.json();
-    return (d.songs || [])
-      .filter((x) => !x.off)
-      .map((x) => ({ ne: true, neId: x.id, title: x.title, artist: x.artist, album: x.album, cover: x.cover, vip: !!x.vip, dur: x.dur, url: `https://music.163.com/song/media/outer/url?id=${x.id}.mp3` }));
+    if (res.status === 404 && type !== "playlist") throw Object.assign(new Error("网易云曲库还没部署好"), { neDown: true });
+    if (res.status === 401) throw Object.assign(new Error("网易云曲库要关掉 JWT 验证（见 NETEASE-SETUP.md）"), { neDown: true });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || "网易云请求失败（" + res.status + "）");
+    return d;
+  }
+  const neTrack = (x) => ({ ne: true, neId: x.id, title: x.title, artist: x.artist, album: x.album, cover: x.cover, vip: !!x.vip, dur: x.dur, url: `https://music.163.com/song/media/outer/url?id=${x.id}.mp3` });
+  async function neteaseSearch(term) {
+    const d = await neCall("search", { s: term, limit: 40 });
+    return (d.songs || []).filter((x) => !x.off).map(neTrack);
+  }
+  async function neRefreshMe() {
+    if (!neCookie()) {
+      neMe = { login: false };
+      return neMe;
+    }
+    try {
+      neMe = await neCall("my");
+    } catch (_) {
+      neMe = neMe || { login: false };
+    }
+    return neMe;
+  }
+  const neCanPlayVip = () => !!(neMe && neMe.login && neMe.vip);
+
+  /* 播放地址缓存：网易云给的地址 20 分钟左右会过期 */
+  const neUrlCache = new Map();
+  async function neResolveUrl(id) {
+    const hit = neUrlCache.get(id);
+    if (hit && hit.until > Date.now()) return hit;
+    const d = await neCall("url", { id, quality: "high" }, 10000);
+    const r = { url: d.url || "", trial: !!d.trial, reason: d.reason || "", until: Date.now() + Math.max(60, (d.expire || 1200) - 120) * 1000 };
+    if (r.url) neUrlCache.set(id, r);
+    return r;
+  }
+  async function neFetchLyric(t, id) {
+    if (t.lrc || t.__lrcTried) return;
+    t.__lrcTried = true;
+    try {
+      const d = await neCall("lyric", { id });
+      const lrc = String(d.lrc || "").trim();
+      if (!lrc || /纯音乐，请欣赏/.test(lrc)) return;
+      t.lrc = lrc;
+      const clean = { ...t };
+      delete clean.__lrcTried;
+      await FunDB.putTrack(clean).catch(() => {});
+      if (curTrack() === t) {
+        music.lrc = parseLrc(t.lrc);
+        music.lrcIdx = -1;
+        renderMusicUi();
+      }
+    } catch (_) {
+      /* 没歌词就算了 */
+    }
+  }
+
+  /* 登录自己的网易云账号：扫码（用 App 扫一扫里的相册选截图）或手动粘贴 MUSIC_U */
+  function loadQrLib() {
+    if (window.MxQR) return Promise.resolve();
+    return new Promise((ok, bad) => {
+      const sc = document.createElement("script");
+      sc.src = "vendor/qrcode/qrcode.js?v=1";
+      sc.onload = ok;
+      sc.onerror = bad;
+      document.head.appendChild(sc);
+    });
+  }
+  async function openNeLogin(onDone) {
+    await neRefreshMe();
+    if (neMe && neMe.login) {
+      const sh = openSheet(
+        `<div class="ne-acct">${neMe.avatar ? `<img src="${esc(neMe.avatar)}" alt="" referrerpolicy="no-referrer" />` : ""}<div><strong>${esc(neMe.nickname || "网易云用户")}</strong><small>${neMe.vip ? "黑胶 VIP · 会员歌曲可以在这里听完整版" : "不是会员 · VIP 歌曲只能听试听片段"}</small></div></div>
+         <p class="fun-note">登录信息只存在这台手机上。换手机要重新登录。</p>
+         <div class="fun-sheet-actions"><button type="button" class="fun-btn ghost" data-a="out">退出登录</button><button type="button" class="fun-btn solid" data-a="ok">好的</button></div>`,
+        { title: "网易云账号" }
+      );
+      sh.body.addEventListener("click", (e) => {
+        const a = e.target.closest("[data-a]")?.dataset.a;
+        if (a === "out") {
+          localStorage.removeItem(NE_COOKIE_KEY);
+          neMe = { login: false };
+          neUrlCache.clear();
+          toast("已退出网易云账号");
+          sh.close();
+          onDone?.();
+        }
+        if (a === "ok") sh.close();
+      });
+      return;
+    }
+    const sh = openSheet(
+      `<p class="fun-note">登录<b>你自己的</b>网易云账号：会员能听的歌，在小手机里也能听完整版、还能导入你的歌单。登录信息只存在这台手机上。</p>
+       <div class="ne-qr" id="ne-qr"><span class="fun-spin"></span></div>
+       <p class="ne-qr-status" id="ne-qr-st">正在生成二维码…</p>
+       <ol class="ne-steps"><li>截图或长按保存上面的二维码</li><li>打开网易云 App → 左上角 ≡ → 扫一扫 → 右上角「相册」选这张图</li><li>在 App 里点「确认登录」，回到这里会自动登录</li></ol>
+       <details class="ne-manual"><summary>扫码不方便？手动粘贴 MUSIC_U</summary>
+         <textarea id="ne-mu" rows="3" placeholder="在电脑浏览器登录 music.163.com，开发者工具 → Application → Cookies 里复制 MUSIC_U 的值"></textarea>
+         <button type="button" class="fun-btn ghost sm" data-a="mu">用这个登录</button></details>
+       <p class="fun-note warn">这是网易云的非官方登录方式，极少数情况下网易云可能要求重新验证账号。只登录你自己的账号。</p>`,
+      { title: "登录网易云" }
+    );
+    sh.el.classList.add("fun-sheet--tall");
+    let alive = true;
+    let timer = 0;
+    const st = sh.body.querySelector("#ne-qr-st");
+    const finish = async (cookie) => {
+      alive = false;
+      clearTimeout(timer);
+      localStorage.setItem(NE_COOKIE_KEY, cookie);
+      neUrlCache.clear();
+      await neRefreshMe();
+      if (!neMe || !neMe.login) {
+        localStorage.removeItem(NE_COOKIE_KEY);
+        toast("登录没成功，再试一次");
+        return;
+      }
+      toast(`已登录网易云：${neMe.nickname}${neMe.vip ? "（会员）" : ""}`);
+      sh.close();
+      onDone?.();
+    };
+    const origClose = sh.close;
+    sh.close = () => {
+      alive = false;
+      clearTimeout(timer);
+      origClose();
+    };
+    sh.body.addEventListener("click", (e) => {
+      const a = e.target.closest("[data-a]")?.dataset.a;
+      if (a === "mu") {
+        const v = sh.body.querySelector("#ne-mu").value.trim().replace(/^MUSIC_U=/, "");
+        if (v.length < 40) return toast("MUSIC_U 看起来不完整");
+        void finish("MUSIC_U=" + v);
+      }
+      if (a === "re") void start();
+    });
+    const start = async () => {
+      if (!alive) return;
+      st.textContent = "正在生成二维码…";
+      try {
+        await loadQrLib();
+        const k = await neCall("qr_key");
+        sh.body.querySelector("#ne-qr").innerHTML = window.MxQR.svg(k.qr);
+        st.textContent = "等你用网易云 App 扫码…";
+        const t0 = Date.now();
+        const poll = async () => {
+          if (!alive) return;
+          if (Date.now() - t0 > 170000) {
+            st.innerHTML = `二维码过期了 <button type="button" class="fun-btn ghost sm" data-a="re">换一张</button>`;
+            return;
+          }
+          try {
+            const r = await neCall("qr_check", { key: k.key });
+            if (r.code === 803 && r.cookie) return void finish(r.cookie);
+            if (r.code === 800) {
+              st.innerHTML = `二维码过期了 <button type="button" class="fun-btn ghost sm" data-a="re">换一张</button>`;
+              return;
+            }
+            if (r.code === 802) st.textContent = `${r.nickname ? r.nickname + "，" : ""}已扫码，请在 App 里点「确认登录」`;
+          } catch (_) {
+            /* 网络抖一下，继续等 */
+          }
+          timer = setTimeout(poll, 2000);
+        };
+        timer = setTimeout(poll, 2000);
+      } catch (err) {
+        st.textContent = err.message || "生成二维码失败";
+      }
+    };
+    void start();
+  }
+
+  /* 导入网易云歌单（我的歌单 / 粘贴歌单链接） */
+  async function importNePlaylist(id, name) {
+    toast("正在读取歌单…");
+    let d;
+    try {
+      d = await neCall("playlist", { id }, 25000);
+    } catch (err) {
+      return toast(err.message);
+    }
+    const list = (d.tracks || []).map(neTrack).filter((t) => !t.vip || neCanPlayVip());
+    const skipped = (d.tracks || []).length - list.length;
+    let added = 0;
+    for (const r of list) {
+      if (music.tracks.some((t) => t.url === r.url)) continue;
+      const rec = { id: uid(), title: r.title, artist: r.artist, url: r.url, cover: r.cover, neId: r.neId, addedAt: Date.now() + added };
+      await FunDB.putTrack(rec).catch(() => {});
+      music.tracks.push(rec);
+      added++;
+    }
+    renderMusicUi();
+    toast(`「${d.name || name || "歌单"}」导入了 ${added} 首${skipped ? `，${skipped} 首 VIP 歌没导（登录会员账号后可以导）` : ""}`);
+  }
+  async function openNePlaylists() {
+    await neRefreshMe();
+    const mine = neMe && neMe.login ? neMe.playlists || [] : [];
+    const sh = openSheet(
+      `<div class="fm-search"><input type="text" id="ne-pl-link" placeholder="粘贴网易云歌单链接或歌单 id" /><button type="button" class="fun-btn solid sm" data-a="link">导入</button></div>
+       ${neMe && neMe.login ? `<p class="fun-kicker">我的歌单</p><div class="ne-pls">${mine.map((p) => `<button type="button" class="ne-pl" data-pl="${p.id}"><img src="${esc(p.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" /><span><strong>${esc(p.name)}</strong><small>${p.count} 首${p.mine ? "" : " · 收藏"}</small></span></button>`).join("") || `<p class="fun-note">账号里还没有歌单</p>`}</div>` : `<p class="fun-note">登录网易云账号后，这里会列出你的歌单。<button type="button" class="fun-btn ghost sm" data-a="login">登录网易云</button></p>`}`,
+      { title: "导入网易云歌单" }
+    );
+    sh.el.classList.add("fun-sheet--tall");
+    sh.body.addEventListener("click", (e) => {
+      const a = e.target.closest("[data-a]")?.dataset.a;
+      const pl = e.target.closest("[data-pl]");
+      if (a === "login") {
+        sh.close();
+        void openNeLogin(() => openNePlaylists());
+      }
+      if (a === "link") {
+        const raw = sh.body.querySelector("#ne-pl-link").value.trim();
+        const m = raw.match(/playlist[^\d]*?(?:id=)?(\d{5,})/) || raw.match(/^(\d{5,})$/) || raw.match(/[?&]id=(\d{5,})/);
+        if (!m) return toast("没认出歌单 id，复制网易云里「分享 → 复制链接」");
+        sh.close();
+        void importNePlaylist(m[1]);
+      }
+      if (pl) {
+        sh.close();
+        void importNePlaylist(pl.dataset.pl, pl.querySelector("strong")?.textContent);
+      }
+    });
   }
 
   function openSearch(prefill) {
@@ -825,7 +1093,8 @@
     const sh = openSheet(
       `<div class="fm-search"><input type="search" placeholder="歌名 / 歌手" value="${esc(prefill || "")}" /><button type="button" class="fun-btn solid sm">搜索</button></div>
        <div class="fm-src"><button type="button" class="is-on" data-src="ne">☁ 网易云</button><button type="button" data-src="it">Apple 试听</button></div>
-       <p class="fun-note" id="fm-src-note">网易云曲库：免费歌曲直接听完整版；标了 VIP 的要去网易云 App 用会员听。</p>
+       <div class="ne-bar" id="ne-bar"></div>
+       <p class="fun-note" id="fm-src-note">网易云曲库：免费歌曲直接听完整版；标了 VIP 的要登录你的网易云会员才能在这里听。</p>
        <div class="fm-results" id="fm-results"></div>`,
       { title: "搜歌" }
     );
@@ -836,8 +1105,26 @@
     const setSrc = (k) => {
       src = k;
       sh.body.querySelectorAll("[data-src]").forEach((b) => b.classList.toggle("is-on", b.dataset.src === k));
-      note.textContent = k === "ne" ? "网易云曲库：免费歌曲直接听完整版；标了 VIP 的要去网易云 App 用会员听。" : "Apple Music 曲库：每首可以试听 30 秒。";
+      note.textContent = k === "ne" ? "网易云曲库：免费歌曲直接听完整版；标了 VIP 的要登录你的网易云会员才能在这里听。" : "Apple Music 曲库：每首可以试听 30 秒。";
+      sh.body.querySelector("#ne-bar").hidden = k !== "ne";
     };
+    const bar = sh.body.querySelector("#ne-bar");
+    const renderBar = () => {
+      bar.innerHTML =
+        neMe && neMe.login
+          ? `<span>☁ ${esc(neMe.nickname || "网易云")}${neMe.vip ? ` <em class="fm-vip">VIP</em>` : ""}</span><button type="button" data-ne="acct">账号</button><button type="button" data-ne="pl">导入歌单</button>`
+          : `<span>没登录网易云</span><button type="button" data-ne="login">登录会员</button><button type="button" data-ne="pl">导入歌单</button>`;
+    };
+    renderBar();
+    void neRefreshMe().then(() => {
+      renderBar();
+      if (results.length && src === "ne") go();
+    });
+    bar.addEventListener("click", (e) => {
+      const a = e.target.closest("[data-ne]")?.dataset.ne;
+      if (a === "login" || a === "acct") void openNeLogin(() => (renderBar(), inp.value.trim() && go()));
+      if (a === "pl") void openNePlaylists();
+    });
     let results = [];
     const go = async () => {
       const q = inp.value.trim();
@@ -857,7 +1144,7 @@
           ? results
               .map(
                 (r, i) => `<div class="fm-res" data-i="${i}"><img src="${esc(r.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" /><span><strong>${esc(r.title)}${r.vip ? ` <em class="fm-vip">VIP</em>` : ""}</strong><small>${esc(r.artist)}${r.album ? " · " + esc(r.album) : ""}</small></span>
-                ${r.vip ? `<button type="button" class="fun-btn ghost sm" data-r="ne" title="去网易云 App 听">☁ 去听</button>` : `<button type="button" class="fun-btn ghost sm" data-r="play">${r.ne ? "播放" : "试听"}</button><button type="button" class="fun-btn solid sm" data-r="add">＋</button>`}</div>`
+                ${r.vip && !neCanPlayVip() ? `<button type="button" class="fun-btn ghost sm" data-r="ne" title="去网易云 App 听">☁ 去听</button>` : `<button type="button" class="fun-btn ghost sm" data-r="play">${r.ne ? "播放" : "试听"}</button><button type="button" class="fun-btn solid sm" data-r="add">＋</button>`}</div>`
               )
               .join("")
           : `<p class="fun-note">没有找到，换个关键词试试</p>`;
@@ -886,6 +1173,7 @@
       if (i < 0) {
         const rec = { id: uid(), title: r.title, artist: r.artist, url: r.url, cover: r.cover, addedAt: Date.now() };
         if (!r.ne) rec.preview = true;
+        else rec.neId = r.neId;
         await FunDB.putTrack(rec);
         music.tracks.push(rec);
         i = music.tracks.length - 1;
@@ -1020,7 +1308,8 @@
   audio.addEventListener("error", () => {
     if (!audio.getAttribute("src")) return;
     const t = curTrack();
-    if (t && neteaseId(t.url)) openInNetease(t, true);
+    if (music.neResolving) return; // 正在拿网易云真正的播放地址，等它
+    if (t && (t.neId || neteaseId(t.url))) openInNetease(t, true);
     else toast("这首歌放不了：链接失效或格式不支持");
   });
   ["play", "pause", "loadedmetadata", "timeupdate"].forEach((ev) =>
@@ -1249,6 +1538,7 @@
             <div class="fm-list-head"><span class="fun-kicker">PLAYLIST · <b id="fm-count">0 首</b></span>
               <div class="fm-list-tools">
                 <button type="button" class="fun-btn solid sm" id="fm-search-btn">🔍 搜歌</button>
+                <button type="button" class="fun-btn ghost sm" id="fm-ne-pl">☁ 网易云歌单</button>
                 <button type="button" class="fun-btn ghost sm" id="fm-ne-paste">📋 粘贴网易云</button>
                 <button type="button" class="fun-btn ghost sm" id="fm-add-link"><i class="ph ph-link"></i> 链接</button>
                 <button type="button" class="fun-btn ghost sm" id="fm-add-file"><i class="ph ph-upload-simple"></i> 上传</button>
@@ -1320,6 +1610,7 @@
       };
       body.querySelector("#fm-add-link").onclick = openAddLink;
       body.querySelector("#fm-ne-paste").onclick = () => void pasteNeFromClipboard();
+      body.querySelector("#fm-ne-pl").onclick = () => void openNePlaylists();
       body.querySelector("#fm-search-btn").onclick = () => openSearch("");
       body.querySelector("#fm-list").addEventListener("click", (e) => {
         const del = e.target.closest("[data-del]");

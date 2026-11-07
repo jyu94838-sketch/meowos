@@ -97,10 +97,10 @@
         },
         {
           role: "user",
-          content: `${worldLine()}角色：\n${castDesc()}\n玩家「${user.name}」也生活在这个世界。\n\n${about}\n\n生成 ${n} 条微博。格式：[{"author":"账号名（角色用原名）","verified":是否蓝V,"text":"正文","likes":点赞数,"reposts":转发数,"comments":[{"name":"","text":""}]}]，每条 2~4 条评论。`
+          content: `${worldLine()}角色：\n${castDesc()}\n玩家「${user.name}」也生活在这个世界。\n\n${about}\n\n生成 ${n} 条微博。格式：[{"author":"账号名（角色用原名）","verified":是否蓝V,"text":"正文","likes":点赞数,"reposts":转发数,"comments":[{"name":"","text":""}]}]，每条 2~4 条评论。每条正文都要写完整，不要写到一半。`
         }
       ],
-      { maxTokens: 3000, temperature: 0.95 }
+      { maxTokens: 7000, temperature: 0.95 }
     );
     const arr = F.parseJsonLoose(txt);
     if (!Array.isArray(arr)) throw new Error("格式不对，再试一次");
