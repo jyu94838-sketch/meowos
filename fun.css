@@ -8087,3 +8087,17 @@ img.cp-pet-img.is-sleepy { filter: brightness(0.85) saturate(0.8); }
 .mx-imp-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 999px; border: 1px dashed var(--line, #ccc); background: none; color: var(--text-sub, #888); font: inherit; font-size: 0.72rem; cursor: pointer; }
 .mx-imp-btn small { opacity: 0.65; font-size: 0.62rem; }
 .mx-imp-btn:active { opacity: 0.6; }
+
+/* 小剧场 HTML（群聊截屏 / 求助论坛等）：按内容撑开，整块往下滑着看完整 */
+#chat-char-inner-voice.is-theater-tab.is-theater-html .chat-theater-body {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  display: block !important;
+}
+#chat-char-inner-voice.is-theater-tab.is-theater-html .chat-theater-html-frame {
+  flex: none !important;
+  display: block;
+  width: 100% !important;
+  min-height: 200px;
+}

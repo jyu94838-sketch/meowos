@@ -23252,11 +23252,31 @@ function theaterNormalizeModelHtml(raw) {
     .join("\n");
 }
 
+/** 小剧场 HTML：iframe 高度跟着内容走（iframe 不允许脚本，只允许父页面量高度） */
+function fitChatTheaterFrameHeight(frame) {
+  const measure = () => {
+    try {
+      const d = frame.contentDocument;
+      if (!d || !d.documentElement) return;
+      const h = Math.max(d.documentElement.scrollHeight, d.body ? d.body.scrollHeight : 0);
+      if (h > 0) frame.style.height = Math.max(160, Math.ceil(h) + 6) + "px";
+    } catch (_) {
+      /* 量不到就保持默认高度（框内可滑动） */
+    }
+  };
+  measure();
+  setTimeout(measure, 300);
+  setTimeout(measure, 1200);
+}
+
 /** @param {string} innerHtml */
 function theaterWrapHtmlDocument(innerHtml) {
   const body = String(innerHtml || "").trim() || "<p>（空）</p>";
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-body{font-family:system-ui,-apple-system,"Noto Sans SC",sans-serif;margin:0;padding:18px 16px;line-height:1.6;background:#faf8f5;color:#1a1a1a}
+body{font-family:system-ui,-apple-system,"Noto Sans SC",sans-serif;margin:0;padding:18px 16px;line-height:1.6;background:#faf8f5;color:#1a1a1a;overflow-wrap:anywhere}
+html,body{height:auto!important;min-height:0!important;overflow-x:hidden}
+*{box-sizing:border-box;max-width:100%}
+img,video,svg,table{max-width:100%!important;height:auto}
 </style></head><body>${body}</body></html>`;
 }
 
@@ -41918,6 +41938,9 @@ function applyChatTheaterSnapshotToUi(snap) {
     const html = String(snap.html || "").trim();
     if (frame instanceof HTMLIFrameElement) {
       frame.hidden = !html;
+      // 按内容高度撑开（不再固定一小块被截掉），外层可以整体往下滑
+      frame.style.height = "";
+      frame.onload = () => fitChatTheaterFrameHeight(frame);
       frame.srcdoc = html ? theaterWrapHtmlDocument(html) : "";
     }
     if (textEl instanceof HTMLElement) textEl.hidden = true;
@@ -71616,7 +71639,10 @@ document.getElementById("ward-chat-css-import-file")?.addEventListener("change",
   function wrapHtmlDocument(innerHtml) {
     const body = String(innerHtml || "").trim() || "<p>（空）</p>";
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-body{font-family:system-ui,-apple-system,"Noto Sans SC",sans-serif;margin:0;padding:18px 16px;line-height:1.6;background:#faf8f5;color:#1a1a1a}
+body{font-family:system-ui,-apple-system,"Noto Sans SC",sans-serif;margin:0;padding:18px 16px;line-height:1.6;background:#faf8f5;color:#1a1a1a;overflow-wrap:anywhere}
+html,body{height:auto!important;min-height:0!important;overflow-x:hidden}
+*{box-sizing:border-box;max-width:100%}
+img,video,svg,table{max-width:100%!important;height:auto}
 </style></head><body>${body}</body></html>`;
   }
 

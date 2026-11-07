@@ -34,7 +34,6 @@
     "user-mask-voice": "我的说话方式",
     "user-mask-boundaries": "我的边界",
     "user-mask-image-gen-prompt": "我的外貌提示词",
-    "world-book-edit-content": "世界书条目",
     "ward-chat-css-input": "聊天 CSS",
     "roam-worldview-text": "世界观",
     "forum-sector-custom-prompt": "版块提示词",
