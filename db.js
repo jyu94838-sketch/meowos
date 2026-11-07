@@ -1766,7 +1766,7 @@
   const ROLEPLAY_MODULE = "roleplay.js?v=16";
   /** 娱乐：音乐 / UNO / 狼人杀 / 短视频 */
   const FUN_MODULES = [
-    "fun.js?v=5",
+    "fun.js?v=6",
     "fun-uno.js?v=2",
     "fun-wolf.js?v=2",
     "fun-video.js?v=2",

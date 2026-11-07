@@ -5089,3 +5089,15 @@ body.dark .mm-dimg {
   flex: 1;
   min-width: 0;
 }
+.fm-ne-tip {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  text-align: center;
+  margin: 4px 0 14px;
+}
+.fm-ne-btn {
+  text-decoration: none;
+  background: #e60026 !important;
+  border-color: #e60026 !important;
+  color: #fff !important;
+}

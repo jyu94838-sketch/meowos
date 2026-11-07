@@ -475,6 +475,19 @@
     if (id) return `https://music.163.com/song/media/outer/url?id=${id}.mp3`;
     return u;
   }
+  /** VIP / 受限歌曲：跳到网易云 App（或网页版）用自己的会员听完整版 */
+  function openInNetease(t, failed) {
+    const id = neteaseId(t.url);
+    if (!id) return;
+    const sh = openSheet(
+      `<p class="fm-ne-tip">${failed ? `《${esc(t.title)}》是 VIP 或版权受限歌曲，网页里放不了。<br/>` : ""}可以在网易云里用你自己的会员听完整版。</p>
+       <a class="fun-btn solid wide fm-ne-btn" href="https://music.163.com/song?id=${id}" target="_blank" rel="noopener">在网易云里打开</a>
+       <p class="fun-note">手机上装了网易云 App 会直接跳过去；没装的话会打开网页版。听完切回 Meow OS 就行。</p>`,
+      { title: "🎵 去网易云听" }
+    );
+    sh.body.querySelector("a").addEventListener("click", () => setTimeout(() => sh.close(), 300));
+  }
+
   /** 从网易云 App 的分享文字里拆出链接、歌名、歌手 */
   function parseShareText(text) {
     const s = String(text || "").trim();
@@ -825,7 +838,7 @@
   audio.addEventListener("error", () => {
     if (!audio.getAttribute("src")) return;
     const t = curTrack();
-    if (t && neteaseId(t.url)) toast("这首网易云歌曲放不了：可能是 VIP 或版权受限歌曲，只有免费歌曲能在网页里完整播放");
+    if (t && neteaseId(t.url)) openInNetease(t, true);
     else toast("这首歌放不了：链接失效或格式不支持");
   });
   ["play", "pause", "loadedmetadata", "timeupdate"].forEach((ev) =>
@@ -931,6 +944,7 @@
           <span class="fm-item-no">${String(i + 1).padStart(2, "0")}</span>
           <span class="fm-item-meta"><strong>${esc(x.title)}</strong><small>${x.preview ? "试听 · " : ""}${esc(x.artist || (x.url ? "链接" : "本地"))}</small></span>
           <span class="fm-item-eq"><i></i><i></i><i></i></span>
+          ${neteaseId(x.url) ? `<button type="button" class="fm-item-del" data-ne="${i}" title="在网易云里打开">☁</button>` : ""}
           <button type="button" class="fm-item-del" data-lrc="${i}" aria-label="歌词" title="歌词">${x.lrc ? "词✓" : "词"}</button>
           <button type="button" class="fm-item-del" data-del="${esc(x.id)}" aria-label="删除"><i class="ph ph-trash"></i></button>
         </li>`
@@ -1121,6 +1135,12 @@
           e.stopPropagation();
           const t = music.tracks.find((x) => x.id === del.dataset.del);
           if (t && confirmDelete(t)) void deleteTrack(t.id);
+          return;
+        }
+        const nb = e.target.closest("[data-ne]");
+        if (nb) {
+          e.stopPropagation();
+          openInNetease(music.tracks[Number(nb.dataset.ne)], false);
           return;
         }
         const lb = e.target.closest("[data-lrc]");
