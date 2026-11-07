@@ -34247,7 +34247,12 @@ async function verifyStExportUnlockBuffer(buffer) {
 let charStUnlockPendingFile = null;
 
 function readStTavernImportUnlocked() {
-  if (!isCloudAuthEnabled()) return false;
+  /* Meow OS：用专属激活码解锁（st-gate.js） */
+  try {
+    return localStorage.getItem("meowos_st_unlock") === "1";
+  } catch {
+    return false;
+  }
   try {
     const D = window.XXJ_DB;
     if (!D?.getKv || !D.K) return false;
@@ -34262,11 +34267,6 @@ function readStTavernImportUnlocked() {
 function syncCharStTavernImportLockUi() {
   const b1 = document.getElementById("char-tavern-import-btn");
   const b2 = document.getElementById("char-roster-tavern-import");
-  if (!isCloudAuthEnabled()) {
-    b1?.setAttribute("hidden", "");
-    b2?.setAttribute("hidden", "");
-    return;
-  }
   b1?.removeAttribute("hidden");
   b2?.removeAttribute("hidden");
   const locked = !readStTavernImportUnlocked();
@@ -68506,12 +68506,9 @@ document.getElementById("chat-detail-call-illust-clear-all")?.addEventListener("
 });
 
 function openCharTavernImportPicker() {
-  if (!isCloudAuthEnabled()) {
-    showToast("账号登录相关功能仅正式版可用");
-    return;
-  }
   if (!readStTavernImportUnlocked()) {
-    void openCharStUnlockOverlay();
+    if (typeof window.openMeowStActivate === "function") window.openMeowStActivate();
+    else showToast("还在加载，稍等一下再试");
     return;
   }
   ensureCharPaneForTavernImport();

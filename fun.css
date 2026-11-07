@@ -6320,3 +6320,57 @@ body.dark .desk-done {
   border-color: #ff4d6d !important;
   color: #ff4d6d !important;
 }
+
+/* SillyTavern 导入激活码 */
+.char-st-import-locked::after {
+  content: "🔒";
+  margin-left: 4px;
+  font-size: 0.8em;
+}
+.stg {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 4px 4px 8px;
+  text-align: center;
+}
+.stg-ico {
+  font-size: 2.4rem;
+}
+.stg-lead {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.stg-input {
+  text-align: center;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+}
+.stg-err {
+  margin: 0;
+  color: #e5484d;
+  font-size: 0.8rem;
+}
+.stg-foot {
+  font-size: 0.72rem;
+}
+.stg-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-card);
+  color: var(--text-main);
+  outline: none;
+}
+.stg-input:focus {
+  border-color: var(--text-sub);
+}
+.fun-sheet-host--global {
+  position: absolute;
+  z-index: 10040;
+  color: var(--text-main);
+}

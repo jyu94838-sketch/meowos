@@ -70,3 +70,11 @@ Supabase 免费项目 **连续 7 天没人访问会自动暂停**。登录 Supab
 
 **别的网站能读取这些卡片吗？**
 卡片数据经过压缩和混淆，放在 PNG 里一个自定义的数据块中，SillyTavern 等其它工具读不出来，只有本站的资源站能导入。不过这只是防止「随手读取」，不是加密保护，懂技术的人仍然可以研究出来，所以不要在卡片里放 API Key 之类的敏感信息（导出时本来也不会带上）。
+
+## 「导入 SillyTavern 卡」激活码
+
+1. Supabase 后台 → SQL Editor → New query，把 `st-codes.sql` 全部内容粘进去 → Run（只需要一次）。
+2. 要发码时，新建查询运行：`select * from mx_make_codes(5, 3, '');`
+   - 5 = 生成几个码，3 = 每个码能激活几台设备，最后的引号里可以写备注（比如发给谁）。
+3. 查看所有码和使用情况：`select code, used, max_uses, note, disabled from mx_codes order by created_at desc;`
+4. 停用某个码：`update mx_codes set disabled = true where code = 'MEOW-XXXX-XXXX';`

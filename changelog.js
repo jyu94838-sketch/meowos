@@ -9,6 +9,12 @@
 (function () {
   const CHANGELOG = [
     {
+      v: 14,
+      date: "2026-11-07",
+      title: "SillyTavern 导入需要激活码",
+      items: ["「角色人设」里的「导入 SillyTavern 卡」上锁了，需要输入专属激活码才能使用；激活一次，这台设备就一直能用"]
+    },
+    {
       v: 13,
       date: "2026-11-07",
       title: "专属 PNG 导入 · 点赞解锁",

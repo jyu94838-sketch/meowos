@@ -278,6 +278,10 @@
   const bodyEl = screen.querySelector("#fun-body");
   const actEl = screen.querySelector("#fun-top-act");
   const sheetHost = screen.querySelector("#fun-sheet-host");
+  // 娱乐页面没打开时（比如在角色、装扮页里弹窗），用盖在整个手机上的弹层
+  const globalSheetHost = document.createElement("div");
+  globalSheetHost.className = "fun-sheet-host fun-sheet-host--global";
+  phone.appendChild(globalSheetHost);
 
   const apps = {};
   let current = null;
@@ -408,7 +412,7 @@
         ${o.title ? `<h3 class="fun-sheet-title">${esc(o.title)}</h3>` : ""}
         <div class="fun-sheet-body">${inner}</div>
       </div>`;
-    sheetHost.appendChild(wrap);
+    (screen.classList.contains("is-open") ? sheetHost : globalSheetHost).appendChild(wrap);
     requestAnimationFrame(() => wrap.classList.add("is-open"));
     let closed = false;
     const close = () => {
