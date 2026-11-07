@@ -1,0 +1,465 @@
+"use strict";
+
+/**
+ * 情侣小屋：你和一位角色的情侣空间
+ * 首页（在一起天数 / 纪念日倒数 / TA 的今日悄悄话 / 心情打卡）、
+ * 恋爱日记（TA 会回复，也会写自己的日记）、恋爱清单、纪念日、每日一问、相册
+ */
+(function () {
+  const F = window.XXJ_FUN;
+  if (!F) return;
+  const { esc, toast, pick, uid, avHtml } = F;
+
+  const KV = "couple_v1";
+  const MOODS = ["🥰", "😊", "😌", "🥺", "😤", "😭", "😴", "🤒"];
+  const LIST = [
+    "一起看日出", "一起看一场电影", "交换手写信", "一起做一顿饭", "穿情侣装出门", "一起去游乐园", "拍一组情侣写真", "一起淋一场雨",
+    "给对方剪一次头发", "一起去看海", "一起熬夜聊到天亮", "一起养一盆植物", "一起去旅行", "给对方准备惊喜", "一起看星星", "一起逛超市",
+    "一起打一局游戏", "互相化妆", "一起拼一副拼图", "一起去图书馆", "一起学一项新技能", "一起去看演唱会", "一起放烟花", "一起堆雪人",
+    "一起去天文馆", "在对方生病时照顾 TA", "一起做蛋糕", "一起去一次寺庙许愿", "一起看一部完整的剧", "一起去露营"
+  ];
+  const QUESTIONS = [
+    "第一次心动是什么时候？", "如果我们一起去旅行，你最想去哪里？", "你觉得我最可爱的一个小习惯是什么？", "你最想和我一起做的一件小事是什么？",
+    "吵架的时候，你最希望我怎么做？", "你觉得我们像哪两种动物？", "如果明天是世界末日，今天你想怎么过？", "你小时候的梦想是什么？",
+    "你最喜欢我叫你什么？", "我们老了以后，你想住在什么样的地方？", "你偷偷为我做过什么我不知道的事？", "最近一次因为我开心是什么时候？",
+    "你最想对十年后的我们说什么？", "你觉得爱是什么？", "有什么话一直想说但没说出口？", "我们的第一次约会，你最记得什么？"
+  ];
+  const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const daysBetween = (a, b) => Math.floor((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
+
+  let S = null; // { partnerId, by: { [charId]: room } }
+  let root = null;
+  let tab = "home";
+  let partner = null;
+  let user = null;
+
+  async function load() {
+    try {
+      S = (await F.FunDB.get(KV)) || null;
+    } catch (_) {
+      S = null;
+    }
+    if (!S) S = { partnerId: "", by: {} };
+  }
+  function save() {
+    F.FunDB.set(KV, S).catch(() => toast("保存失败：存储空间不足"));
+  }
+  const room = () => {
+    const id = partner?.id;
+    if (!S.by[id]) S.by[id] = { start: dayKey(), nick: "", anniv: [], diary: [], list: {}, qa: {}, photos: [], daily: {}, mood: {} };
+    return S.by[id];
+  };
+
+  /* ───── AI ───── */
+  function ctx() {
+    const R = room();
+    const together = daysBetween(R.start, dayKey()) + 1;
+    const recent = R.diary.slice(-4).map((d) => `${d.date} ${d.by === "me" ? user.name : partner.name}的日记：${d.text.slice(0, 60)}`);
+    const done = Object.entries(R.list).filter(([, v]) => v.done).map(([k]) => LIST[Number(k)]).slice(-6);
+    return `你是「${partner.name}」，和${user.name}是恋人，已经在一起 ${together} 天${R.nick ? `，你叫TA「${R.nick}」` : ""}。${partner.persona ? "你的人设：\n" + partner.persona + "\n" : ""}${user.persona ? `${user.name}的人设：${user.persona}\n` : ""}${recent.length ? "最近的日记：\n" + recent.join("\n") + "\n" : ""}${done.length ? "你们一起完成过的事：" + done.join("、") + "\n" : ""}用你的性格和说话方式，像真的恋人一样自然、具体，不要写成客服腔。只输出你说的话。`;
+  }
+  async function say(instruction, max) {
+    const txt = await F.aiText(
+      [
+        { role: "system", content: ctx() },
+        { role: "user", content: instruction }
+      ],
+      { maxTokens: max || 600 }
+    );
+    return F.cleanLine(txt, 600, partner.name);
+  }
+  const needKey = () => {
+    if (F.hasApiKey()) return false;
+    toast("请先在设置里填写 API Key");
+    return true;
+  };
+
+  /* ───── 渲染 ───── */
+  function render() {
+    if (!root) return;
+    if (!partner) return renderPick();
+    const R = room();
+    const together = daysBetween(R.start, dayKey()) + 1;
+    root.innerHTML = `<div class="cp">
+      <div class="cp-top">
+        <div class="cp-avs">${avHtml(user, "fun-av cp-av")}<span class="cp-heart">❤</span>${avHtml(partner, "fun-av cp-av")}</div>
+        <p class="cp-days">我们在一起 <b>${together}</b> 天</p>
+        <small>${esc(user.name)} & ${esc(partner.name)} · 从 ${R.start.replace(/-/g, ".")} 开始</small>
+      </div>
+      <div class="cp-tabs">${[["home", "🏠", "小屋"], ["diary", "📔", "日记"], ["list", "✅", "清单"], ["qa", "💬", "一问"], ["anniv", "📅", "纪念日"], ["album", "📷", "相册"]].map(([k, i, n]) => `<button type="button" data-tab="${k}" class="${tab === k ? "is-on" : ""}"><span>${i}</span>${n}</button>`).join("")}</div>
+      <div class="cp-panel" id="cp-panel"></div></div>`;
+    const p = root.querySelector("#cp-panel");
+    ({ home: renderHome, diary: renderDiary, list: renderList, qa: renderQa, anniv: renderAnniv, album: renderAlbum })[tab](p);
+  }
+
+  function nextAnniv() {
+    const R = room();
+    const t = dayKey();
+    const items = [{ name: "在一起", date: R.start, yearly: true }, ...R.anniv];
+    let best = null;
+    for (const a of items) {
+      let d = a.date;
+      if (a.yearly) {
+        const [, m, dd] = a.date.split("-");
+        const y = new Date().getFullYear();
+        d = `${y}-${m}-${dd}`;
+        if (d < t) d = `${y + 1}-${m}-${dd}`;
+      }
+      if (d < t) continue;
+      const left = daysBetween(t, d);
+      if (!best || left < best.left) best = { ...a, left, on: d };
+    }
+    // 100 天倍数里程碑
+    const together = daysBetween(R.start, t) + 1;
+    const next100 = Math.ceil((together + (together % 100 === 0 ? 0 : 0)) / 100) * 100 || 100;
+    const left100 = next100 - together;
+    if (!best || left100 < best.left) best = { name: `在一起 ${next100} 天`, left: left100 };
+    return best;
+  }
+
+  function renderHome(p) {
+    const R = room();
+    const t = dayKey();
+    const daily = R.daily[t];
+    const myMood = R.mood[t]?.me;
+    const taMood = R.mood[t]?.ta;
+    const na = nextAnniv();
+    p.innerHTML = `
+      <div class="cp-card cp-note">
+        <p class="fun-kicker">💌 ${esc(partner.name)} 的今日悄悄话</p>
+        ${daily ? `<p class="cp-whisper">${esc(daily)}</p>` : `<button type="button" class="fun-btn solid sm" data-a="daily">拆开今天的悄悄话</button>`}
+      </div>
+      <div class="cp-card">
+        <p class="fun-kicker">今天的心情</p>
+        <div class="cp-moods">${MOODS.map((m) => `<button type="button" class="cp-mood${myMood === m ? " is-on" : ""}" data-mood="${m}">${m}</button>`).join("")}</div>
+        ${taMood ? `<p class="cp-ta-mood">${avHtml(partner, "fun-av sm")} ${esc(partner.name)} 今天：<b>${esc(taMood.m)}</b> ${esc(taMood.t)}</p>` : myMood ? `<p class="fun-note">${esc(partner.name)} 看到你的心情了…</p>` : `<p class="fun-note">打卡后 TA 也会告诉你 TA 的心情</p>`}
+      </div>
+      <div class="cp-card cp-count"><span>📅</span><div><strong>${na.left === 0 ? "就是今天！" : `还有 ${na.left} 天`}</strong><small>${esc(na.name)}</small></div></div>
+      <div class="cp-row">
+        <button type="button" class="cp-tile" data-tab="qa"><span>💬</span>今日一问${R.qa[t]?.me ? " ✓" : ""}</button>
+        <button type="button" class="cp-tile" data-tab="list"><span>✅</span>恋爱清单 ${Object.values(R.list).filter((v) => v.done).length}/${LIST.length}</button>
+      </div>
+      <div class="cp-foot"><button type="button" class="sh-link" data-a="settings">小屋设置</button> · <button type="button" class="sh-link" data-a="switch">换一位恋人</button></div>`;
+  }
+
+  function renderDiary(p) {
+    const R = room();
+    p.innerHTML = `<div class="cp-card"><textarea id="cp-dtext" rows="3" maxlength="500" placeholder="今天想对 TA 说的话，或者记下今天发生的事…"></textarea>
+      <div class="ww-row"><button type="button" class="fun-btn ghost sm" data-a="tadiary">看看 TA 今天写了什么</button><button type="button" class="fun-btn solid sm" data-a="write">写进日记</button></div></div>
+      <div class="cp-diary">${
+        R.diary.length
+          ? R.diary
+              .slice()
+              .reverse()
+              .map(
+                (d) => `<div class="cp-entry${d.by === "ta" ? " is-ta" : ""}"><p class="fun-kicker">${d.date.replace(/-/g, ".")} · ${d.by === "me" ? esc(user.name) : esc(partner.name)} 的日记</p><p>${esc(d.text).replace(/\n/g, "<br/>")}</p>
+            ${d.reply ? `<div class="cp-reply">${avHtml(d.by === "me" ? partner : user, "fun-av sm")}<span>${esc(d.reply)}</span></div>` : d.by === "me" ? `<p class="fun-note">等 TA 回复…</p>` : ""}</div>`
+              )
+              .join("")
+          : `<p class="fun-note cp-center">还没有日记。写下第一篇吧，TA 会认真回复的。</p>`
+      }</div>`;
+  }
+
+  function renderList(p) {
+    const R = room();
+    const n = Object.values(R.list).filter((v) => v.done).length;
+    p.innerHTML = `<div class="cp-progress"><span style="width:${(n / LIST.length) * 100}%"></span></div><p class="fun-note cp-center">完成了 ${n} / ${LIST.length} 件小事</p>
+      <div class="cp-list">${LIST.map((it, i) => {
+        const v = R.list[i] || {};
+        return `<button type="button" class="cp-li${v.done ? " is-done" : ""}" data-li="${i}"><span class="cp-check">${v.done ? "✓" : ""}</span><span><strong>${esc(it)}</strong>${v.done ? `<small>${esc(v.date || "")}${v.reply ? " · " + esc(partner.name) + "：" + esc(v.reply) : ""}</small>` : ""}</span></button>`;
+      }).join("")}</div>`;
+  }
+
+  function todayQuestion() {
+    const t = dayKey();
+    const n = Number(t.replace(/-/g, "")) % QUESTIONS.length;
+    return QUESTIONS[n];
+  }
+  function renderQa(p) {
+    const R = room();
+    const t = dayKey();
+    const q = R.qa[t]?.q || todayQuestion();
+    const cur = R.qa[t] || {};
+    const past = Object.entries(R.qa).filter(([d, v]) => d !== t && v.me && v.ta).sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, 10);
+    p.innerHTML = `<div class="cp-card cp-q"><p class="fun-kicker">${t.replace(/-/g, ".")} · 每日一问</p><h3>${esc(q)}</h3>
+        ${
+          cur.me
+            ? `<div class="cp-ans"><b>${esc(user.name)}</b><p>${esc(cur.me)}</p></div><div class="cp-ans is-ta"><b>${esc(partner.name)}</b><p>${cur.ta ? esc(cur.ta) : `<span class="is-typing"><i></i><i></i><i></i></span>`}</p></div>`
+            : `<textarea id="cp-qa" rows="2" maxlength="300" placeholder="先写下你的答案，才能看到 TA 的"></textarea><button type="button" class="fun-btn solid sm" data-a="answer">提交答案</button>`
+        }</div>
+      ${past.length ? `<p class="fun-kicker">往期</p>${past.map(([d, v]) => `<div class="cp-card cp-past"><small>${d.replace(/-/g, ".")}</small><strong>${esc(v.q)}</strong><p><b>${esc(user.name)}：</b>${esc(v.me)}</p><p><b>${esc(partner.name)}：</b>${esc(v.ta)}</p></div>`).join("")}` : ""}`;
+  }
+
+  function renderAnniv(p) {
+    const R = room();
+    const t = dayKey();
+    const list = [{ id: "start", name: "在一起", date: R.start, yearly: true, fixed: true }, ...R.anniv];
+    p.innerHTML = `<div class="cp-annivs">${list
+      .map((a) => {
+        const passed = daysBetween(a.date, t);
+        return `<div class="cp-card cp-anniv"><div><strong>${esc(a.name)}</strong><small>${a.date.replace(/-/g, ".")}${a.yearly ? " · 每年" : ""}</small></div><span class="cp-big">${passed >= 0 ? `已经 <b>${passed}</b> 天` : `还有 <b>${-passed}</b> 天`}</span>${a.fixed ? "" : `<button type="button" class="sh-link" data-del="${a.id}">删除</button>`}</div>`;
+      })
+      .join("")}</div>
+      <div class="cp-card"><p class="fun-kicker">添加纪念日</p><input id="cp-an" maxlength="20" placeholder="比如：第一次约会 / TA 的生日" /><input id="cp-ad" type="date" />
+        <label class="fun-switch"><input type="checkbox" id="cp-ay" checked /><span>每年重复</span></label><button type="button" class="fun-btn solid sm" data-a="addanniv">添加</button></div>`;
+  }
+
+  function renderAlbum(p) {
+    const R = room();
+    p.innerHTML = `<div class="cp-album-head"><button type="button" class="fun-btn solid sm" data-a="photo">＋ 放一张照片</button><input type="file" accept="image/*" hidden id="cp-file" /></div>
+      <div class="cp-album">${
+        R.photos.length
+          ? R.photos
+              .slice()
+              .reverse()
+              .map((ph) => `<figure class="cp-photo" data-ph="${ph.id}"><img src="${esc(ph.img)}" alt="" /><figcaption>${esc(ph.cap || "")}<small>${ph.date.replace(/-/g, ".")}</small>${ph.reply ? `<em>${esc(partner.name)}：${esc(ph.reply)}</em>` : ""}</figcaption></figure>`)
+              .join("")
+          : `<p class="fun-note cp-center">相册还是空的</p>`
+      }</div>`;
+    p.querySelector("#cp-file").onchange = async (e) => {
+      const f = e.target.files?.[0];
+      e.target.value = "";
+      if (!f) return;
+      const img = await compress(f);
+      openPhotoCaption(img);
+    };
+  }
+
+  function compress(file) {
+    return new Promise((resolve, reject) => {
+      const im = new Image();
+      const url = URL.createObjectURL(file);
+      im.onload = () => {
+        const s = Math.min(1, 900 / Math.max(im.width, im.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(im.width * s);
+        c.height = Math.round(im.height * s);
+        c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL("image/jpeg", 0.82));
+      };
+      im.onerror = reject;
+      im.src = url;
+    });
+  }
+
+  function openPhotoCaption(img) {
+    const sh = F.openSheet(
+      `<img class="cp-prev" src="${esc(img)}" alt="" /><label class="fun-field"><span>写一句话</span><input id="cp-cap" maxlength="60" placeholder="这是我们…" /></label><div class="fun-sheet-actions"><button type="button" class="fun-btn solid">放进相册</button></div>`,
+      { title: "新照片" }
+    );
+    sh.body.querySelector("button").onclick = async () => {
+      const R = room();
+      const ph = { id: uid(), img, cap: sh.body.querySelector("#cp-cap").value.trim(), date: dayKey() };
+      R.photos.push(ph);
+      save();
+      sh.close();
+      render();
+      if (!F.hasApiKey()) return;
+      try {
+        const msg = [
+          { role: "system", content: ctx() },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: `${user.name}往你们的情侣相册里放了一张照片${ph.cap ? "，配文：「" + ph.cap + "」" : ""}。看看照片，说一句话（30字内）。` },
+              { type: "image_url", image_url: { url: img } }
+            ]
+          }
+        ];
+        let txt;
+        try {
+          txt = await F.aiText(msg, { maxTokens: 400 });
+        } catch (_) {
+          txt = await say(`${user.name}往你们的情侣相册里放了一张照片${ph.cap ? "，配文：「" + ph.cap + "」" : ""}（你看不到图）。说一句话（30字内）。`, 300);
+        }
+        ph.reply = F.cleanLine(txt, 80, partner.name);
+        save();
+        if (tab === "album") render();
+      } catch (_) {
+        /* ignore */
+      }
+    };
+  }
+
+  function openSettings() {
+    const R = room();
+    const sh = F.openSheet(
+      `<label class="fun-field"><span>在一起的日子</span><input type="date" id="cp-start" value="${R.start}" /></label>
+       <label class="fun-field"><span>TA 怎么叫你（爱称，选填）</span><input id="cp-nick" maxlength="10" value="${esc(R.nick || "")}" placeholder="宝宝 / 笨蛋 / 小猫…" /></label>
+       <div class="fun-sheet-actions"><button type="button" class="fun-btn solid">保存</button></div>`,
+      { title: "小屋设置" }
+    );
+    sh.body.querySelector("button").onclick = () => {
+      R.start = sh.body.querySelector("#cp-start").value || R.start;
+      R.nick = sh.body.querySelector("#cp-nick").value.trim();
+      save();
+      sh.close();
+      render();
+    };
+  }
+
+  async function renderPick() {
+    const cast = await F.loadCast();
+    if (!root) return;
+    root.innerHTML = `<div class="fun-setup"><div class="fun-hero">🏡</div><p class="fun-kicker">COUPLE HOUSE</p><h2 class="fun-h2">情侣小屋</h2>
+      <p class="fun-note">选一位角色成为你的恋人，一起记录在一起的每一天。每位恋人有各自独立的小屋，可以随时切换。</p>
+      <div class="cp-pick">${cast.length ? cast.map((c) => `<button type="button" class="pt-person" data-pick="${esc(c.id)}">${avHtml(c, "fun-av")}<strong>${esc(c.name)}</strong>${S.by[c.id] ? `<small>❤ ${daysBetween(S.by[c.id].start, dayKey()) + 1} 天</small>` : ""}</button>`).join("") : `<p class="fun-note warn">角色库里还没有角色</p>`}</div></div>`;
+    root.querySelectorAll("[data-pick]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          partner = cast.find((c) => c.id === b.dataset.pick);
+          const isNew = !S.by[partner.id];
+          S.partnerId = partner.id;
+          room();
+          save();
+          tab = "home";
+          render();
+          if (isNew) openSettings();
+        })
+    );
+  }
+
+  /* ───── 交互 ───── */
+  async function onClick(e) {
+    const t = e.target.closest("[data-tab]");
+    if (t) {
+      tab = t.dataset.tab;
+      return render();
+    }
+    const R = partner ? room() : null;
+    const btn = e.target.closest("button");
+    const a = e.target.closest("[data-a]")?.dataset.a;
+    const busy = (txt) => {
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = txt;
+      }
+    };
+    try {
+      if (a === "switch") {
+        partner = null;
+        S.partnerId = "";
+        save();
+        return render();
+      }
+      if (a === "settings") return openSettings();
+      if (a === "daily") {
+        if (needKey()) return;
+        busy("拆信中…");
+        R.daily[dayKey()] = await say(`今天是${new Date().toLocaleDateString("zh-CN")}。给${user.name}写今天的悄悄话：一两句，像早安/晚安/突然想你时发的那种，要有今天的具体小事或小情绪。`, 400);
+        save();
+        return render();
+      }
+      const mood = e.target.closest("[data-mood]")?.dataset.mood;
+      if (mood) {
+        const d = dayKey();
+        R.mood[d] = { ...(R.mood[d] || {}), me: mood };
+        save();
+        render();
+        if (!F.hasApiKey() || R.mood[d].ta) return;
+        const txt = await F.aiText(
+          [
+            { role: "system", content: ctx() },
+            { role: "user", content: `${user.name}今天的心情打卡是 ${mood}。请给出你今天的心情和对TA心情的回应。只输出 JSON：{"mood":"一个表情","text":"一句话，25字内"}` }
+          ],
+          { maxTokens: 300 }
+        );
+        const o = F.parseJsonLoose(txt) || { mood: "🙂", text: F.cleanLine(txt, 40) };
+        R.mood[d].ta = { m: String(o.mood || "🙂").slice(0, 4), t: String(o.text || "").slice(0, 60) };
+        save();
+        return render();
+      }
+      if (a === "write") {
+        const v = root.querySelector("#cp-dtext").value.trim();
+        if (!v) return;
+        const entry = { id: uid(), by: "me", date: dayKey(), text: v };
+        R.diary.push(entry);
+        save();
+        render();
+        if (!F.hasApiKey()) return;
+        entry.reply = await say(`${user.name}在你们的恋爱日记里写了：\n「${v}」\n请回复这篇日记，要回应里面的具体内容和情绪，30~80字。`, 600);
+        save();
+        if (tab === "diary") render();
+        return;
+      }
+      if (a === "tadiary") {
+        if (needKey()) return;
+        busy("翻开 TA 的日记…");
+        const text = await say(`以你的身份写一篇今天的恋爱日记（${new Date().toLocaleDateString("zh-CN")}），80~160字，写你今天的生活、想到${user.name}的瞬间、没说出口的小心思。`, 900);
+        R.diary.push({ id: uid(), by: "ta", date: dayKey(), text });
+        save();
+        return render();
+      }
+      const li = e.target.closest("[data-li]");
+      if (li) {
+        const i = Number(li.dataset.li);
+        const v = R.list[i] || {};
+        if (v.done) {
+          delete R.list[i];
+          save();
+          return render();
+        }
+        R.list[i] = { done: true, date: dayKey() };
+        save();
+        render();
+        if (!F.hasApiKey()) return;
+        R.list[i].reply = await say(`你们刚刚一起完成了恋爱清单里的「${LIST[i]}」。说一句感想（20字内）。`, 300);
+        save();
+        if (tab === "list") render();
+        return;
+      }
+      if (a === "answer") {
+        const v = root.querySelector("#cp-qa").value.trim();
+        if (!v) return toast("写下你的答案吧");
+        const d = dayKey();
+        const q = todayQuestion();
+        R.qa[d] = { q, me: v };
+        save();
+        render();
+        if (!F.hasApiKey()) return;
+        R.qa[d].ta = await say(`今天的情侣问答是：「${q}」\n${user.name}的答案是：「${v}」\n请给出你自己的答案（真诚、具体、符合你的性格），也可以顺带回应一下TA的答案。40~100字。`, 700);
+        save();
+        if (tab === "qa") render();
+        return;
+      }
+      if (a === "addanniv") {
+        const name = root.querySelector("#cp-an").value.trim();
+        const date = root.querySelector("#cp-ad").value;
+        if (!name || !date) return toast("填上名字和日期");
+        R.anniv.push({ id: uid(), name, date, yearly: root.querySelector("#cp-ay").checked });
+        save();
+        return render();
+      }
+      const del = e.target.closest("[data-del]")?.dataset.del;
+      if (del) {
+        R.anniv = R.anniv.filter((x) => x.id !== del);
+        save();
+        return render();
+      }
+      if (a === "photo") return root.querySelector("#cp-file").click();
+    } catch (err) {
+      toast("出错了：" + err.message);
+      render();
+    }
+  }
+
+  F.register("情侣小屋", {
+    title: "情侣小屋",
+    kicker: "COUPLE HOUSE",
+    async mount(body) {
+      root = document.createElement("div");
+      root.className = "cp-root";
+      body.appendChild(root);
+      root.addEventListener("click", onClick);
+      const [cast, u] = await Promise.all([F.loadCast(), F.loadUser()]);
+      user = u;
+      await load();
+      partner = cast.find((c) => c.id === S.partnerId) || null;
+      if (root) render();
+    },
+    unmount() {
+      root = null;
+    }
+  });
+})();

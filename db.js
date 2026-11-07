@@ -1774,6 +1774,8 @@
     "fun-ludo.js?v=2",
     "fun-bubble.js?v=2",
     "fun-town.js?v=1",
+    "fun-astro.js?v=1",
+    "fun-couple.js?v=1",
     "share-config.js?v=3",
     "fun-share.js?v=2"
   ];

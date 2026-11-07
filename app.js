@@ -54791,7 +54791,7 @@ document.querySelectorAll("#drawer .drawer-item, .dock-btn").forEach((node) => {
       drawer.classList.remove("open");
       return;
     }
-    if (["音乐", "短视频", "UNO", "狼人杀", "游戏厅", "Bubble", "资源站", "Pocket Town"].includes(node.dataset.app)) {
+    if (["音乐", "短视频", "UNO", "狼人杀", "游戏厅", "Bubble", "资源站", "Pocket Town", "星座", "情侣小屋"].includes(node.dataset.app)) {
       if (typeof window.openFunApp === "function") window.openFunApp(node.dataset.app);
       else showToast("模块还在加载，稍等一下");
       drawer.classList.remove("open");
