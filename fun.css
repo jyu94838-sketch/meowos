@@ -6689,3 +6689,9 @@ body.dark .desk-app-ico {
   align-items: center;
   gap: 6px;
 }
+.mx-cl-empty {
+  text-align: center;
+  color: var(--text-sub);
+  font-size: 0.85rem;
+  margin: 18px 0;
+}

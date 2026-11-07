@@ -7,25 +7,11 @@
  * - 桌面第二页「更新公告」可以随时查看全部历史
  */
 (function () {
-  const CHANGELOG = [
-    {
-      v: 2,
-      date: "2026-11-07",
-      title: "第二页去掉重复的应用",
-      items: ["聊天、查岗、关系、人设、漫游、我的已经在第一页了，第二页不再重复放"]
-    },
-    {
-      v: 1,
-      date: "2026-11-07",
-      title: "Meow OS 1.0",
-      items: [
-        "欢迎来到 Meow OS！以后每次更新都会在这里告诉你改了什么",
-        "桌面第二页的应用换成方形图标，配色和第一页一致；自己换的图标会铺满整个方块（我的 → 装扮 → 桌面图标）"
-      ]
-    }
-  ];
-  const LATEST = CHANGELOG[0].v;
-  const SEEN_KEY = "meowos_seen_v2"; // 1.0 起重新计数
+  // 每次发版在最前面加一条，例如：
+  // { v: 1, date: "2026-11-08", title: "标题", items: ["改了什么"] },
+  const CHANGELOG = [];
+  const LATEST = CHANGELOG.length ? CHANGELOG[0].v : 0;
+  const SEEN_KEY = "meowos_seen_v3"; // 清空后重新计数
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -38,7 +24,7 @@
       <div class="mx-cl-card" role="dialog" aria-label="更新公告">
         <p class="mx-cl-k">${isUpdate ? "WHAT'S NEW" : "CHANGELOG"}</p>
         <h3>${isUpdate ? "Meow OS 更新啦" : "更新公告"}</h3>
-        <div class="mx-cl-list">${entries
+        <div class="mx-cl-list">${entries.length ? "" : `<p class="mx-cl-empty">暂时还没有更新公告</p>`}${entries
           .map(
             (e) => `<section><p class="mx-cl-ver"><b>${esc(e.title)}</b><small>v${e.v} · ${esc(e.date)}</small></p><ul>${e.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></section>`
           )
@@ -67,7 +53,7 @@
     } catch (_) {
       return;
     }
-    if (seen >= LATEST) return;
+    if (!LATEST || seen >= LATEST) return;
     const entries = seen ? CHANGELOG.filter((e) => e.v > seen) : CHANGELOG.slice(0, 1);
     // 等开屏结束、桌面出来以后再弹
     const wait = () => {
