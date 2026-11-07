@@ -1,4 +1,4 @@
-const CACHE_NAME = "xxj-pwa-v269";
+const CACHE_NAME = "xxj-pwa-v270";
 const KEEPALIVE_PERIODIC_TAG = "xxj-keepalive";
 const SCHEDULE_IDB = "xxj_sw_schedule";
 const SCHEDULE_STORE = "due";
@@ -22,6 +22,10 @@ const PRECACHE_URLS = [
   "./checkup.css?v=351",
   "./vendor/supabase.min.js",
   "./vendor/fflate.umd.js",
+  "./vendor/phosphor/regular/style.css?v=1",
+  "./vendor/phosphor/regular/Phosphor.woff2",
+  "./vendor/phosphor/fill/style.css?v=1",
+  "./vendor/phosphor/fill/Phosphor-Fill.woff2",
   "./manifest.webmanifest",
   "./icons/apple-touch-icon.png",
   "./icons/icon-192.png",

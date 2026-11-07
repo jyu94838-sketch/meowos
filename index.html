@@ -118,11 +118,15 @@
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@300;400;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Space+Grotesk:wght@300;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <!-- 谷歌字体国内常连不上：改成不阻塞页面（连不上就用系统字体，页面照常打开） -->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@300;400;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Space+Grotesk:wght@300;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="style.css?v=99">
   <link rel="stylesheet" href="roam.css?v=31">
   <link rel="stylesheet" href="forum.css?v=44">
   <link rel="stylesheet" href="relation.css?v=18">
+  <!-- 图标字体放在自己的仓库里：国内（尤其安卓）连不上 jsdelivr 时图标会全白 -->
+  <link rel="stylesheet" href="vendor/phosphor/regular/style.css?v=1">
+  <link rel="stylesheet" href="vendor/phosphor/fill/style.css?v=1">
   <link rel="stylesheet" href="fun.css?v=28">
 </head>
 <body>
@@ -8650,6 +8654,5 @@
   <!-- app.js / ai-api 由 db.js 在 #phone 就绪后注入；图标字体需尽早加载 -->
   <script src="fun-desk.js?v=12"></script>
   <script src="mx-skins.js?v=3"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web"></script>
 </body>
 </html>
