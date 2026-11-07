@@ -200,8 +200,30 @@
     { k: "penguin", n: "企鹅", e: ["🐧", "🐧", "🐧"] },
     { k: "fox", n: "小狐狸", e: ["🦊", "🦊", "🦊"] },
     { k: "duck", n: "小鸭", e: ["🐣", "🐥", "🦆"] },
-    { k: "panda", n: "熊猫", e: ["🐼", "🐼", "🐼"] }
+    { k: "panda", n: "熊猫", e: ["🐼", "🐼", "🐼"] },
+    { k: "bird", n: "小鸟", e: ["🐣", "🐦", "🦜"] },
+    { k: "turtle", n: "小乌龟", e: ["🐢", "🐢", "🐢"] },
+    { k: "fish", n: "小金鱼", e: ["🐟", "🐠", "🐠"] },
+    { k: "hedgehog", n: "刺猬", e: ["🦔", "🦔", "🦔"] },
+    { k: "squirrel", n: "松鼠", e: ["🐿️", "🐿️", "🐿️"] },
+    { k: "dragon", n: "小龙", e: ["🥚", "🐉", "🐲"] },
+    { k: "custom", n: "自定义", e: ["🐾", "🐾", "🐾"] }
   ];
+  const BREEDS = {
+    cat: ["橘猫", "布偶猫", "英短蓝猫", "三花", "暹罗猫", "黑猫", "奶牛猫", "缅因猫"],
+    dog: ["柯基", "柴犬", "金毛", "萨摩耶", "边牧", "泰迪", "比熊", "哈士奇"],
+    rabbit: ["垂耳兔", "白兔", "侏儒兔", "狮子兔"],
+    hamster: ["金丝熊", "布丁仓鼠", "银狐仓鼠"],
+    bird: ["玄凤鹦鹉", "虎皮鹦鹉", "文鸟", "小黄鸡"],
+    fox: ["赤狐", "雪狐"],
+    dragon: ["小火龙", "冰龙", "云朵龙"]
+  };
+  /** 宠物的种类名（自定义的用自己写的） */
+  const petKind = (pet) => {
+    const type = PETS.find((x) => x.k === pet.type) || PETS[0];
+    return pet.type === "custom" ? pet.customKind || "小宠物" : type.n;
+  };
+  const petDesc = (pet) => [pet.breed, petKind(pet), pet.look].filter(Boolean).join("，");
   const ACTS = {
     feed: { n: "喂饭", i: "🍖", d: { hunger: 35, mood: 5 }, say: ["吃得肚子圆滚滚", "狼吞虎咽", "吃完舔了舔嘴巴"] },
     bath: { n: "洗澡", i: "🛁", d: { clean: 45, mood: -5 }, say: ["一开始不情愿，洗完香喷喷", "甩了一身水", "泡泡糊了一脸"] },
@@ -248,20 +270,36 @@
     const R = room();
     if (!R.pet) {
       p.innerHTML = `<div class="cp-card cp-center"><p class="fun-kicker">🐾 一起养一只小宠物吧</p><div class="cp-pet-types">${PETS.map((x) => `<button type="button" class="cp-pet-type" data-pt="${x.k}"><span>${x.e[0]}</span>${x.n}</button>`).join("")}</div>
-        <input id="cp-pname" maxlength="8" placeholder="给 TA 起个名字" /><button type="button" class="fun-btn solid" data-a="adopt">领养</button></div>`;
+        <div class="cp-pet-form" id="cp-pform"></div>
+        <input id="cp-pname" maxlength="12" placeholder="给 TA 起个名字" /><button type="button" class="fun-btn solid" data-a="adopt">领养</button></div>`;
       let sel = PETS[0].k;
+      const form = p.querySelector("#cp-pform");
+      const drawForm = () => {
+        const br = BREEDS[sel] || [];
+        form.innerHTML = `${sel === "custom" ? `<input id="cp-pkind" maxlength="12" placeholder="是什么动物？比如：小羊驼、水豚、独角兽" />` : ""}
+          ${br.length ? `<div class="cp-breeds">${br.map((b) => `<button type="button" data-br="${esc(b)}">${esc(b)}</button>`).join("")}</div>` : ""}
+          <input id="cp-pbreed" maxlength="16" placeholder="品种（选填）" />
+          <input id="cp-plook" maxlength="60" placeholder="长什么样（选填）：毛色、眼睛、特征…" />`;
+        form.querySelectorAll("[data-br]").forEach((b) => (b.onclick = () => (form.querySelector("#cp-pbreed").value = b.dataset.br)));
+      };
       const mark = () => p.querySelectorAll("[data-pt]").forEach((b) => b.classList.toggle("is-on", b.dataset.pt === sel));
-      p.querySelectorAll("[data-pt]").forEach((b) => (b.onclick = () => ((sel = b.dataset.pt), mark())));
+      p.querySelectorAll("[data-pt]").forEach((b) => (b.onclick = () => ((sel = b.dataset.pt), mark(), drawForm())));
       mark();
+      drawForm();
       p.querySelector('[data-a="adopt"]').onclick = async () => {
         const type = PETS.find((x) => x.k === sel);
-        const name = p.querySelector("#cp-pname").value.trim() || type.n;
-        R.pet = { type: sel, name, born: dayKey(), level: 1, exp: 0, hunger: 80, clean: 80, mood: 80, energy: 80, tick: Date.now(), taAt: Date.now(), log: [{ at: Date.now(), who: "sys", text: `${user.name}和${partner.name}领养了${type.n}「${name}」🎀` }] };
+        const customKind = sel === "custom" ? (p.querySelector("#cp-pkind")?.value || "").trim() : "";
+        if (sel === "custom" && !customKind) return toast("写一下是什么动物");
+        const breed = p.querySelector("#cp-pbreed").value.trim();
+        const look = p.querySelector("#cp-plook").value.trim();
+        const kindName = customKind || type.n;
+        const name = p.querySelector("#cp-pname").value.trim() || kindName;
+        R.pet = { type: sel, customKind, breed, look, name, born: dayKey(), level: 1, exp: 0, hunger: 80, clean: 80, mood: 80, energy: 80, tick: Date.now(), taAt: Date.now(), photos: [], log: [{ at: Date.now(), who: "sys", text: `${user.name}和${partner.name}领养了${breed ? breed : ""}${kindName}「${name}」🎀` }] };
         save();
         render();
         if (F.hasApiKey()) {
           try {
-            R.pet.log.push({ at: Date.now(), who: "ta", text: await say(`你和${user.name}刚刚一起领养了一只${type.n}，取名「${name}」。说一句话（25字内）。`, 300) });
+            R.pet.log.push({ at: Date.now(), who: "ta", text: await say(`你和${user.name}刚刚一起领养了一只${petDesc(R.pet)}，取名「${name}」。说一句话（25字内）。`, 300) });
             save();
             if (tab === "pet") render();
           } catch (_) {
@@ -279,14 +317,156 @@
     const low = pet.hunger < 30 ? "饿了…" : pet.clean < 30 ? "有点脏脏的" : pet.mood < 30 ? "好无聊" : pet.energy < 25 ? "困困" : "";
     const bar = (k, n, c) => `<div class="cp-stat"><span>${n}</span><i><b style="width:${pet[k]}%;background:${c}"></b></i><em>${pet[k]}</em></div>`;
     p.innerHTML = `<div class="cp-card cp-pethome">
-        <div class="cp-pet-stage"><span class="cp-pet-emoji st-${st}${pet.energy < 25 ? " is-sleepy" : ""}">${type.e[st]}</span>${low ? `<span class="cp-pet-bubble">${low}</span>` : ""}</div>
-        <strong>${esc(pet.name)}</strong><small>${type.n} · ${STAGE_NAME[st]} · Lv.${pet.level}（${pet.exp}/${pet.level * 30}）· 第 ${daysBetween(pet.born, dayKey()) + 1} 天</small>
+        <div class="cp-pet-stage">${
+          pet.img
+            ? `<img class="cp-pet-emoji cp-pet-img${pet.energy < 25 ? " is-sleepy" : ""}" src="${esc(pet.img)}" alt="" />`
+            : `<span class="cp-pet-emoji st-${st}${pet.energy < 25 ? " is-sleepy" : ""}">${type.e[st]}</span>`
+        }${low ? `<span class="cp-pet-bubble">${low}</span>` : ""}${pet.imgStage != null && pet.img && pet.imgStage !== st ? `<span class="cp-pet-grow">长大了！可以重新生成样子</span>` : ""}</div>
+        <strong>${esc(pet.name)} <button type="button" class="cp-pet-edit" data-a="petedit">✎ 设定</button></strong><small>${esc(pet.breed ? pet.breed + " · " : "")}${esc(petKind(pet))} · ${STAGE_NAME[st]} · Lv.${pet.level}（${pet.exp}/${pet.level * 30}）· 第 ${daysBetween(pet.born, dayKey()) + 1} 天</small>
+        ${pet.look ? `<small class="cp-pet-look">${esc(pet.look)}</small>` : ""}
+        <div class="cp-pet-imgbtns"><button type="button" data-a="petimg">${pet.img ? "🎨 重新生成样子" : "🎨 生成 TA 的样子"}</button><button type="button" data-a="petshot">📸 拍一张日常</button><button type="button" data-a="petup">🖼 上传照片</button></div>
         ${bar("hunger", "饱腹", "#ffb86b")}${bar("clean", "清洁", "#7cc4e8")}${bar("mood", "心情", "#ff8fab")}${bar("energy", "精力", "#a78bfa")}
         <div class="cp-acts">${Object.entries(ACTS).map(([k, a]) => `<button type="button" data-act="${k}"><span>${a.i}</span>${a.n}</button>`).join("")}</div>
       </div>
+      ${(pet.photos || []).length ? `<p class="fun-kicker" style="margin-top:12px">${esc(pet.name)}的相册</p><div class="cp-pet-photos">${pet.photos.map((ph, i) => `<button type="button" data-pph="${i}"><img src="${esc(ph.img)}" alt="" loading="lazy" /></button>`).join("")}</div>` : ""}
       <div class="ww-row"><button type="button" class="fun-btn ghost sm" data-a="petask">问问 ${esc(partner.name)} 关于${esc(pet.name)}</button></div>
       <p class="fun-kicker" style="margin-top:12px">养育日记</p>
       <div class="cp-petlog">${pet.log.slice().reverse().map((l) => `<p class="${l.who}"><small>${new Date(l.at).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</small>${esc(l.text)}</p>`).join("")}</div>`;
+  }
+
+  /* ───── 宠物：设定 / 生成样子 / 拍照 ───── */
+  const petLook = (pet) => {
+    const st = STAGE(pet.level);
+    const age = ["baby, tiny, very young", "young, juvenile", "adult, fully grown"][st];
+    return `${petDesc(pet)}，${STAGE_NAME[st]}（${age}）`;
+  };
+  function petEdit(R) {
+    const pet = R.pet;
+    const sh = F.openSheet(
+      `<label class="fun-field"><span>名字</span><input id="pe-name" maxlength="12" value="${esc(pet.name)}" /></label>
+       <label class="fun-field"><span>种类</span><select id="pe-type">${PETS.map((x) => `<option value="${x.k}"${x.k === pet.type ? " selected" : ""}>${x.e[0]} ${x.n}</option>`).join("")}</select></label>
+       <label class="fun-field" id="pe-kind-f"${pet.type === "custom" ? "" : " hidden"}><span>是什么动物</span><input id="pe-kind" maxlength="12" value="${esc(pet.customKind || "")}" placeholder="比如：水豚、小羊驼、独角兽" /></label>
+       <label class="fun-field"><span>品种（选填）</span><input id="pe-breed" maxlength="16" value="${esc(pet.breed || "")}" placeholder="比如：布偶猫、柯基" /></label>
+       <label class="fun-field"><span>长什么样（选填）</span><textarea id="pe-look" rows="2" maxlength="80" placeholder="毛色、眼睛颜色、花纹、戴的小饰品…生成图片时会用到">${esc(pet.look || "")}</textarea></label>
+       <label class="fun-field"><span>性格（选填）</span><input id="pe-persona" maxlength="40" value="${esc(pet.persona || "")}" placeholder="比如：贪吃、黏人、有点傲娇" /></label>
+       <div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-pe="ok">保存</button></div>`,
+      { title: "宠物设定" }
+    );
+    const ty = sh.body.querySelector("#pe-type");
+    ty.onchange = () => (sh.body.querySelector("#pe-kind-f").hidden = ty.value !== "custom");
+    sh.body.querySelector('[data-pe="ok"]').onclick = () => {
+      const oldName = pet.name;
+      const oldDesc = petDesc(pet);
+      const name = sh.body.querySelector("#pe-name").value.trim();
+      if (!name) return toast("名字不能空着");
+      const type = ty.value;
+      const customKind = sh.body.querySelector("#pe-kind").value.trim();
+      if (type === "custom" && !customKind) return toast("写一下是什么动物");
+      pet.name = name;
+      pet.type = type;
+      pet.customKind = type === "custom" ? customKind : "";
+      pet.breed = sh.body.querySelector("#pe-breed").value.trim();
+      pet.look = sh.body.querySelector("#pe-look").value.trim();
+      pet.persona = sh.body.querySelector("#pe-persona").value.trim();
+      if (oldName !== name) pet.log.push({ at: Date.now(), who: "sys", text: `${user.name}给「${oldName}」改名叫「${name}」啦` });
+      if (oldDesc !== petDesc(pet) && pet.img) toast("样子改了，可以点「重新生成样子」");
+      save();
+      sh.close();
+      render();
+    };
+  }
+  async function petPortrait(R, busy) {
+    const pet = R.pet;
+    if (!F.hasImageGen()) return toast("还没配置生图：去「设置 → 生图」填好接口，或者点「上传照片」");
+    busy("正在画 " + pet.name + "…");
+    try {
+      const img = await F.genImage(
+        `一只可爱的宠物的单独肖像：${petLook(pet)}。${pet.persona ? "性格：" + pet.persona + "。" : ""}正面，看着镜头，干净柔和的背景，居中构图，只有这一只动物，没有人。`,
+        { style: "cute pet portrait, soft pastel background, high detail, adorable, centered" }
+      );
+      pet.img = img;
+      pet.imgStage = STAGE(pet.level);
+      pet.log.push({ at: Date.now(), who: "sys", text: `给${pet.name}画了一张新样子 🎨` });
+      save();
+    } catch (err) {
+      toast(err.message || "生成失败");
+    }
+    render();
+  }
+  async function petSnapshot(R, busy) {
+    const pet = R.pet;
+    if (!F.hasImageGen()) return toast("还没配置生图：去「设置 → 生图」填好接口");
+    const lastAct = pet.log
+      .slice()
+      .reverse()
+      .find((l) => l.who !== "sys");
+    const mood = pet.hunger < 30 ? "饿着肚子眼巴巴" : pet.energy < 25 ? "困得打瞌睡" : pet.mood > 70 ? "开心" : "安静";
+    busy("咔嚓…");
+    try {
+      const img = await F.genImage(
+        `宠物日常抓拍：${petLook(pet)}，看起来${mood}。${lastAct ? "刚刚：" + lastAct.text + "。" : ""}在${user.name}和${partner.name}的小家里，温馨的生活感。只拍宠物，不出现人脸。`,
+        { style: "candid pet photo, cozy home, natural light" }
+      );
+      pet.photos = pet.photos || [];
+      pet.photos.unshift({ img, at: Date.now(), cap: lastAct ? lastAct.text : "" });
+      if (pet.photos.length > 12) pet.photos.length = 12;
+      pet.log.push({ at: Date.now(), who: "sys", text: `📸 给${pet.name}拍了一张照片` });
+      save();
+    } catch (err) {
+      toast(err.message || "拍照失败");
+    }
+    render();
+  }
+  function petUpload(R) {
+    const fi = document.createElement("input");
+    fi.type = "file";
+    fi.accept = "image/*";
+    fi.onchange = async () => {
+      const f = fi.files?.[0];
+      if (!f) return;
+      const url = await new Promise((ok) => {
+        const im = new Image();
+        const u = URL.createObjectURL(f);
+        im.onload = () => {
+          const k = Math.min(1, 800 / Math.max(im.width, im.height));
+          const c = document.createElement("canvas");
+          c.width = Math.round(im.width * k);
+          c.height = Math.round(im.height * k);
+          c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(u);
+          ok(c.toDataURL("image/jpeg", 0.86));
+        };
+        im.onerror = () => ok("");
+        im.src = u;
+      });
+      if (!url) return toast("这张图读不出来");
+      R.pet.img = url;
+      R.pet.imgStage = STAGE(R.pet.level);
+      save();
+      render();
+    };
+    fi.click();
+  }
+  function petPhotoView(R, i) {
+    const ph = R.pet.photos[i];
+    if (!ph) return;
+    const sh = F.openSheet(
+      `<img class="cp-pet-big" src="${esc(ph.img)}" alt="" />${ph.cap ? `<p class="fun-note">${esc(ph.cap)}</p>` : ""}
+       <div class="fun-sheet-actions"><button type="button" class="fun-btn ghost" data-v="del">删除</button><button type="button" class="fun-btn ghost" data-v="set">设成头像</button><button type="button" class="fun-btn solid" data-v="ok">好</button></div>`,
+      { title: new Date(ph.at).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) }
+    );
+    sh.body.addEventListener("click", (e) => {
+      const v = e.target.closest("[data-v]")?.dataset.v;
+      if (!v) return;
+      if (v === "del") R.pet.photos.splice(i, 1);
+      if (v === "set") {
+        R.pet.img = ph.img;
+        R.pet.imgStage = STAGE(R.pet.level);
+      }
+      save();
+      sh.close();
+      render();
+    });
   }
 
   /* ───── 小剧场 ───── */
@@ -666,13 +846,18 @@
         if (emo) emo.classList.add("is-hop");
         return;
       }
+      if (a === "petedit" && R.pet) return petEdit(R);
+      if (a === "petimg" && R.pet) return void petPortrait(R, busy);
+      if (a === "petshot" && R.pet) return void petSnapshot(R, busy);
+      if (a === "petup" && R.pet) return petUpload(R);
+      const pph = e.target.closest("[data-pph]");
+      if (pph && R.pet) return petPhotoView(R, Number(pph.dataset.pph));
       if (a === "petask") {
         if (needKey()) return;
         busy("TA 在想…");
         const pet = R.pet;
-        const type = PETS.find((x) => x.k === pet.type) || PETS[0];
         const recent = pet.log.slice(-6).map((l) => l.text).join("；");
-        const t = await say(`你们一起养的${type.n}「${pet.name}」现在 Lv.${pet.level}，饱腹${pet.hunger}、清洁${pet.clean}、心情${pet.mood}、精力${pet.energy}。最近：${recent}。说说你对它的看法、照顾它时的小事，或者提醒${user.name}一起照顾它（40字内）。`, 400);
+        const t = await say(`你们一起养的${petDesc(pet)}「${pet.name}」${pet.persona ? "（性格：" + pet.persona + "）" : ""}现在 Lv.${pet.level}，饱腹${pet.hunger}、清洁${pet.clean}、心情${pet.mood}、精力${pet.energy}。最近：${recent}。说说你对它的看法、照顾它时的小事，或者提醒${user.name}一起照顾它（40字内）。`, 400);
         pet.log.push({ at: Date.now(), who: "ta", text: `${partner.name}：${t}` });
         save();
         return render();

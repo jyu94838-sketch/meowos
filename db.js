@@ -1776,12 +1776,12 @@
     "fun-town.js?v=1",
     "fun-natal.js?v=1",
     "fun-astro.js?v=2",
-    "fun-couple.js?v=3",
+    "fun-couple.js?v=4",
     "fun-weibo.js?v=2",
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
     "fun-widgets.js?v=6", "fun-icons.js?v=5", "mx-chatsearch.js?v=1", "fun-mimi.js?v=6", "mx-choose.js?v=3", "fun-yuzu.js?v=1", "fun-names.js?v=1", "fun-net.js?v=2", "fun-arcade.js?v=2", "fun-dress.js?v=1",
-    "changelog.js?v=33",
+    "changelog.js?v=34",
     "share-config.js?v=3", "st-gate.js?v=1",
     "fun-share.js?v=8"
   ];
