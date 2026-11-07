@@ -7689,3 +7689,97 @@ html body #chat-screen#chat-screen.mx-hide-av .chat-msg-avatar-col {
   margin-top: -4px;
   font-size: 0.66rem;
 }
+
+/* ═════════ 小组件在桌面格子里随便放 ═════════ */
+.desk-apps-grid {
+  grid-auto-flow: row;
+}
+.desk-wg-host {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+.desk-wg-host > .wg {
+  position: absolute;
+  inset: 3px;
+  margin: 0 !important;
+}
+.desk-wg-host:empty {
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--bg-card) 70%, transparent);
+  border: 1px solid var(--line);
+  margin: 3px;
+}
+.desk-ghost.desk-wg-host {
+  display: block;
+  transform: scale(1.04);
+}
+.desk-pager.is-editing .desk-wg-host {
+  cursor: grab;
+  animation: desk-wg-wobble 0.32s ease-in-out infinite alternate;
+}
+.desk-pager.is-editing .desk-wg-host > .wg {
+  pointer-events: none;
+}
+@keyframes desk-wg-wobble {
+  from { transform: rotate(-0.6deg); }
+  to { transform: rotate(0.6deg); }
+}
+.desk-wg-host.is-dragging {
+  opacity: 0.25;
+  animation: none !important;
+}
+.desk-drop-pv {
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--text-main) 10%, transparent);
+  outline: 2px dashed color-mix(in srgb, var(--text-main) 40%, transparent);
+  outline-offset: -3px;
+  pointer-events: none;
+  z-index: 0;
+}
+.desk-drop-pv.is-bad {
+  background: rgba(230, 70, 70, 0.12);
+  outline-color: rgba(230, 70, 70, 0.55);
+}
+.desk-wg-add {
+  margin: 0 0 8px !important;
+}
+
+/* ═════════ 搜歌：网易云 / Apple 切换 ═════════ */
+.fm-src {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 2px;
+}
+.fm-src button {
+  flex: 1;
+  padding: 7px 0;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--text-sub);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.fm-src button.is-on {
+  background: #e72d2c;
+  border-color: #e72d2c;
+  color: #fff;
+}
+.fm-src button[data-src="it"].is-on {
+  background: var(--text-main);
+  border-color: var(--text-main);
+  color: var(--bg-card);
+}
+.fm-vip {
+  display: inline-block;
+  font-style: normal;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0 4px;
+  border-radius: 4px;
+  border: 1px solid #e72d2c;
+  color: #e72d2c;
+  vertical-align: 2px;
+}

@@ -3306,7 +3306,7 @@ const KeepAliveModule = (() => {
     try {
       if (!("mediaSession" in navigator)) return;
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: "没心机",
+        title: "Meow OS",
         artist: "后台保活",
         album: " "
       });
@@ -4203,7 +4203,7 @@ function closeNotifySettingsSheet() {
 function buildTestChatNotifySnap(preview) {
   const mid = String(getActiveMaskIdForInbox() || "").trim() || "test";
   const tid = String(readChatActiveThreadRef().threadId || "").trim();
-  let displayName = "没心机";
+  let displayName = "Meow OS";
   let avatarUrl = "";
   let charId = "";
   let initial = "没";
@@ -5217,7 +5217,7 @@ function enqueueSystemChatNotification(snap) {
 
 /** @param {ChatNotifySnap} snap */
 function buildSystemNotificationPayload(snap) {
-  const title = String(snap.displayName || "").trim() || "没心机";
+  const title = String(snap.displayName || "").trim() || "Meow OS";
   const body = String(snap.preview || "").trim() || "新消息";
   const mid = String(snap.maskId || "").trim();
   const tid = String(snap.threadId || "").trim();
@@ -13674,7 +13674,7 @@ async function runBackupZipExport() {
     const url = URL.createObjectURL(built.blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `mxj-backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}.zip`;
+    a.download = `MeowOS-backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}.zip`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -28062,7 +28062,7 @@ function runMomentsGalleryDownloadClick() {
     showToast("没有可下载的图片");
     return;
   }
-  const stem = chatImageDownloadStem("没心机-朋友圈配图");
+  const stem = chatImageDownloadStem("MeowOS-朋友圈配图");
   const pref = momentsGalleryDownloadPrefetch;
   if (pref && pref.stored === stored && pref.blob) {
     try {
@@ -30465,7 +30465,7 @@ function exportActiveChatThreadRecordJson() {
       .replace(/\s+/g, "_")
       .slice(0, 72) || "chat";
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  downloadJson(`mxj-chat-${safe}-${ts}.json`, payload);
+  downloadJson(`MeowOS-chat-${safe}-${ts}.json`, payload);
   showToast(messages.length ? `已导出 ${messages.length} 条记录` : "已导出（暂无消息）");
 }
 
@@ -34357,7 +34357,7 @@ async function downloadXxjStGateCard() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "没心机-ST验证卡.png";
+  a.download = "MeowOS-ST验证卡.png";
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
@@ -54303,7 +54303,7 @@ function clearChatPhotoViewerDownloadPrefetch() {
 }
 
 function chatImageDownloadStem(baseName) {
-  return String(baseName || "没心机-聊天图片")
+  return String(baseName || "MeowOS-聊天图片")
     .trim()
     .replace(/[/\\?%*:|"<>]/g, "_")
     .slice(0, 72);
@@ -54456,7 +54456,7 @@ function runChatPhotoViewerDownloadClick() {
     showToast("没有可下载的图片");
     return;
   }
-  const stem = chatImageDownloadStem("没心机-聊天图片");
+  const stem = chatImageDownloadStem("MeowOS-聊天图片");
   const pref = chatPhotoViewerDownloadPrefetch;
   if (pref && pref.stored === stored && pref.blob) {
     try {
@@ -70741,7 +70741,7 @@ function exportWardrobeChatCssSnippetJson() {
   };
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const base = wardrobePromptJsonBasename(
-    `没心机-密谈壳-${chatUiCssPresetKindLabel(kind)}-${ts}`
+    `MeowOS-密谈壳-${chatUiCssPresetKindLabel(kind)}-${ts}`
   );
   if (base == null) return;
   downloadJson(`${base}.json`, payload);
@@ -70849,7 +70849,7 @@ function exportWardrobeLookJson() {
     if (v !== undefined) kv[key] = v;
   }
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const base = wardrobePromptJsonBasename(`没心机-装扮-${ts}`);
+  const base = wardrobePromptJsonBasename(`MeowOS-装扮-${ts}`);
   if (base == null) return;
   downloadJson(`${base}.json`, {
     format: "xxj-wardrobe-look",

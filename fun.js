@@ -790,29 +790,74 @@
       );
   }
 
+  /* ───── 网易云曲库（站长部署的 Supabase 函数 netease 代理搜索；播放用官方外链） ───── */
+  function neApiBase() {
+    const c = window.MX_SHARE_CONFIG || {};
+    return c.url ? String(c.url).replace(/\/+$/, "") + "/functions/v1/netease" : "";
+  }
+  async function neteaseSearch(term) {
+    const base = neApiBase();
+    if (!base) throw Object.assign(new Error("网易云曲库还没设置"), { neDown: true });
+    const c = window.MX_SHARE_CONFIG || {};
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 12000);
+    let res;
+    try {
+      res = await fetch(`${base}?type=search&limit=40&s=${encodeURIComponent(term)}`, {
+        headers: c.anonKey ? { apikey: c.anonKey } : {},
+        signal: ctl.signal
+      });
+    } catch (e) {
+      throw Object.assign(new Error(e?.name === "AbortError" ? "网易云搜索超时，检查一下网络" : "连不上网易云曲库"), { neDown: e?.name !== "AbortError" });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (res.status === 404 || res.status === 401) throw Object.assign(new Error("网易云曲库还没部署好"), { neDown: true });
+    if (!res.ok) throw new Error("网易云搜索失败（" + res.status + "）");
+    const d = await res.json();
+    return (d.songs || [])
+      .filter((x) => !x.off)
+      .map((x) => ({ ne: true, neId: x.id, title: x.title, artist: x.artist, album: x.album, cover: x.cover, vip: !!x.vip, dur: x.dur, url: `https://music.163.com/song/media/outer/url?id=${x.id}.mp3` }));
+  }
+
   function openSearch(prefill) {
+    let src = "ne"; // ne = 网易云，it = Apple 试听
     const sh = openSheet(
       `<div class="fm-search"><input type="search" placeholder="歌名 / 歌手" value="${esc(prefill || "")}" /><button type="button" class="fun-btn solid sm">搜索</button></div>
-       <button type="button" class="fm-ne-go" id="fm-ne-go">☁ 去网易云搜，听完整版</button>
-       <p class="fun-note">下面是 Apple Music 曲库，可以试听 30 秒。想听完整版：点上面或每首歌的 ☁ 去网易云，找到歌后「分享 → 复制链接」，回来点「粘贴并播放」就行。</p>
+       <div class="fm-src"><button type="button" class="is-on" data-src="ne">☁ 网易云</button><button type="button" data-src="it">Apple 试听</button></div>
+       <p class="fun-note" id="fm-src-note">网易云曲库：免费歌曲直接听完整版；标了 VIP 的要去网易云 App 用会员听。</p>
        <div class="fm-results" id="fm-results"></div>`,
       { title: "搜歌" }
     );
     sh.el.classList.add("fun-sheet--tall");
     const inp = sh.body.querySelector("input");
     const box = sh.body.querySelector("#fm-results");
+    const note = sh.body.querySelector("#fm-src-note");
+    const setSrc = (k) => {
+      src = k;
+      sh.body.querySelectorAll("[data-src]").forEach((b) => b.classList.toggle("is-on", b.dataset.src === k));
+      note.textContent = k === "ne" ? "网易云曲库：免费歌曲直接听完整版；标了 VIP 的要去网易云 App 用会员听。" : "Apple Music 曲库：每首可以试听 30 秒。";
+    };
     let results = [];
     const go = async () => {
       const q = inp.value.trim();
       if (!q) return;
       box.innerHTML = `<p class="fun-note"><span class="fun-spin"></span> 搜索中…</p>`;
       try {
-        results = await itunesSearch(q);
+        try {
+          results = src === "ne" ? await neteaseSearch(q) : await itunesSearch(q);
+        } catch (err) {
+          if (src !== "ne" || !err.neDown) throw err;
+          // 网易云曲库没部署 / 连不上：自动换 Apple 试听
+          setSrc("it");
+          note.textContent = "网易云曲库暂时连不上（站长需要按 NETEASE-SETUP.md 部署一次），先用 Apple 试听。";
+          results = await itunesSearch(q);
+        }
         box.innerHTML = results.length
           ? results
               .map(
-                (r, i) => `<div class="fm-res" data-i="${i}"><img src="${esc(r.cover)}" alt="" loading="lazy" /><span><strong>${esc(r.title)}</strong><small>${esc(r.artist)} · ${esc(r.album || "")}</small></span>
-                <button type="button" class="fun-btn ghost sm" data-r="ne" title="去网易云听完整版">☁</button><button type="button" class="fun-btn ghost sm" data-r="play">试听</button><button type="button" class="fun-btn solid sm" data-r="add">＋</button></div>`
+                (r, i) => `<div class="fm-res" data-i="${i}"><img src="${esc(r.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" /><span><strong>${esc(r.title)}${r.vip ? ` <em class="fm-vip">VIP</em>` : ""}</strong><small>${esc(r.artist)}${r.album ? " · " + esc(r.album) : ""}</small></span>
+                ${r.vip ? `<button type="button" class="fun-btn ghost sm" data-r="ne" title="去网易云 App 听">☁ 去听</button>` : `<button type="button" class="fun-btn ghost sm" data-r="play">${r.ne ? "播放" : "试听"}</button><button type="button" class="fun-btn solid sm" data-r="add">＋</button>`}</div>`
               )
               .join("")
           : `<p class="fun-note">没有找到，换个关键词试试</p>`;
@@ -821,21 +866,26 @@
       }
     };
     sh.body.querySelector(".fm-search button").onclick = go;
-    sh.body.querySelector("#fm-ne-go").onclick = () => {
-      const q = inp.value.trim();
-      if (!q) return toast("先输入歌名");
-      goNeSearch(q);
-    };
+    sh.body.querySelector(".fm-src").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-src]");
+      if (!b || b.dataset.src === src) return;
+      setSrc(b.dataset.src);
+      if (inp.value.trim()) go();
+    });
     inp.addEventListener("keydown", (e) => e.key === "Enter" && !e.isComposing && go());
     box.addEventListener("click", async (e) => {
       const row = e.target.closest(".fm-res");
       const r = row && results[Number(row.dataset.i)];
       const act = e.target.closest("[data-r]")?.dataset.r;
       if (!r || !act) return;
-      if (act === "ne") return goNeSearch(`${r.title} ${r.artist}`);
+      if (act === "ne") {
+        if (r.neId) return openInNetease({ title: r.title, url: r.url }, false);
+        return goNeSearch(`${r.title} ${r.artist}`);
+      }
       let i = music.tracks.findIndex((t) => t.url === r.url);
       if (i < 0) {
-        const rec = { id: uid(), title: r.title, artist: r.artist, url: r.url, cover: r.cover, preview: true, addedAt: Date.now() };
+        const rec = { id: uid(), title: r.title, artist: r.artist, url: r.url, cover: r.cover, addedAt: Date.now() };
+        if (!r.ne) rec.preview = true;
         await FunDB.putTrack(rec);
         music.tracks.push(rec);
         i = music.tracks.length - 1;

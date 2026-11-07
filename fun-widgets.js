@@ -2,7 +2,7 @@
 
 /**
  * 桌面小组件
- * - 显示在桌面第二页顶部（应用图标上方），4 列网格：小 2×2、中 4×2、大 4×4
+ * - 放在桌面应用页的格子里（和图标一起），小 2×2、中 4×2、大 4×4；长按桌面后可以拖到任意位置
  * - 在「我的 → 装扮」里点「桌面小组件」管理，也可以点桌面上的「编辑」
  * - 类型：照片、音乐、便签、倒数日、时钟、情侣天数、角色、今日运势
  */
@@ -142,8 +142,45 @@
     return `<div class="wg wg-${w.size} wg-t-${w.type}" data-wid="${w.id}">${await widgetInner(w)}${editing ? `<button type="button" class="wg-del" data-del="${w.id}">✕</button>` : ""}</div>`;
   }
 
-  /* ───── 桌面上的小组件区 ───── */
+  /* ───── 桌面：位置交给 fun-desk.js，这里只负责画内容 ───── */
+  const htmlCache = {};
+  let paintSeq = 0;
+  function fillHost(host, html) {
+    if (host.__wgHtml === html) return;
+    host.__wgHtml = html;
+    host.innerHTML = html;
+  }
+  async function paint() {
+    const hosts = [...document.querySelectorAll(".desk-wg-host[data-wid]:not(.desk-ghost)")];
+    // 先用上次的样子填上，不闪
+    hosts.forEach((h) => htmlCache[h.dataset.wid] && fillHost(h, htmlCache[h.dataset.wid]));
+    const seq = ++paintSeq;
+    for (const w of widgets) {
+      try {
+        htmlCache[w.id] = await widgetHtml(w, false);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    if (seq !== paintSeq) return;
+    document.querySelectorAll(".desk-wg-host[data-wid]:not(.desk-ghost)").forEach((h) => htmlCache[h.dataset.wid] && fillHost(h, htmlCache[h.dataset.wid]));
+  }
+  let deskClickBound = false;
   async function renderDesk() {
+    const D = window.XXJ_DESK;
+    if (D && typeof D.setWidgets === "function") {
+      if (!deskClickBound) {
+        deskClickBound = true;
+        document.addEventListener("click", (e) => {
+          if (!e.target.closest(".desk-wg-host")) return;
+          if (D.isEditing && D.isEditing()) return;
+          onDeskClick(e);
+        });
+      }
+      D.setWidgets(widgets.map((w) => ({ id: w.id, size: w.size })));
+      await paint();
+      return;
+    }
     if (!area) {
       area = document.getElementById("desk-widgets-slot");
       if (!area) {
@@ -380,5 +417,6 @@
       void renderDesk();
     }, 4000);
   }
+  window.XXJ_WIDGETS = { paint: () => void paint() };
   void boot();
 })();

@@ -181,6 +181,93 @@ body.dark #chat-list-screen .chat-thread-card-name { color: #e8e8e8 !important; 
 }
 `
   };
+  // 聊天页整体（顶栏、角色卡、输入框）也跟着风格走
+  const frame = (o) => `
+/* ===== 聊天页顶栏 / 输入框 ===== */
+/* 去掉原主题的角色大卡片、背景装饰（点顶栏名字仍可看心声） */
+#chat-screen .chat-identity-wrap,
+#chat-screen .settings-ambient,
+#chat-screen .chat-filmgrain,
+#chat-screen .chat-watermark { display: none !important; }
+#chat-screen .settings-inner,
+#chat-screen .chat-body-stack,
+#chat-screen .chat-main { background: ${o.bg} !important; }
+#chat-screen { background: ${o.bg} !important; }
+
+/* 顶栏：居中显示名字 */
+#chat-screen .chat-screen-topbar {
+  background: ${o.top} !important;
+  border-bottom: 1px solid ${o.line} !important;
+  box-shadow: none !important;
+}
+#chat-screen #chat-meta-label { display: none !important; }
+#chat-screen #chat-meta-eyebrow { display: none !important; }
+#chat-screen .mx-chat-title {
+  display: block !important; font-size: 1.05rem; font-weight: 600; letter-spacing: 0;
+  color: ${o.text}; text-transform: none; font-style: normal; cursor: pointer;
+  max-width: 52vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#chat-screen .chat-thread-detail-tape-btn,
+#chat-screen #mx-chat-search-btn {
+  background: transparent !important; border: none !important; box-shadow: none !important; transform: none !important;
+}
+#chat-screen .chat-thread-detail-tape-btn-sheen { display: none !important; }
+
+/* 输入区：通栏浅灰底 + 白色输入框 */
+#chat-screen .chat-composer {
+  background: ${o.bar} !important;
+  border-top: 1px solid ${o.line} !important;
+  box-shadow: none !important;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+}
+#chat-screen .chat-composer .chat-slab-spine,
+#chat-screen .chat-composer .chat-slab-tape,
+#chat-screen .chat-composer .chat-composer-cap { display: none !important; }
+#chat-screen .chat-composer .chat-slab,
+#chat-screen .chat-composer .chat-slab-stack,
+#chat-screen .chat-composer .chat-slab-mat {
+  display: block !important; padding: 0 !important; margin: 0 !important;
+  border: none !important; background: none !important; box-shadow: none !important; transform: none !important;
+}
+#chat-screen .chat-composer .chat-composer-panel {
+  display: flex !important; align-items: flex-end; gap: 8px;
+  padding: 0 !important; margin: 0 !important;
+  border: none !important; background: none !important; box-shadow: none !important; border-radius: 0 !important; transform: none !important;
+}
+#chat-screen .chat-composer .chat-input-ruled {
+  flex: 1; min-width: 0; background: ${o.input} !important; border: none !important;
+  border-radius: ${o.inputRadius} !important; box-shadow: none !important; padding: 0 !important;
+}
+#chat-screen .chat-composer .chat-input {
+  background: transparent !important; background-image: none !important; border: none !important;
+  min-height: 40px !important; height: 40px; max-height: 110px !important; field-sizing: content; resize: none !important; padding: 9px 12px !important; font-size: 1rem !important; line-height: 1.4 !important;
+  color: ${o.text} !important; font-style: normal !important;
+}
+#chat-screen .chat-composer .chat-input::placeholder { color: ${o.ph} !important; font-style: normal !important; }
+#chat-screen .chat-composer .chat-composer-fabs { display: flex !important; gap: 8px; align-items: center; flex-direction: row !important; padding-bottom: 3px; margin: 0 !important; }
+#chat-screen .chat-composer .chat-more-btn {
+  width: 34px !important; height: 34px !important; min-width: 34px; border-radius: 50% !important;
+  border: 1.6px solid ${o.icon} !important; background: transparent !important; color: ${o.icon} !important;
+  box-shadow: none !important; transform: none !important; padding: 0 !important; font-size: 1.1rem;
+}
+#chat-screen .chat-composer .chat-send-fab {
+  width: auto !important; min-width: 56px; height: 34px !important; border-radius: ${o.sendRadius} !important;
+  border: none !important; background: ${o.send} !important; color: #fff !important;
+  box-shadow: none !important; transform: none !important; padding: 0 12px !important;
+}
+body.dark #chat-screen,
+body.dark #chat-screen .settings-inner,
+body.dark #chat-screen .chat-body-stack,
+body.dark #chat-screen .chat-main { background: ${o.dbg} !important; }
+body.dark #chat-screen .chat-screen-topbar,
+body.dark #chat-screen .chat-composer { background: ${o.dbar} !important; border-color: #2a2a2a !important; }
+body.dark #chat-screen .chat-composer .chat-input-ruled { background: #2c2c2c !important; }
+body.dark #chat-screen .mx-chat-title,
+body.dark #chat-screen .chat-composer .chat-input { color: #e6e6e6 !important; }
+`;
+  CSS.wechat += frame({ bg: "#ededed", top: "#ededed", bar: "#f7f7f7", line: "#e0e0e0", input: "#fff", inputRadius: "6px", text: "#191919", ph: "#b2b2b2", icon: "#181818", send: "#07c160", sendRadius: "6px", dbg: "#111", dbar: "#1e1e1e" });
+  CSS.qq += frame({ bg: "#f1f4f9", top: "#ffffffee", bar: "#f5f7fa", line: "#e3e8f0", input: "#fff", inputRadius: "18px", text: "#1f1f1f", ph: "#a9b2bf", icon: "#4a5568", send: "linear-gradient(135deg, #3fb2ff, #1888ff)", sendRadius: "17px", dbg: "#17181c", dbar: "#1c1d21" });
+
   const CHAT_SKINS = [
     ["default", "默认", "Meow OS 原来的样子"],
     ["wechat", "微信风", "绿色气泡、方形头像"],
@@ -258,6 +345,28 @@ body.dark #chat-list-screen .chat-thread-card-name { color: #e8e8e8 !important; 
       } else av.textContent = name.slice(0, 1);
       btn.insertBefore(av, btn.firstChild);
     });
+  }
+  /* 微信 / QQ 风格：顶栏中间显示角色名字，点名字看心声 */
+  function syncTitle() {
+    const eb = document.getElementById("chat-meta-eyebrow");
+    if (!eb) return;
+    let t = document.querySelector("#chat-screen .mx-chat-title");
+    if (!t) {
+      t = document.createElement("span");
+      t.className = "mx-chat-title";
+      t.style.display = "none";
+      t.setAttribute("role", "button");
+      t.addEventListener("click", () => document.getElementById("chat-header-char-face")?.click());
+      eb.parentNode.appendChild(t);
+    }
+    const raw = String(eb.textContent || "").trim();
+    const m = raw.match(/「(.+)」/);
+    t.textContent = m ? m[1] : raw.replace(/^与/, "");
+  }
+  const eb0 = document.getElementById("chat-meta-eyebrow");
+  if (eb0 && window.MutationObserver) {
+    new MutationObserver(syncTitle).observe(eb0, { childList: true, characterData: true, subtree: true });
+    syncTitle();
   }
   const listRoot = document.getElementById("chat-thread-list-root");
   if (listRoot && window.MutationObserver) new MutationObserver(() => decorateList()).observe(listRoot, { childList: true, subtree: true });
