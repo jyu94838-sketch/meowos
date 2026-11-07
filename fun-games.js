@@ -73,30 +73,9 @@
     title: "游戏厅",
     kicker: "GAME CENTER",
     async mount(body) {
-      const recs = await F.loadRecords();
-      const won = recs.filter((r) => r.userWon).length;
-      const byName = {};
-      for (const r of recs) for (const n of r.players) {
-        const x = (byName[n] = byName[n] || { n: 0, w: 0 });
-        x.n++;
-        if (r.userWon) x.w++;
-      }
-      const rivals = Object.entries(byName).sort((a, b) => b[1].n - a[1].n).slice(0, 6);
       body.innerHTML = `<div class="gh">
         <div class="gh-grid">${GAMES.map((g) => `<button type="button" class="gh-card" data-g="${g.key}"><span class="gh-ico">${g.icon}</span><strong>${g.name}</strong><small>${g.desc}</small></button>`).join("")}</div>
-        <div class="gh-rec">
-          <div class="gh-rec-head"><span class="fun-kicker">RECORDS · 战绩</span><span class="gh-total">${recs.length} 局 · 胜 ${won} · 胜率 ${recs.length ? Math.round((won / recs.length) * 100) : 0}%</span></div>
-          ${rivals.length ? `<div class="gh-rivals">${rivals.map(([n, v]) => `<span class="fun-chip">${esc(n)} · 同局 ${v.n} · 你赢 ${v.w}</span>`).join("")}</div>` : ""}
-          <ul class="gh-list">${
-            recs.length
-              ? recs
-                  .slice(-15)
-                  .reverse()
-                  .map((r) => `<li><span class="gh-res ${r.userWon ? "is-win" : ""}">${r.userWon ? "胜" : "负"}</span><span><strong>${esc(r.game)}</strong><small>${esc(r.players.join("、"))}${r.note ? " · " + esc(r.note) : ""}</small></span><small>${new Date(r.at).toLocaleDateString()}</small></li>`)
-                  .join("")
-              : `<li class="gh-none">还没有战绩，去玩一局吧。角色们会记住和你的输赢。</li>`
-          }</ul>
-        </div></div>`;
+      </div>`;
       body.querySelectorAll("[data-g]").forEach((b) => (b.onclick = () => F.open(b.dataset.g)));
     },
     unmount() {}

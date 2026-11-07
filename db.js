@@ -1770,7 +1770,7 @@
     "fun-uno.js?v=2",
     "fun-wolf.js?v=2",
     "fun-video.js?v=3",
-    "fun-games.js?v=2",
+    "fun-games.js?v=3",
     "fun-ludo.js?v=2",
     "fun-bubble.js?v=2",
     "fun-town.js?v=1",
@@ -1781,7 +1781,7 @@
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
     "fun-widgets.js?v=3",
-    "changelog.js?v=11",
+    "changelog.js?v=12",
     "share-config.js?v=3",
     "fun-share.js?v=3"
   ];
