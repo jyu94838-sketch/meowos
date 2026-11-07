@@ -22,28 +22,28 @@
     if (typeof f === "function") f();
     else if (typeof showToast === "function") showToast("还在加载，稍等一下");
   };
-  /** key: [名称, Phosphor 图标, 色相, 打开方式] */
+  /** key: [名称, Phosphor 图标, 色相, 英文小标, 打开方式] */
   const APPS = {
-    chat: ["聊天", "ph-chat-circle-text", 215, call("openChatListScreen")],
-    bubble: ["Bubble", "ph-chat-teardrop-dots", 280, fun("Bubble")],
-    char: ["角色人设", "ph-identification-card", 250, call("openCharScreen")],
-    wb: ["世界书", "ph-book-open-text", 30, call("openWorldBookScreen")],
-    relation: ["关系", "ph-heart-straight", 345, call("openRelationScreen")],
-    checkup: ["查岗", "ph-device-mobile-camera", 190, call("openCheckupScreen")],
-    roam: ["漫游", "ph-footprints", 140, call("openRoamScreen")],
-    couple: ["情侣小屋", "ph-house-simple", 335, fun("情侣小屋")],
-    music: ["音乐", "ph-music-notes", 260, fun("音乐")],
-    video: ["刷刷", "ph-film-strip", 0, fun("短视频")],
-    weibo: ["微博", "ph-fire", 22, fun("微博")],
-    sprout: ["Sprout", "ph-plant", 120, fun("Sprout")],
-    forum: ["论坛", "ph-newspaper", 205, call("openForumScreen")],
-    mart: ["Meow Mart", "ph-shopping-bag", 18, fun("Meow Mart")],
-    town: ["Pocket Town", "ph-house-line", 95, fun("Pocket Town")],
-    astro: ["星座", "ph-moon-stars", 265, fun("星座")],
-    games: ["游戏厅", "ph-game-controller", 300, fun("游戏厅")],
-    share: ["资源站", "ph-package", 175, fun("资源站")],
-    my: ["我的", "ph-user-circle", 230, call("openMyScreen")],
-    news: ["更新公告", "ph-megaphone", 40, call("openChangelog")]
+    chat: ["聊天", "ph-chat-circle-text", 215, "Chat", call("openChatListScreen")],
+    bubble: ["Bubble", "ph-chat-teardrop-dots", 280, "Idol", fun("Bubble")],
+    char: ["角色人设", "ph-identification-card", 250, "Persona", call("openCharScreen")],
+    wb: ["世界书", "ph-book-open-text", 30, "Lore", call("openWorldBookScreen")],
+    relation: ["关系", "ph-heart-straight", 345, "Bond", call("openRelationScreen")],
+    checkup: ["查岗", "ph-device-mobile-camera", 190, "Audit", call("openCheckupScreen")],
+    roam: ["漫游", "ph-footprints", 140, "Roam", call("openRoamScreen")],
+    couple: ["情侣小屋", "ph-house-simple", 335, "Couple", fun("情侣小屋")],
+    music: ["音乐", "ph-music-notes", 260, "Music", fun("音乐")],
+    video: ["刷刷", "ph-film-strip", 0, "Shorts", fun("短视频")],
+    weibo: ["微博", "ph-fire", 22, "Trend", fun("微博")],
+    sprout: ["Sprout", "ph-plant", 120, "Notes", fun("Sprout")],
+    forum: ["论坛", "ph-newspaper", 205, "Square", call("openForumScreen")],
+    mart: ["Meow Mart", "ph-shopping-bag", 18, "Shop", fun("Meow Mart")],
+    town: ["Pocket Town", "ph-house-line", 95, "Town", fun("Pocket Town")],
+    astro: ["星座", "ph-moon-stars", 265, "Stars", fun("星座")],
+    games: ["游戏厅", "ph-game-controller", 300, "Arcade", fun("游戏厅")],
+    share: ["资源站", "ph-package", 175, "Share", fun("资源站")],
+    my: ["我的", "ph-user-circle", 230, "Mine", call("openMyScreen")],
+    news: ["更新公告", "ph-megaphone", 40, "News", call("openChangelog")]
   };
   const DEFAULT = [Object.keys(APPS)];
 
@@ -93,9 +93,10 @@
   dots.className = "desk-dots";
   phone.appendChild(dots);
 
+  // 和第一页一样的卡片样式：英文小标 + 斜体名字 + 右上角线条图标
   const iconHtml = (k) => {
-    const [name, icon, h] = APPS[k];
-    return `<button type="button" class="desk-app" data-k="${k}" style="--h:${h}"><span class="desk-app-ico"><i class="ph ${icon}"></i></span><span class="desk-app-name">${name}</span></button>`;
+    const [name, icon, , kicker] = APPS[k];
+    return `<button type="button" class="desk-app app-nora" data-k="${k}"><span class="app-nora-k">${kicker}</span><strong>${name}</strong><i class="ph ${icon}"></i></button>`;
   };
 
   function render() {
@@ -245,7 +246,7 @@
       }
       const app = e.target.closest(".desk-app");
       if (!app || editing) return;
-      APPS[app.dataset.k]?.[3]();
+      APPS[app.dataset.k]?.[4]();
     },
     true
   );
@@ -269,7 +270,7 @@
         drag.started = true;
         const r = drag.el.getBoundingClientRect();
         const g = drag.el.cloneNode(true);
-        g.className = "desk-app desk-ghost";
+        g.className = "desk-app app-nora desk-ghost";
         g.style.cssText += `;left:${r.left}px;top:${r.top}px;width:${r.width}px`;
         document.body.appendChild(g);
         drag.ghost = g;
