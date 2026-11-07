@@ -295,7 +295,7 @@
     const lv = Math.min(18, 1 + Math.floor((t.checkin?.days || 0) / 3));
     const signed = t.checkin?.last === new Date().toDateString();
     const sh = F.openSheet(
-      `<div class="wb-th ${t.kind}"><span class="wb-topic-ico ${t.kind}">${t.kind === "cp" ? "💞" : "⭐"}</span><div><strong>${esc(topicName(t))}</strong><small>${t.members.map((m) => esc(m.name)).join(" × ")} · 粉丝 ${fmtN(t.fans)}</small></div>
+      `<div class="wb-th ${t.kind}"><span class="wb-topic-ico ${t.kind}">${t.kind === "cp" ? "💞" : "⭐"}</span><div><strong>${esc(topicName(t))} <button type="button" class="wb-rename" data-a="trename">✎ 改名</button></strong><small>${t.members.map((m) => esc(m.name)).join(" × ")} · 粉丝 ${fmtN(t.fans)}</small></div>
          <button type="button" class="fun-btn ${signed ? "ghost" : "solid"} sm" data-a="sign" ${signed ? "disabled" : ""}>${signed ? `已签到 · Lv.${lv}` : "签到"}</button></div>
        <div class="ww-row wb-trow"><button type="button" class="fun-btn ghost sm" data-a="tpost">✏️ 发帖</button><button type="button" class="fun-btn solid sm" data-a="tgen">看看大家发了什么</button></div>
        <div id="wb-tp">${t.posts.map((x) => postHtml(x, "topic")).join("") || `<p class="fun-note">还没有帖子</p>`}</div>`,
@@ -312,6 +312,31 @@
         toast(`签到成功！连续签到 ${t.checkin.days} 天`);
         sh.close();
         openTopic(t);
+      }
+      if (a === "trename") {
+        const r = F.openSheet(
+          `<label class="fun-field"><span>超话名${t.kind === "cp" ? "（CP 名）" : "（后面会自动加「超话」两个字）"}</span><input id="wb-rn" maxlength="16" value="${esc(t.name)}" /></label>
+           <div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-ok>保存</button></div>`,
+          { title: "给超话改名" }
+        );
+        const inp = r.body.querySelector("#wb-rn");
+        setTimeout(() => inp.focus(), 200);
+        r.body.querySelector("[data-ok]").onclick = () => {
+          const v = inp.value.trim().replace(/超话$/, "").replace(/[#]/g, "");
+          if (!v) return toast("名字不能空着");
+          const old = topicName(t);
+          t.name = v;
+          const now = topicName(t);
+          // 帖子上「来自 xx」也一起改
+          t.posts.forEach((x) => x.topic === old && (x.topic = now));
+          save();
+          r.close();
+          sh.close();
+          toast("已改名为「" + now + "」");
+          openTopic(t);
+          if (root) render();
+        };
+        return;
       }
       if (a === "tpost") {
         sh.close();

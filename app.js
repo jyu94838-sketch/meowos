@@ -35495,7 +35495,9 @@ function syncChatCloseBackLabel() {
   const closeImgSurface = chatTopbarBtnUsesImgSurface(closeBtn);
   const target = resolveChatCloseBackNavTarget();
   closeBtn.dataset.chatNavBack = target;
-  const label = closeImgSurface || glassOn ? "" : target === "list" ? "列表" : "桌面";
+  // 只留返回箭头，不显示「列表 / 桌面」两个字
+  const label = "";
+  void closeImgSurface;
   closeBtn.setAttribute("aria-label", target === "list" ? "返回会话列表" : "返回桌面");
   let icon = closeBtn.querySelector("i.ph");
   if (!icon) {

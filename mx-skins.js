@@ -267,7 +267,8 @@ body.dark #chat-screen .chat-composer .chat-input { color: #e6e6e6 !important; }
 `;
   // 每条气泡都带头像 + 引用块在浅色 / 深色下都看得清
   const perBubble = (o) => `
-#chat-screen .chat-msg-bubble-stack { position: relative; }
+#chat-screen .chat-msg-bubble-stack { position: relative; gap: 12px !important; row-gap: 12px !important; }
+#chat-screen .chat-messages > .chat-msg { margin-bottom: 18px !important; }
 #chat-screen .mx-av-rep { position: absolute !important; top: 0; margin: 0 !important; pointer-events: auto; }
 #chat-screen .chat-msg--assistant .mx-av-rep { left: calc(-10px - var(--mx-av, 40px)); }
 #chat-screen .chat-msg--user .mx-av-rep { right: calc(-10px - var(--mx-av, 40px)); }

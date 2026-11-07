@@ -112,27 +112,39 @@
     setTimeout(() => inp.focus(), 250);
   }
 
+  /** 放进聊天「＋」面板：查找聊天记录、字体大小 */
   function inject() {
-    const right = document.querySelector("#chat-screen .chat-topbar-right");
-    if (!right) return false;
-    if (document.getElementById("mx-chat-search-btn")) return true;
-    const b = document.createElement("button");
-    b.type = "button";
-    b.id = "mx-chat-search-btn";
-    b.className = "mx-chat-search-btn";
-    b.setAttribute("aria-label", "查找聊天记录");
-    b.innerHTML = `<i class="ph ph-magnifying-glass" aria-hidden="true"></i>`;
-    b.addEventListener("click", open);
-    right.insertBefore(b, right.firstChild);
-    // Aa：调聊天字体和头像大小
-    const fs = document.createElement("button");
-    fs.type = "button";
-    fs.id = "mx-chat-fs-btn";
-    fs.className = "mx-chat-search-btn";
-    fs.setAttribute("aria-label", "调字体大小");
-    fs.innerHTML = `<span style="font-weight:700;font-size:0.95rem;letter-spacing:-0.02em">Aa</span>`;
-    fs.addEventListener("click", openFs);
-    right.insertBefore(fs, b);
+    const grid = document.querySelector("#chat-more-drawer .chat-more-drawer-grid");
+    if (!grid) return false;
+    if (document.getElementById("mx-more-search")) return true;
+    const mk = (id, icon, label, fn) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.id = id;
+      b.className = "drawer-item chat-more-drawer-item";
+      b.innerHTML = `<i class="ph ${icon}" aria-hidden="true"></i><span>${label}</span>`;
+      b.addEventListener(
+        "click",
+        (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          try {
+            if (typeof closeChatMoreSheet === "function") closeChatMoreSheet();
+          } catch (_) {
+            /* ignore */
+          }
+          setTimeout(fn, 120);
+        },
+        true
+      );
+      return b;
+    };
+    const persona = document.getElementById("chat-more-persona-wrap");
+    grid.insertBefore(mk("mx-more-search", "ph-magnifying-glass", "查找记录", open), persona || null);
+    grid.insertBefore(mk("mx-more-fs", "ph-text-aa", "字体大小", openFs), persona || null);
+    // 旧版放在顶栏的按钮去掉
+    document.getElementById("mx-chat-search-btn")?.remove();
+    document.getElementById("mx-chat-fs-btn")?.remove();
     return true;
   }
   function openFs() {
@@ -143,6 +155,7 @@
     pop.id = "mx-fs-pop";
     pop.className = "mx-fs-pop";
     const v = Math.min(150, Math.max(80, Number(localStorage.getItem(KEY)) || 100));
+    pop.classList.add("is-bottom");
     pop.innerHTML = `<div class="mx-fs-pop-k">聊天字体和头像大小 <b>${v}%</b></div>
       <div class="mx-fs-row"><span class="mx-fs-a sm">A</span><input type="range" min="80" max="150" step="5" value="${v}" /><span class="mx-fs-a lg">A</span></div>
       <div class="mx-fs-pop-btns"><button type="button" data-r>还原</button><button type="button" data-x>好了</button></div>`;

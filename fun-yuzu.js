@@ -41,7 +41,7 @@
     }
     S = Object.assign({ records: [], periodLen: 5, cycleLen: 28, manual: false, daily: {}, remind: { on: false, charId: "", daysBefore: 2, memory: true, lastFor: "" }, notes: [] }, S || {});
     S.daily = S.daily || {};
-    S.remind = Object.assign({ on: false, charId: "", daysBefore: 2, memory: true, lastFor: "" }, S.remind || {});
+    S.remind = Object.assign({ on: false, charId: "", daysBefore: 2, memory: true, lastFor: "", body: false, bodyFor: "" }, S.remind || {});
     return S;
   }
   const save = () => F.FunDB.set(KV, S).catch(() => toast("保存失败"));
@@ -278,6 +278,7 @@
       .slice(0, 5);
     return `
       <section class="yz-card yz-phase">${ph ? `<h3>${ph.e} 现在是：${ph.n}</h3><ul>${ph.tips.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<h3>🌷 阶段小贴士</h3><p class="fun-note">先在「经期」里记一次经期，这里会按你现在所处的阶段给建议。</p>`}</section>
+      ${bodyCardHtml()}
       <section class="yz-card"><h3>📝 今天的身体记录</h3>
         ${dl ? `<div class="yz-daysum">${dayLine(dl)}</div>` : `<p class="fun-note">记一下今天的感觉，攒多了就能看出规律。</p>`}
         <button type="button" class="fun-btn solid" data-a="logday" data-day="${t}">${dl ? "修改今天的记录" : "记录今天"}</button>
@@ -288,6 +289,58 @@
       <section class="yz-card yz-doc"><h3>🏥 出现这些情况，建议去看医生</h3><ul>${DOCTOR.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></section>
       <p class="fun-note yz-foot">这里是一般的健康常识，不能代替医生的诊断。身体不舒服请及时就医。所有记录只保存在这台设备上。</p>`;
   }
+  let castCache = [];
+  function bodyCardHtml() {
+    const R = S.remind;
+    const ch = castCache.find((c) => c.id === R.charId);
+    return `<section class="yz-card"><h3>💗 身体不舒服时让 TA 知道</h3>
+      <label class="fun-switch"><input type="checkbox" id="yz-body" ${R.body ? "checked" : ""}/><span>${R.body ? `开着：${ch ? esc(ch.name) : "TA"}会知道` : "关着：TA 不知道"}</span></label>
+      <div class="yz-cast">${castCache.length ? castCache.map((c) => `<button type="button" class="fun-chip-btn${R.charId === c.id ? " is-on" : ""}" data-c="${esc(c.id)}">${F.avHtml ? F.avHtml(c, "fun-av sm") : ""}${esc(c.name)}</button>`).join("") : `<p class="fun-note">角色库里还没有角色</p>`}</div>
+      <p class="fun-note">${R.body ? `你记录今天痛、有症状或者心情不好时，${ch ? esc(ch.name) : "TA"}会知道，${R.memory ? "并在你们的聊天里发消息关心你（TA 会记得）" : "在柚子里给你留一句关心"}。` : "打开以后，你记录身体不舒服时，选中的角色会知道并来关心你。和「经期」页的提醒用的是同一位角色。"}</p>
+    </section>`;
+  }
+  const isUnwell = (x) => x && (x.pain >= 1 || (x.syms || []).length || ["😣", "😔", "😤", "🥱"].includes(x.mood) || x.flow >= 3);
+  /** 记了不舒服：让角色知道（只对今天的记录，每天同样的内容只说一次） */
+  async function tellChar(d, x) {
+    const R = S.remind;
+    if (!R.body || !R.charId || d !== today() || !isUnwell(x)) return;
+    const sig = d + "|" + x.pain + "|" + (x.syms || []).join(",") + "|" + x.mood + "|" + x.flow;
+    if (R.bodyFor === sig) return;
+    const cast = castCache.length ? castCache : await F.loadCast();
+    const ch = cast.find((c) => c.id === R.charId);
+    if (!ch) return;
+    const user = await F.loadUser();
+    const p = predict();
+    const how = [x.flow ? "流量" + FLOW[x.flow] : "", x.pain ? PAIN[x.pain] : "", (x.syms || []).length ? "有" + x.syms.join("、") : "", x.mood ? "心情 " + x.mood : "", x.note ? "她说：" + x.note : ""].filter(Boolean).join("，");
+    let text = "";
+    if (F.hasApiKey()) {
+      try {
+        text = await F.aiText(
+          [
+            {
+              role: "system",
+              content: `你是「${ch.name}」。${ch.persona ? "人设：\n" + ch.persona + "\n" : ""}${F.recordSummary ? F.recordSummary(ch.name) : ""}
+你知道了「${user.name}」今天身体不太舒服${p.inPeriod ? "（正在经期）" : ""}。按你的性格和你们的关系，主动发消息关心 TA：具体一点（热水、热敷、休息、想吃什么、要不要陪着），别说教，不要像医生。像微信聊天，口语化，可以分 2~3 条，用 ||| 分隔，每条不超过 40 字。只输出你发的消息。`
+            },
+            { role: "user", content: `${user.name}今天的情况：${how}。` }
+          ],
+          { maxTokens: 300, temperature: 0.85 }
+        );
+      } catch (_) {
+        text = "";
+      }
+    }
+    if (!text) text = `今天是不是不太舒服|||热水喝了没，肚子疼就先躺着别硬撑|||想吃什么跟我说`;
+    let toChat = false;
+    if (R.memory && typeof window.mxPushCharMessage === "function") toChat = await window.mxPushCharMessage(ch.id, text).catch(() => false);
+    S.notes.unshift({ at: Date.now(), from: ch.name, text, toChat });
+    S.notes = S.notes.slice(0, 30);
+    R.bodyFor = sig;
+    await save();
+    toast(toChat ? `${ch.name} 知道你不舒服，给你发了消息` : `${ch.name}：${text.split("|||")[0]}`);
+    if (root) draw();
+  }
+
   function dayLine(x) {
     if (!x) return "";
     return [x.mood || "", x.flow ? "流量" + FLOW[x.flow] : "", x.pain ? PAIN[x.pain] : "", (x.syms || []).join("、"), x.note ? "「" + esc(x.note) + "」" : ""].filter(Boolean).join(" · ");
@@ -335,6 +388,7 @@
         sh.close();
         toast("已记录");
         draw();
+        void tellChar(d, cur);
       }
     });
   }
@@ -353,6 +407,7 @@
           : `<small>预计经期</small><b>${p.until === 0 ? "今天" : "推迟 " + -p.until + " 天"}</b><small>来了就点「经期来了」</small>`;
     const recs = sorted().reverse();
     const tabs = `<div class="yz-tabs"><button type="button" data-tab="cycle" class="${tab === "cycle" ? "is-on" : ""}">🍊 经期</button><button type="button" data-tab="health" class="${tab === "health" ? "is-on" : ""}">🌷 女性健康</button></div>`;
+    castCache = cast;
     if (tab === "health") {
       root.innerHTML = `<div class="yz">${tabs}${healthHtml(p)}</div>`;
       return;
@@ -455,7 +510,10 @@
     const c = e.target.closest("[data-c]");
     if (c) {
       S.remind.charId = c.dataset.c;
-      S.remind.on = true;
+      if (tab === "health") {
+        S.remind.body = true;
+        S.remind.bodyFor = "";
+      } else S.remind.on = true;
       S.remind.lastFor = "";
       await save();
       return draw();
@@ -471,6 +529,11 @@
     const t = e.target;
     if (t.id === "yz-on") S.remind.on = t.checked;
     if (t.id === "yz-mem") S.remind.memory = t.checked;
+    if (t.id === "yz-body") {
+      S.remind.body = t.checked;
+      S.remind.bodyFor = "";
+      if (t.checked && !S.remind.charId) toast("再选一位角色");
+    }
     if (t.id === "yz-before") S.remind.daysBefore = Number(t.value);
     S.remind.lastFor = "";
     await save();
