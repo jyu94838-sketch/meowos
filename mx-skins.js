@@ -199,15 +199,33 @@ body.dark #chat-list-screen .chat-thread-card-name { color: #e8e8e8 !important; 
     }
   };
   let styleEl = null;
+  const boost = (css) => css.replace(/(body\.dark\s+)?#(chat-screen|chat-list-screen|phone)\b/g, (m, dark, id) => `html body${dark ? ".dark" : ""} #${id}#${id}`);
+  function keepLast() {
+    if (!styleEl || !document.body) return;
+    if (document.body.lastElementChild !== styleEl) document.body.appendChild(styleEl);
+  }
+  // 别的模块后来插进来的样式表 → 把风格包再挪到最后
+  const watchLast = () => {
+    if (!document.body || !window.MutationObserver) return;
+    let t = 0;
+    new MutationObserver(() => {
+      clearTimeout(t);
+      t = setTimeout(keepLast, 50);
+    }).observe(document.body, { childList: true });
+  };
+  if (document.body) watchLast();
+  else document.addEventListener("DOMContentLoaded", watchLast);
   function apply() {
     const chat = get(KEY_CHAT, "default");
     const home = get(KEY_HOME, "default");
     if (!styleEl) {
       styleEl = document.createElement("style");
       styleEl.id = "mx-skin-css";
-      document.head.appendChild(styleEl);
+      (document.body || document.head).appendChild(styleEl);
     }
-    styleEl.textContent = (CSS[chat] || "") + "\n" + (CSS[home] || "");
+    // 套用时把选择器加强（双 id），并放在页面最后：自定义主题 / 卷宗 CSS 也盖不过风格包
+    styleEl.textContent = boost((CSS[chat] || "") + "\n" + (CSS[home] || ""));
+    keepLast();
     document.documentElement.dataset.mxChatSkin = chat;
     if (chat !== "default") decorateList();
   }

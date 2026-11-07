@@ -562,6 +562,66 @@
     return { url, title, artist, isShort: /163cn\.tv|y\.music\.163\.com\/m\/[a-z]/i.test(url) && !neteaseId(url) };
   }
 
+  /** 在网易云里搜（装了 App 会跳 App，否则打开网页版） */
+  const neSearchUrl = (q) => `https://music.163.com/#/search/m/?s=${encodeURIComponent(q)}&type=1`;
+  let neWaitingPaste = false;
+  function goNeSearch(q) {
+    neWaitingPaste = true;
+    window.open(neSearchUrl(q), "_blank", "noopener");
+  }
+  /** 把网易云分享文字加进歌单并播放；成功返回 true */
+  async function addFromShareText(text, extra) {
+    const share = parseShareText(text);
+    if (!share.url || !/163/.test(share.url)) return false;
+    if (share.isShort) {
+      toast("这是短链接：在浏览器里打开它，再复制地址栏里的完整链接");
+      return false;
+    }
+    const url = normalizeMusicUrl(share.url);
+    const exist = music.tracks.findIndex((t) => t.url === url);
+    if (exist >= 0) {
+      playIndex(exist);
+      toast("已经在歌单里了，直接播放");
+      return true;
+    }
+    const rec = { id: uid(), title: share.title || extra?.title || "网易云歌曲", artist: share.artist || extra?.artist || "", url, addedAt: Date.now() };
+    await FunDB.putTrack(rec);
+    music.tracks.push(rec);
+    renderMusicUi();
+    playIndex(music.tracks.length - 1);
+    toast(`已加入并播放：${rec.title}`);
+    return true;
+  }
+  /** 读剪贴板里的网易云分享链接 */
+  async function pasteNeFromClipboard() {
+    let text = "";
+    try {
+      text = await navigator.clipboard.readText();
+    } catch (_) {
+      text = "";
+    }
+    if (text && (await addFromShareText(text))) return;
+    if (!text) toast("读不到剪贴板，请手动粘贴");
+    else toast("剪贴板里没有网易云链接，请手动粘贴");
+    openAddLink();
+  }
+  // 从网易云切回来：提示一键粘贴
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !neWaitingPaste) return;
+    neWaitingPaste = false;
+    const sh = openSheet(
+      `<p class="fun-note">在网易云里点歌曲的「分享 → 复制链接」了吗？点下面就能直接加进歌单播放（免费歌曲能听完整版）。</p>
+       <div class="fun-sheet-actions"><button type="button" class="fun-btn ghost" data-ne="no">还没有</button><button type="button" class="fun-btn solid" data-ne="paste">📋 粘贴并播放</button></div>`,
+      { title: "从网易云回来啦" }
+    );
+    sh.body.addEventListener("click", (e) => {
+      const a = e.target.closest("[data-ne]")?.dataset.ne;
+      if (!a) return;
+      sh.close();
+      if (a === "paste") void pasteNeFromClipboard();
+    });
+  });
+
   const curTrack = () => music.tracks[music.idx] || null;
 
   function playIndex(i, autoplay) {
@@ -733,7 +793,8 @@
   function openSearch(prefill) {
     const sh = openSheet(
       `<div class="fm-search"><input type="search" placeholder="歌名 / 歌手" value="${esc(prefill || "")}" /><button type="button" class="fun-btn solid sm">搜索</button></div>
-       <p class="fun-note">来自 Apple Music 曲库，可以试听 30 秒片段。完整歌曲请用「上传」或「链接」。</p>
+       <button type="button" class="fm-ne-go" id="fm-ne-go">☁ 去网易云搜，听完整版</button>
+       <p class="fun-note">下面是 Apple Music 曲库，可以试听 30 秒。想听完整版：点上面或每首歌的 ☁ 去网易云，找到歌后「分享 → 复制链接」，回来点「粘贴并播放」就行。</p>
        <div class="fm-results" id="fm-results"></div>`,
       { title: "搜歌" }
     );
@@ -751,7 +812,7 @@
           ? results
               .map(
                 (r, i) => `<div class="fm-res" data-i="${i}"><img src="${esc(r.cover)}" alt="" loading="lazy" /><span><strong>${esc(r.title)}</strong><small>${esc(r.artist)} · ${esc(r.album || "")}</small></span>
-                <button type="button" class="fun-btn ghost sm" data-r="play">试听</button><button type="button" class="fun-btn solid sm" data-r="add">＋</button></div>`
+                <button type="button" class="fun-btn ghost sm" data-r="ne" title="去网易云听完整版">☁</button><button type="button" class="fun-btn ghost sm" data-r="play">试听</button><button type="button" class="fun-btn solid sm" data-r="add">＋</button></div>`
               )
               .join("")
           : `<p class="fun-note">没有找到，换个关键词试试</p>`;
@@ -760,12 +821,18 @@
       }
     };
     sh.body.querySelector(".fm-search button").onclick = go;
+    sh.body.querySelector("#fm-ne-go").onclick = () => {
+      const q = inp.value.trim();
+      if (!q) return toast("先输入歌名");
+      goNeSearch(q);
+    };
     inp.addEventListener("keydown", (e) => e.key === "Enter" && !e.isComposing && go());
     box.addEventListener("click", async (e) => {
       const row = e.target.closest(".fm-res");
       const r = row && results[Number(row.dataset.i)];
       const act = e.target.closest("[data-r]")?.dataset.r;
       if (!r || !act) return;
+      if (act === "ne") return goNeSearch(`${r.title} ${r.artist}`);
       let i = music.tracks.findIndex((t) => t.url === r.url);
       if (i < 0) {
         const rec = { id: uid(), title: r.title, artist: r.artist, url: r.url, cover: r.cover, preview: true, addedAt: Date.now() };
@@ -1132,7 +1199,8 @@
             <div class="fm-list-head"><span class="fun-kicker">PLAYLIST · <b id="fm-count">0 首</b></span>
               <div class="fm-list-tools">
                 <button type="button" class="fun-btn solid sm" id="fm-search-btn">🔍 搜歌</button>
-                <button type="button" class="fun-btn ghost sm" id="fm-add-link"><i class="ph ph-link"></i> 网易云</button>
+                <button type="button" class="fun-btn ghost sm" id="fm-ne-paste">📋 粘贴网易云</button>
+                <button type="button" class="fun-btn ghost sm" id="fm-add-link"><i class="ph ph-link"></i> 链接</button>
                 <button type="button" class="fun-btn ghost sm" id="fm-add-file"><i class="ph ph-upload-simple"></i> 上传</button>
               </div>
             </div>
@@ -1201,6 +1269,7 @@
         fileIn.value = "";
       };
       body.querySelector("#fm-add-link").onclick = openAddLink;
+      body.querySelector("#fm-ne-paste").onclick = () => void pasteNeFromClipboard();
       body.querySelector("#fm-search-btn").onclick = () => openSearch("");
       body.querySelector("#fm-list").addEventListener("click", (e) => {
         const del = e.target.closest("[data-del]");

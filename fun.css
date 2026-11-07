@@ -7140,8 +7140,8 @@ body.dark .desk-app-ico {
 }
 
 /* 聊天设置：隐藏头像 */
-#chat-screen.mx-hide-av .chat-msg-avatar,
-#chat-screen.mx-hide-av .chat-msg-avatar-col {
+html body #chat-screen#chat-screen.mx-hide-av .chat-msg-avatar,
+html body #chat-screen#chat-screen.mx-hide-av .chat-msg-avatar-col {
   display: none !important;
 }
 .mimi-head {
@@ -7610,4 +7610,18 @@ body.dark .desk-app-ico {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.fm-ne-go {
+  width: 100%;
+  margin: 8px 0 2px;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #e72d2c, #c20c0c);
+  color: #fff;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
 }
