@@ -596,6 +596,99 @@
     });
   }
 
+  /* ───── 在线搜歌（Apple iTunes 公开搜索接口：免费、免 Key，可试听 30 秒） ───── */
+  function itunesSearch(term) {
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&entity=song&limit=25&country=CN`;
+    const map = (data) =>
+      (data?.results || [])
+        .filter((r) => r.previewUrl)
+        .map((r) => ({ title: r.trackName, artist: r.artistName, album: r.collectionName, cover: String(r.artworkUrl100 || "").replace("100x100", "300x300"), url: r.previewUrl, dur: Math.round((r.trackTimeMillis || 0) / 1000) }));
+    return fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(map)
+      .catch(
+        () =>
+          // 个别网络下 fetch 被跨域拦截时，用 JSONP 兜底
+          new Promise((resolve, reject) => {
+            const cb = "__mxItunes" + Date.now();
+            const sc = document.createElement("script");
+            const timer = setTimeout(() => {
+              cleanup();
+              reject(new Error("搜索超时，检查一下网络"));
+            }, 12000);
+            const cleanup = () => {
+              clearTimeout(timer);
+              delete window[cb];
+              sc.remove();
+            };
+            window[cb] = (data) => {
+              cleanup();
+              resolve(map(data));
+            };
+            sc.onerror = () => {
+              cleanup();
+              reject(new Error("搜索失败，检查一下网络"));
+            };
+            sc.src = url + "&callback=" + cb;
+            document.head.appendChild(sc);
+          })
+      );
+  }
+
+  function openSearch(prefill) {
+    const sh = openSheet(
+      `<div class="fm-search"><input type="search" placeholder="歌名 / 歌手" value="${esc(prefill || "")}" /><button type="button" class="fun-btn solid sm">搜索</button></div>
+       <p class="fun-note">来自 Apple Music 曲库，可以试听 30 秒片段。完整歌曲请用「上传」或「链接」。</p>
+       <div class="fm-results" id="fm-results"></div>`,
+      { title: "搜歌" }
+    );
+    sh.el.classList.add("fun-sheet--tall");
+    const inp = sh.body.querySelector("input");
+    const box = sh.body.querySelector("#fm-results");
+    let results = [];
+    const go = async () => {
+      const q = inp.value.trim();
+      if (!q) return;
+      box.innerHTML = `<p class="fun-note"><span class="fun-spin"></span> 搜索中…</p>`;
+      try {
+        results = await itunesSearch(q);
+        box.innerHTML = results.length
+          ? results
+              .map(
+                (r, i) => `<div class="fm-res" data-i="${i}"><img src="${esc(r.cover)}" alt="" loading="lazy" /><span><strong>${esc(r.title)}</strong><small>${esc(r.artist)} · ${esc(r.album || "")}</small></span>
+                <button type="button" class="fun-btn ghost sm" data-r="play">试听</button><button type="button" class="fun-btn solid sm" data-r="add">＋</button></div>`
+              )
+              .join("")
+          : `<p class="fun-note">没有找到，换个关键词试试</p>`;
+      } catch (err) {
+        box.innerHTML = `<p class="fun-note warn">${esc(err.message)}</p>`;
+      }
+    };
+    sh.body.querySelector(".fm-search button").onclick = go;
+    inp.addEventListener("keydown", (e) => e.key === "Enter" && !e.isComposing && go());
+    box.addEventListener("click", async (e) => {
+      const row = e.target.closest(".fm-res");
+      const r = row && results[Number(row.dataset.i)];
+      const act = e.target.closest("[data-r]")?.dataset.r;
+      if (!r || !act) return;
+      let i = music.tracks.findIndex((t) => t.url === r.url);
+      if (i < 0) {
+        const rec = { id: uid(), title: r.title, artist: r.artist, url: r.url, cover: r.cover, preview: true, addedAt: Date.now() };
+        await FunDB.putTrack(rec);
+        music.tracks.push(rec);
+        i = music.tracks.length - 1;
+        if (act === "add") toast(`已加入歌单：${r.title}`);
+      } else if (act === "add") toast("已经在歌单里了");
+      renderMusicUi();
+      if (act === "play") playIndex(i);
+      e.target.closest("[data-r]").textContent = act === "add" ? "✓" : "♪";
+    });
+    if (prefill) go();
+  }
+
   /* ───── 一起听 ───── */
   async function chooseBuddy() {
     const cast = await loadCast();
@@ -628,7 +721,7 @@
         [
           {
             role: "system",
-            content: `你是「${b.name}」。${b.persona ? "人设：\n" + b.persona + "\n" : ""}你正和${user.name}戴着同一副耳机一起听歌。像真人一样自然地聊：可以说对这首歌的感受、联想到的回忆、哼一句、问对方为什么喜欢。你可以凭自己知道的去理解这首歌，不确定的不要编造歌词。1~3 句话，口语化，只输出你说的话。`
+            content: `你是「${b.name}」。${b.persona ? "人设：\n" + b.persona + "\n" : ""}你正和${user.name}戴着同一副耳机一起听歌。像真人一样自然地聊：可以说对这首歌的感受、联想到的回忆、哼一句、问对方为什么喜欢。如果推荐歌曲，用《歌名》标出来。你可以凭自己知道的去理解这首歌，不确定的不要编造歌词。1~3 句话，口语化，只输出你说的话。`
           },
           {
             role: "user",
@@ -637,7 +730,10 @@
         ],
         { maxTokens: 500 }
       );
-      music.buddyLog.push({ who: "buddy", text: cleanLine(txt, 200, b.name) });
+      const said = cleanLine(txt, 200, b.name);
+      music.buddyLog.push({ who: "buddy", text: said });
+      const rec = said.match(/《([^》]{1,30})》/);
+      music.buddyRec = rec && (!t || rec[1] !== t.title) ? rec[1] : "";
       if (music.buddyLog.length > 30) music.buddyLog = music.buddyLog.slice(-30);
     } catch (err) {
       toast(`${b.name}没听清：${err.message}`);
@@ -662,7 +758,8 @@
       <div class="fm-buddy-log">${logs
         .map((x) => `<p class="${x.who === "me" ? "is-me" : ""}">${esc(x.text)}</p>`)
         .join("")}${music.buddyBusy ? `<p class="is-typing"><i></i><i></i><i></i></p>` : ""}${!logs.length && !music.buddyBusy ? `<p class="fm-buddy-hint">放一首歌，${esc(b.name)}会先开口</p>` : ""}</div>
-      <div class="fm-buddy-input"><input type="text" placeholder="聊聊这首歌…" maxlength="120" /><button type="button" class="fun-btn solid sm" data-buddy="send">发送</button></div>`;
+      <div class="fm-buddy-input"><input type="text" placeholder="聊聊这首歌，或者让 TA 推荐一首…" maxlength="120" /><button type="button" class="fun-btn solid sm" data-buddy="send">发送</button></div>
+      ${music.buddyRec ? `<button type="button" class="fm-rec" data-buddy="rec">🎵 搜索 TA 推荐的「${esc(music.buddyRec)}」</button>` : ""}`;
     const lg = box.querySelector(".fm-buddy-log");
     lg.scrollTop = lg.scrollHeight;
     const inp = box.querySelector("input");
@@ -796,6 +893,7 @@
     root.querySelector("#fm-mode i").className = "ph " + mm.icon;
     root.querySelector("#fm-mode").title = mm.label;
     root.querySelector("#fm-disc").style.setProperty("--disc-h", t ? hue(t.title) : 220);
+    root.querySelector("#fm-disc").style.setProperty("--cover", t && t.cover ? `url("${t.cover}")` : "none");
     root.classList.toggle("show-lyrics", music.showLyrics);
     root.querySelector("#fm-lrc-btn").classList.toggle("is-on", music.showLyrics);
     updateProgress();
@@ -814,7 +912,7 @@
       .map(
         (x, i) => `<li class="fm-item${x.id === t?.id ? " is-on" : ""}" data-id="${esc(x.id)}" data-i="${i}">
           <span class="fm-item-no">${String(i + 1).padStart(2, "0")}</span>
-          <span class="fm-item-meta"><strong>${esc(x.title)}</strong><small>${esc(x.artist || (x.url ? "链接" : "本地"))}</small></span>
+          <span class="fm-item-meta"><strong>${esc(x.title)}</strong><small>${x.preview ? "试听 · " : ""}${esc(x.artist || (x.url ? "链接" : "本地"))}</small></span>
           <span class="fm-item-eq"><i></i><i></i><i></i></span>
           <button type="button" class="fm-item-del" data-lrc="${i}" aria-label="歌词" title="歌词">${x.lrc ? "词✓" : "词"}</button>
           <button type="button" class="fm-item-del" data-del="${esc(x.id)}" aria-label="删除"><i class="ph ph-trash"></i></button>
@@ -923,8 +1021,9 @@
           <section class="fm-list-wrap">
             <div class="fm-list-head"><span class="fun-kicker">PLAYLIST · <b id="fm-count">0 首</b></span>
               <div class="fm-list-tools">
+                <button type="button" class="fun-btn solid sm" id="fm-search-btn">🔍 搜歌</button>
                 <button type="button" class="fun-btn ghost sm" id="fm-add-link"><i class="ph ph-link"></i> 链接</button>
-                <button type="button" class="fun-btn solid sm" id="fm-add-file"><i class="ph ph-upload-simple"></i> 上传</button>
+                <button type="button" class="fun-btn ghost sm" id="fm-add-file"><i class="ph ph-upload-simple"></i> 上传</button>
               </div>
             </div>
             <ul class="fm-list" id="fm-list"></ul>
@@ -964,6 +1063,7 @@
       body.querySelector("#fm-buddy").addEventListener("click", (e) => {
         const a = e.target.closest("[data-buddy]")?.dataset.buddy;
         if (a === "pick") void chooseBuddy();
+        if (a === "rec" && music.buddyRec) openSearch(music.buddyRec);
         if (a === "off") {
           music.buddy = null;
           renderBuddy();
@@ -991,6 +1091,7 @@
         fileIn.value = "";
       };
       body.querySelector("#fm-add-link").onclick = openAddLink;
+      body.querySelector("#fm-search-btn").onclick = () => openSearch("");
       body.querySelector("#fm-list").addEventListener("click", (e) => {
         const del = e.target.closest("[data-del]");
         if (del) {
