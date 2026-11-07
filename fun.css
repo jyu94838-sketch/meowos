@@ -8080,3 +8080,4 @@ img.cp-pet-img.is-sleepy { filter: brightness(0.85) saturate(0.8); }
 .yz-d.has-log::after { content: ""; position: absolute; left: 50%; bottom: 4px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: #b38cf0; }
 .mx-fs-pop.is-bottom { top: auto; left: 12px; right: 12px; width: auto; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
 .wb-rename { margin-left: 6px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); background: none; color: var(--text-sub); font: inherit; font-size: 0.66rem; font-weight: 400; vertical-align: 2px; cursor: pointer; }
+.dr-item.is-m::after { content: "♂"; margin-left: 4px; font-size: 0.7rem; color: #5b8def; }

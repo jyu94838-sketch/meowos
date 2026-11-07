@@ -75,6 +75,11 @@
   let gid = 0;
   const animeEye = (cx, c, id, opt) => {
     const o = opt || {};
+    if (o.sharp)
+      return `<path d="M${cx - 11} ${EY - 1} Q${cx} ${EY - 9} ${cx + 11} ${EY - 2} Q${cx + 6} ${EY + 7} ${cx} ${EY + 7} Q${cx - 7} ${EY + 7} ${cx - 11} ${EY - 1}Z" fill="#fff"/>
+        <ellipse cx="${cx}" cy="${EY}" rx="6.6" ry="7.4" fill="url(#${id})"/><ellipse cx="${cx}" cy="${EY + 1}" rx="3" ry="4.2" fill="#1d1420"/><circle cx="${cx + 2.6}" cy="${EY - 2.6}" r="2.2" fill="#fff"/>
+        <path d="M${cx - 13} ${EY - 2} Q${cx} ${EY - 11} ${cx + 13} ${EY - 3}" stroke="#2a1d24" stroke-width="3.8" fill="none" stroke-linecap="round"/>
+        <path d="M${cx - 11} ${EY - 16} Q${cx} ${EY - (cx < 100 ? 20 : 18)} ${cx + 11} ${EY - (cx < 100 ? 16 : 20)}" stroke="#3a2a2a" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
     return `<ellipse cx="${cx}" cy="${EY}" rx="10" ry="12.5" fill="#fff"/>
       <ellipse cx="${cx}" cy="${EY + 1}" rx="8.6" ry="11.2" fill="url(#${id})"/>
       ${o.slit ? `<ellipse cx="${cx}" cy="${EY + 1}" rx="1.8" ry="8" fill="#1d1420"/>` : `<ellipse cx="${cx}" cy="${EY + 2}" rx="4.2" ry="5.8" fill="#1d1420"/>`}
@@ -221,6 +226,158 @@
     cafe: { name: "咖啡店", draw: () => `<rect width="200" height="300" fill="#f3e7d8"/><rect x="0" y="62" width="200" height="6" fill="#c9a77a"/><rect y="250" width="200" height="50" fill="#b98b5e"/><rect x="18" y="20" width="40" height="34" rx="4" fill="#fff" opacity=".7"/><rect x="142" y="20" width="40" height="34" rx="4" fill="#fff" opacity=".7"/>` },
     plain: { name: "纯白", draw: () => `<rect width="200" height="300" fill="#ffffff"/>` }
   };
+  /* ───── 男生款 ───── */
+  Object.assign(HAIR, {
+    center: {
+      name: "中分",
+      m: 1,
+      back: (c) => `<path d="M44 104 Q40 30 100 28 Q160 30 156 104 Q156 116 148 124 L52 124 Q44 116 44 104Z" fill="${c}" ${stk(c)}/>`,
+      front: (c) =>
+        `<path d="M48 104 Q44 38 100 34 Q98 50 88 60 Q74 72 64 88 Q58 96 56 104Z" fill="${c}" ${stk(c)}/><path d="M152 104 Q156 38 100 34 Q102 50 112 60 Q126 72 136 88 Q142 96 144 104Z" fill="${c}" ${stk(c)}/><path d="M66 52 Q84 42 98 40 M134 52 Q116 42 102 40" stroke="#fff" stroke-width="4" opacity=".25" fill="none" stroke-linecap="round"/>`
+    },
+    wolf: {
+      name: "狼尾",
+      m: 1,
+      back: (c) => `<path d="M42 104 Q38 30 100 28 Q162 30 158 104 L160 150 Q156 172 140 178 L134 158 L66 158 L60 178 Q44 172 40 150Z" fill="${c}" ${stk(c)}/>`,
+      front: (c) =>
+        `<path d="M46 104 Q42 36 100 32 Q158 36 154 104 L148 86 L140 100 L132 74 L120 92 L110 68 L98 92 L88 70 L78 94 L68 76 L60 98 L54 84Z" fill="${c}" ${stk(c)}/><path d="M48 96 L44 140 L56 118Z M152 96 L156 140 L144 118Z" fill="${c}" ${stk(c, 1.2)}/>`
+    },
+    buzz: {
+      name: "寸头",
+      m: 1,
+      back: () => "",
+      front: (c) => `<path d="M50 94 Q48 36 100 36 Q152 36 150 94 Q146 66 128 60 Q100 54 72 60 Q54 66 50 94Z" fill="${c}" ${stk(c)} opacity=".95"/><path d="M60 64 l2 -3 M72 56 l2 -3 M86 52 l2 -3 M100 50 l2 -3 M114 52 l2 -3 M128 56 l2 -3 M140 64 l2 -3" stroke="${ol(c)}" stroke-width="1.2" opacity=".6"/>`
+    },
+    slick: {
+      name: "背头",
+      m: 1,
+      back: (c) => `<path d="M44 100 Q40 30 100 26 Q160 30 156 100 Q158 126 150 142 L50 142 Q42 126 44 100Z" fill="${c}" ${stk(c)}/>`,
+      front: (c) =>
+        `<path d="M48 96 Q44 30 100 26 Q156 30 152 96 Q146 62 120 54 Q100 50 80 54 Q56 62 48 96Z" fill="${c}" ${stk(c)}/><path d="M64 70 Q80 46 104 40 M80 64 Q96 44 120 40 M98 58 Q114 44 136 46" stroke="${ol(c)}" stroke-width="1.6" fill="none" opacity=".7"/><path d="M118 54 Q130 64 128 80" stroke="${c}" stroke-width="4" fill="none" stroke-linecap="round"/>`
+    },
+    curly: {
+      name: "卷毛",
+      m: 1,
+      back: (c) => `<path d="M42 100 Q36 28 100 24 Q164 28 158 100 Q158 114 150 120 L50 120 Q42 114 42 100Z" fill="${c}" ${stk(c)}/>`,
+      front: (c) =>
+        [[56, 70], [72, 54], [90, 46], [110, 46], [128, 54], [144, 70], [64, 88], [138, 88], [82, 66], [100, 62], [118, 66]]
+          .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="13" fill="${c}" ${stk(c, 1.3)}/>`)
+          .join("") + `<path d="M86 50 q6 -6 12 0 M112 52 q6 -6 12 0" stroke="#fff" stroke-width="2.4" opacity=".3" fill="none"/>`
+    },
+    emo: {
+      name: "刘海遮眼",
+      m: 1,
+      back: (c) => `<path d="M40 104 Q36 28 100 26 Q164 28 160 104 L162 160 Q148 168 136 160 L64 160 Q52 168 38 160Z" fill="${c}" ${stk(c)}/>`,
+      front: (c) =>
+        `<path d="M44 110 Q40 34 104 30 Q160 36 156 104 L148 92 L142 108 L134 86 L124 104 Q116 116 104 120 Q86 124 74 118 L66 128 L64 110 L54 122Z" fill="${c}" ${stk(c)}/><path d="M70 56 Q100 40 132 50" stroke="#fff" stroke-width="5" opacity=".25" fill="none" stroke-linecap="round"/>`
+    }
+  });
+  Object.assign(EYES, {
+    sharp: { name: "冷淡眼", m: 1, draw: (c, id) => irisGrad(id, c) + animeEye(EYE_L, c, id, { sharp: 1 }) + animeEye(EYE_R, c, id, { sharp: 1 }) }
+  });
+  Object.assign(MOUTH, {
+    smirk: { name: "坏笑", m: 1, draw: () => `<path d="M92 135 Q102 138 110 131" stroke="#7a3a3a" stroke-width="2.4" fill="none" stroke-linecap="round"/>` },
+    flat: { name: "面无表情", m: 1, draw: () => `<path d="M94 135 h12" stroke="#7a3a3a" stroke-width="2.4" stroke-linecap="round"/>` }
+  });
+  Object.assign(TOP, {
+    tank: {
+      name: "无袖背心",
+      m: 1,
+      draw: (c) => `<path d="M84 157 Q90 168 90 178 L86 218 Q100 224 114 218 L110 178 Q110 168 116 157 L108 157 Q100 172 92 157Z" fill="${c}" ${stk(c)}/>`
+    },
+    jersey: {
+      name: "篮球服",
+      m: 1,
+      draw: (c) =>
+        `<path d="M82 157 Q90 170 88 180 L84 220 Q100 226 116 220 L112 180 Q110 170 118 157 L108 157 Q100 172 92 157Z" fill="${c}" ${stk(c)}/><path d="M92 157 Q100 172 108 157" stroke="#fff" stroke-width="2.4" fill="none"/><text x="100" y="204" font-size="17" font-weight="800" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif">23</text>`
+    },
+    bomber: {
+      name: "夹克",
+      m: 1,
+      draw: (c) =>
+        sleeves(c, true) +
+        torso(c, "M72 168 Q72 158 88 157 L112 157 Q128 158 128 168 L130 216 Q100 222 70 216Z") +
+        `<path d="M72 210 Q100 216 128 210 L130 220 Q100 226 70 220Z" fill="${shade(c, 0.78)}"/><path d="M100 158 V218" stroke="${ol(c)}" stroke-width="1.8"/><path d="M86 157 Q100 166 114 157 L112 152 Q100 160 88 152Z" fill="${shade(c, 0.78)}"/><rect x="78" y="176" width="10" height="3" rx="1.5" fill="${ol(c)}"/>`
+    },
+    leather: {
+      name: "皮衣",
+      m: 1,
+      draw: (c) =>
+        sleeves("#1f1d22", true) +
+        torso("#1f1d22") +
+        `<path d="M92 157 L100 176 L108 157Z" fill="#f2f2f5"/><path d="M84 157 L96 190 L90 157Z M116 157 L104 190 L110 157Z" fill="#2e2b32" stroke="#000" stroke-width="1"/><path d="M104 170 L112 214" stroke="#c9c9d0" stroke-width="1.6"/><path d="M78 196 h10 M112 196 h10" stroke="#444" stroke-width="2"/>` +
+        `<path d="M74 168 Q80 162 86 160" stroke="#fff" stroke-width="2" opacity=".2" fill="none"/>`
+    },
+    trench: {
+      name: "风衣",
+      m: 1,
+      draw: (c) =>
+        sleeves(c, true) +
+        `<path d="M72 166 Q72 158 88 157 L112 157 Q128 158 128 166 L136 252 Q100 260 64 252Z" fill="${c}" ${stk(c)}/><path d="M86 157 L100 190 L94 157Z M114 157 L100 190 L106 157Z" fill="${shade(c, 0.82)}" ${stk(c, 1)}/><path d="M70 204 L130 204 L131 211 L69 211Z" fill="${shade(c, 0.75)}"/><rect x="96" y="203" width="8" height="9" rx="1" fill="none" stroke="#d4b25a" stroke-width="1.6"/><circle cx="92" cy="182" r="2" fill="${ol(c)}"/><circle cx="108" cy="182" r="2" fill="${ol(c)}"/><path d="M100 212 V254" stroke="${ol(c)}" stroke-width="1.4"/>`
+    },
+    gakuran: {
+      name: "立领制服",
+      m: 1,
+      draw: (c) =>
+        sleeves(c, true) +
+        torso(c) +
+        `<rect x="88" y="150" width="24" height="10" rx="3" fill="${c}" ${stk(c)}/>` +
+        [168, 182, 196, 210].map((y) => `<circle cx="100" cy="${y}" r="2.6" fill="#e8c55a" stroke="#b38f2a" stroke-width=".8"/>`).join("")
+    },
+    cardigan: {
+      name: "开衫",
+      m: 1,
+      draw: (c) =>
+        sleeves(c, true) +
+        torso("#f7f7fb") +
+        `<path d="M74 168 Q74 158 88 157 L96 157 L96 218 Q84 220 72 216Z M126 168 Q126 158 112 157 L104 157 L104 218 Q116 220 128 216Z" fill="${c}" ${stk(c)}/>` +
+        [176, 190, 204].map((y) => `<circle cx="97" cy="${y}" r="1.8" fill="${ol(c)}"/>`).join("")
+    }
+  });
+  Object.assign(BOTTOM, {
+    cargo: {
+      name: "工装裤",
+      m: 1,
+      draw: (c) =>
+        `<path d="M74 210 L126 210 L125 264 L104 264 L100 228 L96 264 L75 264Z" fill="${c}" ${stk(c)}/><rect x="72" y="232" width="12" height="14" rx="2" fill="${shade(c, 0.85)}" ${stk(c, 1)}/><rect x="116" y="232" width="12" height="14" rx="2" fill="${shade(c, 0.85)}" ${stk(c, 1)}/><path d="M74 212 h52" stroke="#3a2a2a" stroke-width="3"/>`
+    },
+    track: {
+      name: "运动裤",
+      m: 1,
+      draw: (c) => `<path d="M74 210 L126 210 L125 264 L104 264 L100 228 L96 264 L75 264Z" fill="${c}" ${stk(c)}/><path d="M77 214 L78 262 M123 214 L122 262" stroke="#fff" stroke-width="2.6"/><path d="M76 260 h20 M104 260 h20" stroke="${shade(c, 0.75)}" stroke-width="4"/>`
+    },
+    ripped: {
+      name: "破洞牛仔裤",
+      m: 1,
+      draw: (c) =>
+        `<path d="M74 210 L126 210 L125 264 L104 264 L100 228 L96 264 L75 264Z" fill="${c}" ${stk(c)}/><path d="M80 236 q5 -2 10 0 q-5 3 -10 0Z M108 246 q5 -2 10 0 q-5 3 -10 0Z" fill="#f6cfb2"/><path d="M80 236 h10 M108 246 h10" stroke="#fff" stroke-width="1" stroke-dasharray="2 1.5"/><path d="M100 212 v14" stroke="${ol(c)}" stroke-width="1.2"/>`
+    }
+  });
+  Object.assign(SHOES, {
+    leather: { name: "皮鞋", m: 1, draw: () => `<path d="M76 264 h20 q6 2 8 8 h-30 q-2 -8 2 -8z M104 264 h20 q4 0 2 8 h-30 q2 -6 8 -8z" fill="#2b2326" stroke="#000" stroke-width="1.2"/><path d="M80 266 q6 -1 10 0 M108 266 q6 -1 10 0" stroke="#fff" stroke-width="1.4" opacity=".5"/>` },
+    hightop: {
+      name: "高帮帆布鞋",
+      m: 1,
+      draw: (c) =>
+        `<path d="M80 250 h16 v14 q6 2 8 8 h-30 q0 -6 6 -8z M104 250 h16 v14 q6 2 4 8 h-30 q2 -6 10 -8z" fill="${c}" ${stk(c)}/><path d="M74 272 h30 M98 272 h30" stroke="#fff" stroke-width="3.4"/><path d="M84 254 l8 4 M84 259 l8 4 M108 254 l8 4 M108 259 l8 4" stroke="#fff" stroke-width="1.4"/>`
+    }
+  });
+  Object.assign(ACC, {
+    cap: { name: "鸭舌帽", m: 1, draw: (c) => `<path d="M48 70 Q48 22 100 22 Q152 22 152 70Z" fill="#3b5bdb" stroke="#28409e" stroke-width="1.8"/><path d="M44 70 Q100 62 168 76 Q160 84 100 78 Q60 78 44 70Z" fill="#28409e"/><circle cx="100" cy="24" r="3" fill="#28409e"/>` },
+    capback: { name: "反戴鸭舌帽", m: 1, draw: () => `<path d="M48 66 Q48 22 100 22 Q152 22 152 66Z" fill="#2b2b2b" stroke="#000" stroke-width="1.6"/><path d="M60 64 Q100 70 140 64" stroke="#000" stroke-width="2" fill="none"/><path d="M136 30 Q166 34 172 52 Q160 50 146 42Z" fill="#1a1a1a"/><rect x="92" y="52" width="16" height="8" rx="2" fill="none" stroke="#777" stroke-width="1.4"/>` },
+    beanie: { name: "毛线帽", m: 1, draw: () => `<path d="M48 70 Q46 18 100 16 Q154 18 152 70Z" fill="#5c4b8a" stroke="#3f3266" stroke-width="1.6"/><rect x="44" y="60" width="112" height="16" rx="7" fill="#4a3c72" stroke="#3f3266" stroke-width="1.4"/>${[58, 72, 86, 100, 114, 128, 142].map((x) => `<path d="M${x} 62 v12" stroke="#3f3266" stroke-width="1.2"/>`).join("")}` },
+    earring: { name: "耳钉 + 项链", m: 1, draw: () => `<circle cx="52" cy="122" r="2.8" fill="#e8e8f0" stroke="#999" stroke-width=".8"/><circle cx="148" cy="122" r="2.8" fill="#e8e8f0" stroke="#999" stroke-width=".8"/><path d="M88 158 Q100 176 112 158" stroke="#cfcfd8" stroke-width="2" fill="none" stroke-dasharray="3 1.5"/><path d="M98 172 l2 6 2 -6z" fill="#cfcfd8"/>` },
+    bandaid: { name: "创可贴", m: 1, draw: () => `<rect x="120" y="120" width="20" height="8" rx="4" fill="#f2c9a0" stroke="#d6a77a" stroke-width="1" transform="rotate(-20 130 124)"/><path d="M127 122 l0 4 M130 121 l0 4 M133 120 l0 4" stroke="#d6a77a" stroke-width=".8" transform="rotate(-20 130 124)"/>` },
+    mask: { name: "黑口罩", m: 1, draw: () => `<path d="M72 120 Q100 112 128 120 L126 140 Q100 152 74 140Z" fill="#232126" stroke="#000" stroke-width="1.2"/><path d="M72 122 L52 112 M128 122 L148 112" stroke="#232126" stroke-width="2"/>` }
+  });
+  Object.assign(HELD, {
+    ball: { name: "篮球", m: 1, draw: () => `<circle cx="142" cy="208" r="15" fill="#f08a3c" stroke="#b85a1c" stroke-width="1.6"/><path d="M127 208 h30 M142 193 v30 M131 197 Q142 208 131 219 M153 197 Q142 208 153 219" stroke="#7a3a10" stroke-width="1.4" fill="none"/>` },
+    phone: { name: "手机", m: 1, draw: () => `<rect x="128" y="194" width="16" height="28" rx="3" fill="#2b2b2b" stroke="#000" stroke-width="1"/><rect x="131" y="198" width="10" height="18" rx="1.5" fill="#6a8ad8"/>` },
+    coffee: { name: "咖啡", m: 1, draw: () => `<path d="M126 198 h18 l-2 26 h-14z" fill="#fff" stroke="#bbb" stroke-width="1.2"/><rect x="124" y="194" width="22" height="5" rx="2" fill="#3a2a2a"/><rect x="127" y="206" width="16" height="8" fill="#b98b5e"/>` }
+  });
+  const isMaleItem = (set, k) => !!(set[k] && set[k].m);
+  const FEMININE = { hair: ["twin", "bun", "wavy", "long"], top: ["dress", "sailor"], bottom: ["skirt", "pleated", "none"], shoes: ["maryjane"], acc: ["bow", "flower", "crown"], held: ["bouquet"], eyes: ["sparkle", "wink"], mouth: ["pout", "tongue"] };
+
   const CATS = [
     { k: "hair", name: "发型", set: HAIR, color: "hairC" },
     { k: "eyes", name: "眼睛", set: EYES, color: "eyeC" },
@@ -248,11 +405,28 @@
     return out;
   };
   const rnd = (a) => a[Math.floor(Math.random() * a.length)];
-  function randomOutfit() {
+  /** 随机一身；gender 是「男」就只挑男生款（和中性款），「女」就不挑男生款 */
+  function randomOutfit(gender) {
+    const g = String(gender || "");
+    const boy = /男|male|boy/i.test(g);
+    const girl = /女|female|girl/i.test(g);
     const o = { skin: Math.floor(Math.random() * SKIN.length) };
     for (const c of CATS) {
-      if (c.set) o[c.k] = rnd(Object.keys(c.set));
+      if (c.set) {
+        let keys = Object.keys(c.set);
+        if (boy) {
+          const fem = FEMININE[c.k] || [];
+          const male = keys.filter((k) => isMaleItem(c.set, k));
+          const neutral = keys.filter((k) => !fem.includes(k));
+          keys = male.length && Math.random() < 0.7 ? male : neutral;
+        } else if (girl) keys = keys.filter((k) => !isMaleItem(c.set, k) || ["center", "cardigan", "track", "hightop", "cap", "beanie", "phone", "coffee"].includes(k));
+        o[c.k] = rnd(keys.length ? keys : Object.keys(c.set));
+      }
       if (c.color) o[c.color] = Math.floor(Math.random() * PAL.length);
+    }
+    if (boy) {
+      o.hairC = rnd([0, 1, 2, 4, 3, 13]);
+      if (o.bottom === "none" || (FEMININE.bottom || []).includes(o.bottom)) o.bottom = rnd(["pants", "cargo", "track", "ripped", "shorts"]);
     }
     if (TOP[o.top].dress) o.bottom = "none";
     return valid(o);
@@ -327,7 +501,7 @@
   let tab = "hair";
   let busy = false;
 
-  const outfitOf = (w) => (w === "me" ? (S.user = S.user || valid(DEF)) : (S.chars[ch.id] = S.chars[ch.id] || randomOutfit()));
+  const outfitOf = (w) => (w === "me" ? (S.user = S.user || valid(DEF)) : (S.chars[ch.id] = S.chars[ch.id] || randomOutfit(ch.gender)));
   function render() {
     if (!root) return;
     if (!ch) {
@@ -339,7 +513,7 @@
     const o = outfitOf(who);
     let items = "";
     if (tab === "skin") items = SKIN.map((c, i) => `<button type="button" class="dr-sw${o.skin === i ? " is-on" : ""}" data-skin="${i}" style="background:${c}"></button>`).join("");
-    else items = Object.entries(cat.set).map(([k, v]) => `<button type="button" class="dr-item${o[tab] === k ? " is-on" : ""}" data-item="${k}">${esc(v.name)}</button>`).join("");
+    else items = Object.entries(cat.set).map(([k, v]) => `<button type="button" class="dr-item${o[tab] === k ? " is-on" : ""}${v.m ? " is-m" : ""}" data-item="${k}">${esc(v.name)}</button>`).join("");
     const colors = cat.color ? `<div class="dr-colors">${PAL.map((c, i) => `<button type="button" class="dr-sw${o[cat.color] === i ? " is-on" : ""}" data-col="${i}" style="background:${c}" title="${PAL_NAME[i]}"></button>`).join("")}</div>` : "";
     root.innerHTML = `<div class="dr">
       <div class="dr-stage">
@@ -374,7 +548,7 @@
   async function charDress(target) {
     if (busy) return;
     if (!F.hasApiKey()) {
-      const o = randomOutfit();
+      const o = randomOutfit(target === "char" ? ch.gender : user.gender);
       if (target === "char") S.chars[ch.id] = o;
       else {
         S.prevUser = S.user;
@@ -392,7 +566,7 @@
         [
           {
             role: "system",
-            content: `你是「${ch.name}」。${ch.persona ? "人设：\n" + ch.persona + "\n" : ""}你和「${user.name}」在玩换装游戏，每人有一个 Q 版小人。${
+            content: `你是「${ch.name}」。${ch.persona ? "人设：\n" + ch.persona + "\n" : ""}你和「${user.name}」在玩换装游戏，每人有一个 Q 版小人。${ch.gender ? `你是${ch.gender}生。` : ""}${user.gender ? `${user.name}是${user.gender}生。` : ""}衣柜里男生款、女生款都有，按性别和性格挑合适的。${
               target === "char" ? "现在你给你自己的小人搭一身衣服，要符合你的性格和审美。" : `现在你给「${user.name}」的小人搭一身你觉得最好看 / 最想看 TA 穿的衣服。`
             }\n只能从下面的衣柜里选：\n${catalogText()}\n只输出 JSON：{"outfit":{"hair":"","hairC":0,"eyes":"","eyeC":0,"mouth":"","top":"","topC":0,"bottom":"","botC":0,"shoes":"","shoeC":0,"acc":"","held":"","bg":"","skin":0},"say":"你搭完之后说的一两句话（按人设、口语）"}`
           },
@@ -517,14 +691,14 @@
     if (a === "charme") void charDress("me");
     if (a === "show") void showToChar();
     if (a === "rand") {
-      if (who === "me") S.user = randomOutfit();
-      else S.chars[ch.id] = randomOutfit();
+      if (who === "me") S.user = randomOutfit(user.gender);
+      else S.chars[ch.id] = randomOutfit(ch.gender);
       save();
       render();
     }
     if (a === "reset") {
       if (who === "me") S.user = valid(DEF);
-      else S.chars[ch.id] = randomOutfit();
+      else S.chars[ch.id] = randomOutfit(ch.gender);
       save();
       render();
     }

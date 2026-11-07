@@ -122,6 +122,7 @@
           .slice(0, 700),
         avatar: await resolveImg(x.avatar),
         look: String(x.charImageGenPrompt || "").slice(0, 600),
+        gender: String(x.gender || ""),
         // 生图锁脸用：角色档案里的参考立绘（没有就用头像）
         ref: String(x.charImageRefDataUrl || "").trim() || (/^data:image\//.test(String(x.avatar || "")) ? String(x.avatar) : "")
       }))
@@ -138,7 +139,8 @@
     return {
       name: String(m?.displayName || m?.name || "").trim() || "我",
       avatar: await resolveImg(m?.avatar),
-      persona: String(m?.persona || m?.summary || "").slice(0, 300)
+      persona: String(m?.persona || m?.summary || "").slice(0, 300),
+      gender: String(m?.gender || "")
     };
   }
 
