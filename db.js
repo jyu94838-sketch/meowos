@@ -1780,7 +1780,7 @@
     "fun-weibo.js?v=1",
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
-    "fun-desk.js?v=2",
+    "fun-desk.js?v=3",
     "fun-widgets.js?v=2",
     "changelog.js?v=10",
     "share-config.js?v=3",
