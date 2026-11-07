@@ -9,6 +9,12 @@
 (function () {
   const CHANGELOG = [
     {
+      v: 2,
+      date: "2026-11-07",
+      title: "第二页去掉重复的应用",
+      items: ["聊天、查岗、关系、人设、漫游、我的已经在第一页了，第二页不再重复放"]
+    },
+    {
       v: 1,
       date: "2026-11-07",
       title: "Meow OS 1.0",

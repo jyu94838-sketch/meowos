@@ -1780,8 +1780,8 @@
     "fun-weibo.js?v=1",
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
-    "fun-widgets.js?v=3", "fun-icons.js?v=3",
-    "changelog.js?v=19",
+    "fun-widgets.js?v=3", "fun-icons.js?v=4",
+    "changelog.js?v=20",
     "share-config.js?v=3", "st-gate.js?v=1",
     "fun-share.js?v=5"
   ];

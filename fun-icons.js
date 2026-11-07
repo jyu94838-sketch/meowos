@@ -61,7 +61,7 @@
     const apps = desk.apps();
     root.innerHTML = `<div class="ico-m">
       <p class="fun-kicker">APP ICONS · 换图标</p>
-      <p class="fun-note">点一个应用，从相册选一张图当它的图标（会自动裁成正方形）。聊天、查岗、关系、角色人设、漫游、我的会和第一页一起换。</p>
+      <p class="fun-note">点一个应用，从相册选一张图当它的图标（会自动裁成正方形，铺满整个方块）。第一页的图标在装扮页原有的主屏图标设置里换。</p>
       <div class="desk-apps-grid ico-grid">${apps.map((a) => tile(a, icons[a.key], `data-k="${a.key}"`)).join("")}</div>
       ${Object.keys(icons).length ? `<button type="button" class="fun-btn ghost ico-reset-all" id="ico-reset-all">全部恢复默认图标</button>` : ""}
     </div>`;

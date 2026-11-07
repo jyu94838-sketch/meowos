@@ -16,7 +16,7 @@
   const ICONS_KEY = "meowos_desk_icons_v1";
   const SIZE_KEY = "meowos_icon_size";
   /** 第二页里和第一页同一个应用的格子：换图标时两边一起换（第一页用原版装扮里的图标设置） */
-  const HOME_SLOT = { chat: "聊天", checkup: "查岗", relation: "关系", char: "人设", roam: "漫游", my: "我的" };
+  const HOME_SLOT = {}; // 第一页已有的应用不再放第二页
 
   function readIcons() {
     try {
@@ -44,13 +44,8 @@
   };
   /** key: [名称, Phosphor 图标, 色相, 英文小标, 打开方式] */
   const APPS = {
-    chat: ["聊天", "ph-chat-circle-text", 215, "Chat", call("openChatListScreen")],
     bubble: ["Bubble", "ph-chat-teardrop-dots", 280, "Idol", fun("Bubble")],
-    char: ["角色人设", "ph-identification-card", 250, "Persona", call("openCharScreen")],
     wb: ["世界书", "ph-book-open-text", 30, "Lore", call("openWorldBookScreen")],
-    relation: ["关系", "ph-heart-straight", 345, "Bond", call("openRelationScreen")],
-    checkup: ["查岗", "ph-device-mobile-camera", 190, "Audit", call("openCheckupScreen")],
-    roam: ["漫游", "ph-footprints", 140, "Roam", call("openRoamScreen")],
     couple: ["情侣小屋", "ph-house-simple", 335, "Couple", fun("情侣小屋")],
     music: ["音乐", "ph-music-notes", 260, "Music", fun("音乐")],
     video: ["刷刷", "ph-film-strip", 0, "Shorts", fun("短视频")],
@@ -62,7 +57,6 @@
     astro: ["星座", "ph-moon-stars", 265, "Stars", fun("星座")],
     games: ["游戏厅", "ph-game-controller", 300, "Arcade", fun("游戏厅")],
     share: ["资源站", "ph-package", 175, "Share", fun("资源站")],
-    my: ["我的", "ph-user-circle", 230, "Mine", call("openMyScreen")],
     news: ["更新公告", "ph-megaphone", 40, "News", call("openChangelog")]
   };
   const DEFAULT = [Object.keys(APPS)];
