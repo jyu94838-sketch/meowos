@@ -49,7 +49,8 @@
         ["游戏厅", "ph-game-controller", 300, fun("游戏厅")],
         ["资源站", "ph-package", 175, fun("资源站")],
         ["我的", "ph-user-circle", 230, call("openMyScreen")],
-        ["设置", "ph-gear-six", 220, call("openSettings")]
+        ["设置", "ph-gear-six", 220, call("openSettings")],
+        ["更新公告", "ph-megaphone", 40, call("openChangelog")]
       ]
     }
   ];

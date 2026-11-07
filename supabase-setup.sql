@@ -5,7 +5,7 @@
 create table if not exists public.mx_shares (
   id          uuid primary key default gen_random_uuid(),
   created_at  timestamptz not null default now(),
-  kind        text not null check (kind in ('look', 'worldbook', 'char')),
+  kind        text not null,
   title       text not null check (char_length(title) between 1 and 60),
   description text not null default '' check (char_length(description) <= 300),
   author      text not null default '匿名' check (char_length(author) <= 30),
@@ -18,6 +18,9 @@ create table if not exists public.mx_shares (
   owner_hash  text not null
 );
 alter table public.mx_shares add column if not exists thumb_path text not null default '';
+-- 资源类型（重复运行会更新成最新的类型列表）
+alter table public.mx_shares drop constraint if exists mx_shares_kind_check;
+alter table public.mx_shares add constraint mx_shares_kind_check check (kind in ('look', 'worldbook', 'char', 'preset', 'font'));
 create index if not exists mx_shares_created_idx on public.mx_shares (created_at desc);
 
 alter table public.mx_shares enable row level security;
@@ -79,4 +82,4 @@ on conflict (id) do update set public = true, file_size_limit = 10485760, allowe
 drop policy if exists "mx upload" on storage.objects;
 create policy "mx upload" on storage.objects
   for insert to anon, authenticated
-  with check (bucket_id = 'mx-shares' and (storage.foldername(name))[1] in ('look', 'worldbook', 'char'));
+  with check (bucket_id = 'mx-shares' and (storage.foldername(name))[1] in ('look', 'worldbook', 'char', 'preset', 'font'));

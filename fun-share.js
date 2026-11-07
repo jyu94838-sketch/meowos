@@ -21,8 +21,74 @@
   const KIND_META = {
     look: { name: "美化", icon: "🎨", c1: "#f6d0e2", c2: "#b8889e" },
     worldbook: { name: "世界书", icon: "📖", c1: "#d8e6ff", c2: "#3a5c89" },
-    char: { name: "角色卡", icon: "🎭", c1: "#e4dcff", c2: "#6e4dbd" }
+    char: { name: "角色卡", icon: "🎭", c1: "#e4dcff", c2: "#6e4dbd" },
+    preset: { name: "预设", icon: "🧩", c1: "#d9f5e6", c2: "#1f7a61" },
+    font: { name: "字体", icon: "🔤", c1: "#fff1cc", c2: "#b8920a" }
   };
+  /** 可分享的预设种类：KV 里都是 {id,name,…} 列表（生图预设包在 {v:1,items} 里，本身不含 Key） */
+  const PRESET_SUBS = {
+    theater: { name: "小剧场预设", key: "THEATER_PRESETS" },
+    prose: { name: "晤面文风预设", key: "CHAT_OFFLINE_DM_PROSE_PRESETS" },
+    chatcss: { name: "密谈样式预设", key: "CHAT_THREAD_UI_CSS_PRESETS" },
+    offlinecss: { name: "晤面样式预设", key: "CHAT_OFFLINE_THREAD_UI_CSS_PRESETS" },
+    imagegen: { name: "生图预设", key: "IMAGE_GEN_PRESETS", wrapped: true }
+  };
+  function readPresetList(sub) {
+    const d = window.XXJ_DB;
+    const meta = PRESET_SUBS[sub];
+    if (!d || !meta) return [];
+    const raw = d.getKv(d.K[meta.key]);
+    const arr = meta.wrapped ? raw?.items : raw;
+    return Array.isArray(arr) ? arr.filter((x) => x && typeof x === "object") : [];
+  }
+  function writePresetList(sub, list) {
+    const d = window.XXJ_DB;
+    const meta = PRESET_SUBS[sub];
+    d.setKv(d.K[meta.key], meta.wrapped ? { v: 1, items: list } : list);
+  }
+  function readFonts() {
+    const d = window.XXJ_DB;
+    if (!d) return [];
+    const out = [];
+    const cur = d.getKv(d.K.GLOBAL_UI_TYPO);
+    if (cur && (cur.fontStack || cur.faceFamily || cur.linkUrl)) out.push({ ...cur, id: "__current__", name: "当前使用的字体" });
+    const pre = d.getKv(d.K.GLOBAL_UI_TYPO_PRESETS);
+    if (Array.isArray(pre)) pre.forEach((x) => x && x.id && out.push(x));
+    return out;
+  }
+  /** 字体卡封面：尽量用这款字体本身画一段示例文字 */
+  async function fontCover(f) {
+    const fam = "mxjfont" + Date.now();
+    let family = String(f.fontStack || f.faceFamily || "serif");
+    try {
+      const src = f.faceSrcDataUrl || f.faceSrcUrl;
+      if (src) {
+        const face = new FontFace(fam, `url(${JSON.stringify(src)})`);
+        await face.load();
+        document.fonts.add(face);
+        family = fam;
+      }
+    } catch (_) {
+      /* 加载不了就用字体栈 */
+    }
+    const c = document.createElement("canvas");
+    c.width = 600;
+    c.height = 400;
+    const ctx = c.getContext("2d");
+    const g = ctx.createLinearGradient(0, 0, 600, 400);
+    g.addColorStop(0, "#fff7dd");
+    g.addColorStop(1, "#ffe7a3");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 600, 400);
+    ctx.fillStyle = "#3a2f10";
+    ctx.textAlign = "center";
+    ctx.font = `110px ${family}`;
+    ctx.fillText("Aa 喵", 300, 190);
+    ctx.font = `40px ${family}`;
+    ctx.fillText("今天也要开心哦 123", 300, 290);
+    return c.toDataURL("image/png");
+  }
+
 
   const CRC_TABLE = (() => {
     const t = new Uint32Array(256);
@@ -346,8 +412,22 @@
         sub: String(char.summary || "").slice(0, 80) + (volumes.length ? `（附 ${volumes.length} 本世界书）` : "")
       };
     }
+    if (kind === "preset") {
+      const sub = opts?.sub;
+      const items = readPresetList(sub).filter((x) => ids.includes(String(x.id)));
+      if (!items.length) throw new Error("请选择预设");
+      return { data: { sub, items: JSON.parse(JSON.stringify(items)) }, cover: "", sub: `${PRESET_SUBS[sub].name} × ${items.length}：${items.map((x) => x.name || "未命名").join("、").slice(0, 60)}` };
+    }
+    if (kind === "font") {
+      const f = readFonts().find((x) => ids.includes(String(x.id)));
+      if (!f) throw new Error("请选择字体");
+      const font = JSON.parse(JSON.stringify(f));
+      delete font.id;
+      return { data: { font }, cover: await fontCover(font), sub: String(font.fontStack || font.faceFamily || "自定义字体").slice(0, 60) };
+    }
     throw new Error("未知类型");
   }
+
 
   function newVolId() {
     try {
@@ -412,8 +492,33 @@
       }
       return `角色「${c.displayName}」已加入角色库`;
     }
+    if (payload.kind === "preset") {
+      const meta = PRESET_SUBS[data.sub];
+      if (!meta) throw new Error("不认识的预设类型");
+      const list = readPresetList(data.sub);
+      const names = new Set(list.map((x) => x.name));
+      for (const it of data.items || []) {
+        const x = { ...it, id: typeof newEntityId === "function" ? newEntityId() : "p_" + uid() };
+        if (names.has(x.name)) x.name = (x.name || "预设") + "（导入）";
+        list.push(x);
+      }
+      writePresetList(data.sub, list);
+      return `已导入 ${data.items?.length || 0} 个${meta.name}，去对应页面的预设列表里使用`;
+    }
+    if (payload.kind === "font") {
+      const d = window.XXJ_DB;
+      const pre = d.getKv(d.K.GLOBAL_UI_TYPO_PRESETS);
+      const list = Array.isArray(pre) ? pre.slice() : [];
+      const entry = { ...data.font, id: typeof newEntityId === "function" ? newEntityId() : "f_" + uid(), name: payload.title || data.font?.name || "导入的字体" };
+      if (list.some((x) => x && x.name === entry.name)) entry.name += "（导入）";
+      list.push(entry);
+      d.setKv(d.K.GLOBAL_UI_TYPO_PRESETS, list);
+      if (typeof applyGlobalUiTypoPresetEntry === "function") applyGlobalUiTypoPresetEntry(entry);
+      return `字体「${entry.name}」已导入并套用，可在「装扮 → 字体」里切换`;
+    }
     return "完成";
   }
+
 
   async function makeCard(kind, ids, meta) {
     const exp = await buildExport(kind, ids, meta);
@@ -590,7 +695,7 @@
   }
 
   function kindChips() {
-    return `<div class="sh-chips">${[["", "全部"], ["look", "🎨 美化"], ["worldbook", "📖 世界书"], ["char", "🎭 角色卡"]]
+    return `<div class="sh-chips">${[["", "全部"], ["look", "🎨 美化"], ["worldbook", "📖 世界书"], ["char", "🎭 角色卡"], ["preset", "🧩 预设"], ["font", "🔤 字体"]]
       .map(([k, n]) => `<button type="button" class="fun-chip-btn${filter.kind === k ? " is-on" : ""}" data-kind="${k}">${n}</button>`)
       .join("")}</div>`;
   }
@@ -744,7 +849,7 @@
     });
   }
 
-  let makeState = { kind: "char", ids: [], withBooks: true };
+  let makeState = { kind: "char", ids: [], withBooks: true, sub: "theater" };
   async function renderMake(p) {
     await hydrateStores();
     const user = await F.loadUser();
@@ -756,7 +861,11 @@
         ? chars.map((c) => ({ id: String(c.id), name: c.displayName || "未命名", sub: String(c.summary || "").slice(0, 30) }))
         : k === "worldbook"
           ? vols.map((v) => ({ id: String(v.id), name: v.title || "未命名", sub: `${v.entries?.length || 0} 条` }))
-          : [];
+          : k === "preset"
+            ? readPresetList(makeState.sub).map((x) => ({ id: String(x.id), name: x.name || "未命名", sub: String(x.kind || x.css || x.instruction || x.stylePrompt || "").replace(/\s+/g, " ").slice(0, 30) }))
+            : k === "font"
+              ? readFonts().map((x) => ({ id: String(x.id), name: x.name || "未命名", sub: String(x.fontStack || x.faceFamily || "").slice(0, 30) + (x.faceSrcDataUrl ? " · 含字体文件" : "") }))
+              : [];
     makeState.ids = makeState.ids.filter((id) => list.some((x) => x.id === id));
     if (k !== "look" && !makeState.ids.length && list.length) makeState.ids = [list[0].id];
     const defTitle = k === "look" ? `${user.name}的装扮` : k === "char" ? list.find((x) => x.id === makeState.ids[0])?.name || "" : list.find((x) => x.id === makeState.ids[0])?.name || "";
@@ -767,14 +876,21 @@
           .map(([key, m]) => `<button type="button" class="fun-chip-btn${k === key ? " is-on" : ""}" data-mk="${key}">${m.icon} ${m.name}</button>`)
           .join("")}</div>
         <p class="fun-kicker">2 · 选择内容</p>
+        ${k === "preset" ? `<div class="sh-chips">${Object.entries(PRESET_SUBS).map(([sk, m]) => `<button type="button" class="fun-chip-btn${makeState.sub === sk ? " is-on" : ""}" data-sub="${sk}">${m.name}</button>`).join("")}</div>` : ""}
         ${
           k === "look"
             ? `<p class="fun-note">会打包你当前的装扮：壁纸、主屏图标和背景、Dock、字体、密谈/晤面聊天样式。<b>不含</b>拍立得照片。</p>`
             : list.length
               ? `<div class="sh-pick">${list
                   .map((x) => `<button type="button" class="sh-pick-item${makeState.ids.includes(x.id) ? " is-on" : ""}" data-pid="${esc(x.id)}"><strong>${esc(x.name)}</strong><small>${esc(x.sub)}</small></button>`)
-                  .join("")}</div>${k === "char" ? `<label class="fun-switch"><input type="checkbox" id="sh-withbooks" ${makeState.withBooks ? "checked" : ""}/><span>附带角色绑定的世界书</span></label>` : `<p class="fun-note">可多选，打包成一张卡。</p>`}`
-              : `<p class="fun-note warn">你还没有${KIND_META[k].name}。</p>`
+                  .join("")}</div>${
+                  k === "char"
+                    ? `<label class="fun-switch"><input type="checkbox" id="sh-withbooks" ${makeState.withBooks ? "checked" : ""}/><span>附带角色绑定的世界书</span></label>`
+                    : k === "font"
+                      ? `<p class="fun-note">带字体文件的卡会比较大（上限 10MB）。请只分享你有权分发的字体。</p>`
+                      : `<p class="fun-note">可多选，打包成一张卡。</p>`
+                }`
+              : `<p class="fun-note warn">你还没有${k === "preset" ? PRESET_SUBS[makeState.sub].name : KIND_META[k].name}。${k === "font" ? "先去「装扮 → 字体」设置一个字体。" : ""}</p>`
         }
         <p class="fun-kicker">3 · 填写信息</p>
         <label class="fun-field"><span>标题</span><input id="sh-title" maxlength="40" value="${esc(defTitle)}" /></label>
@@ -785,16 +901,17 @@
         ${cfg() ? "" : `<p class="fun-note">广场未开通，暂时只能下载 PNG。</p>`}
       </div>`;
     p.querySelectorAll("[data-mk]").forEach((b) => (b.onclick = () => ((makeState.kind = b.dataset.mk), (makeState.ids = []), renderMake(p))));
+    p.querySelectorAll("[data-sub]").forEach((b) => (b.onclick = () => ((makeState.sub = b.dataset.sub), (makeState.ids = []), renderMake(p))));
     p.querySelectorAll("[data-pid]").forEach(
       (b) =>
         (b.onclick = () => {
           const id = b.dataset.pid;
-          if (k === "char") makeState.ids = [id];
+          if (k === "char" || k === "font") makeState.ids = [id];
           else makeState.ids = makeState.ids.includes(id) ? makeState.ids.filter((x) => x !== id) : [...makeState.ids, id];
           const t = p.querySelector("#sh-title");
           const keep = t.value;
           p.querySelectorAll("[data-pid]").forEach((x) => x.classList.toggle("is-on", makeState.ids.includes(x.dataset.pid)));
-          if (k === "char" || !keep) t.value = list.find((x) => x.id === id)?.name || keep;
+          if (k === "char" || k === "font" || !keep) t.value = list.find((x) => x.id === id)?.name || keep;
         })
     );
     p.querySelector("#sh-withbooks")?.addEventListener("change", (e) => (makeState.withBooks = e.target.checked));
@@ -803,7 +920,8 @@
         title: p.querySelector("#sh-title").value.trim(),
         desc: p.querySelector("#sh-desc").value.trim(),
         author: p.querySelector("#sh-author").value.trim() || "匿名",
-        withBooks: makeState.withBooks
+        withBooks: makeState.withBooks,
+        sub: makeState.sub
       };
       if (!meta.title) return toast("填个标题吧");
       if (k !== "look" && !makeState.ids.length) return toast("先选内容");
@@ -836,7 +954,7 @@
 
   function renderImport(p) {
     p.innerHTML = `<div class="sh-import">
-      <div class="sh-drop" id="sh-drop"><div class="sh-empty-ico">🖼️</div><p>选择一张 Meow OS 资源卡（.png）</p><small>美化 / 世界书 / 角色卡都可以</small></div>
+      <div class="sh-drop" id="sh-drop"><div class="sh-empty-ico">🖼️</div><p>选择一张 Meow OS 资源卡（.png）</p><small>美化 / 世界书 / 角色卡 / 预设 / 字体都可以</small></div>
       <input type="file" accept="image/png" hidden />
       <div id="sh-import-info"></div></div>`;
     const inp = p.querySelector("input");
@@ -866,7 +984,11 @@
             ? `角色：${esc(d.char?.displayName || "")}${d.volumes?.length ? `，附 ${d.volumes.length} 本世界书` : ""}`
             : payload.kind === "worldbook"
               ? `${d.volumes?.length || 0} 本：${esc((d.volumes || []).map((v) => v.title).join("、"))}`
-              : `${Object.keys(d.kv || {}).length} 项装扮配置（会覆盖现在的装扮）`;
+              : payload.kind === "preset"
+                ? `${esc(PRESET_SUBS[d.sub]?.name || "预设")} × ${d.items?.length || 0}：${esc((d.items || []).map((x) => x.name).join("、"))}`
+                : payload.kind === "font"
+                  ? `字体：${esc(d.font?.fontStack || d.font?.faceFamily || "")}${d.font?.faceSrcDataUrl ? "（含字体文件）" : ""}，导入后会立即套用`
+                  : `${Object.keys(d.kv || {}).length} 项装扮配置（会覆盖现在的装扮）`;
         info.innerHTML = `<div class="sh-import-card"><img src="${URL.createObjectURL(file)}" alt="" />
           <div><p class="fun-kicker">${m.icon} ${m.name}</p><strong>${esc(payload.title)}</strong><p class="fun-note">by ${esc(payload.author || "匿名")}<br/>${detail}</p>
           ${payload.desc ? `<p class="fun-note">${esc(payload.desc)}</p>` : ""}
