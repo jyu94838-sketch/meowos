@@ -1765,7 +1765,17 @@
   const RELATION_AI_MODULE = "relation-ai.js?v=2";
   const ROLEPLAY_MODULE = "roleplay.js?v=16";
   /** 娱乐：音乐 / UNO / 狼人杀 / 短视频 */
-  const FUN_MODULES = ["fun.js?v=1", "fun-uno.js?v=1", "fun-wolf.js?v=1", "fun-video.js?v=1"];
+  const FUN_MODULES = [
+    "fun.js?v=2",
+    "fun-uno.js?v=2",
+    "fun-wolf.js?v=2",
+    "fun-video.js?v=2",
+    "fun-games.js?v=2",
+    "fun-ludo.js?v=2",
+    "fun-bubble.js?v=2",
+    "share-config.js?v=2",
+    "fun-share.js?v=2"
+  ];
   const PRECHAIN = [
     "media-blob.js?v=" + ASSET_V,
     "ai-api.js?v=" + ASSET_V,

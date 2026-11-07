@@ -18,14 +18,26 @@
   let root = null;
   let busy = false;
   let observer = null;
+  let follows = new Set();
+  let tab = "rec"; // rec | follow
 
   async function load() {
     try {
       const v = await F.FunDB.get(KV);
       posts = Array.isArray(v) ? v : [];
+      follows = new Set((await F.FunDB.get("video_follow")) || []);
     } catch (_) {
       posts = [];
     }
+  }
+  function saveFollows() {
+    F.FunDB.set("video_follow", [...follows]).catch(() => {});
+  }
+  function toggleFollow(name) {
+    if (follows.has(name)) follows.delete(name);
+    else follows.add(name);
+    saveFollows();
+    toast(follows.has(name) ? `已关注 ${name}` : `已取消关注 ${name}`);
   }
   function save() {
     posts = posts.slice(0, MAX_POSTS);
@@ -46,12 +58,14 @@
     busy = true;
     renderTopBusy(true);
     try {
-      const authors = shuffle(cast.slice()).slice(0, Math.min(count, cast.length));
+      const base = tab === "follow" ? cast.filter((c) => follows.has(c.name)) : cast;
+      if (tab === "follow" && !base.length) throw new Error("你关注的人里还没有角色，先去推荐页关注几个");
+      const authors = shuffle(base.slice()).slice(0, Math.min(count, base.length));
       const castDesc = cast.length
         ? cast.map((c) => `- ${c.name}：${(c.persona || "（无人设）").replace(/\n/g, " ").slice(0, 160)}`).join("\n")
         : "（没有角色，全部用虚构网友）";
       const want = authors.length
-        ? `本次请让这几位各发 1 条：${authors.map((a) => a.name).join("、")}${count > authors.length ? `；再补 ${count - authors.length} 条路人网友的视频` : ""}。`
+        ? `本次请让这几位各发 1 条：${authors.map((a) => a.name).join("、")}${count > authors.length && tab !== "follow" ? `；再补 ${count - authors.length} 条路人网友的视频` : ""}。`
         : `请生成 ${count} 条路人网友的视频。`;
       const recent = posts.slice(0, 6).map((p) => `${p.author}：${p.caption}`).join("\n");
       const txt = await F.aiText(
@@ -152,14 +166,14 @@
       ${p.scene ? `<div class="sv-scene"><small>画面</small>${esc(p.scene)}</div>` : ""}
       <div class="sv-heart-pop"></div>
       <div class="sv-rail">
-        ${avHtml({ name: p.author, avatar: av }, "fun-av sv-av")}
+        <button type="button" class="sv-av-wrap" data-prof>${avHtml({ name: p.author, avatar: av }, "fun-av sv-av")}${!p.mine && !follows.has(p.author) ? `<span class="sv-follow-plus" data-follow>+</span>` : ""}</button>
         <button type="button" class="sv-rbtn${p.liked ? " is-on" : ""}" data-like><i class="ph-fill ph-heart"></i><span>${fmtNum(p.likes + (p.liked ? 1 : 0))}</span></button>
         <button type="button" class="sv-rbtn" data-cmt><i class="ph-fill ph-chat-circle-dots"></i><span>${fmtNum(p.comments.length)}</span></button>
         <button type="button" class="sv-rbtn" data-share><i class="ph-fill ph-share-fat"></i><span>分享</span></button>
         ${p.mine ? `<button type="button" class="sv-rbtn" data-del><i class="ph ph-trash"></i><span>删除</span></button>` : ""}
       </div>
       <div class="sv-info">
-        <strong>@${esc(p.author)}</strong>
+        <strong data-prof>@${esc(p.author)}</strong>${p.likedBy && p.likedBy.length ? `<span class="sv-likedby">❤ ${esc(p.likedBy.join("、"))} 赞过</span>` : ""}
         <p>${esc(p.caption)} ${p.tags.map((t) => `<b>#${esc(t)}</b>`).join(" ")}</p>
         <span class="sv-bgm"><i class="sv-note">♪</i><span class="sv-marquee"><span>${esc(p.bgm)} - ${esc(p.author)}</span></span></span>
       </div>
@@ -170,13 +184,19 @@
   function renderFeed(scrollTo) {
     if (!root) return;
     const feed = root.querySelector("#sv-feed");
+    root.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("is-on", b.dataset.tab === tab));
+    const list = posts.map((p, i) => ({ p, i })).filter(({ p }) => tab === "rec" || follows.has(p.author));
+    if (tab === "follow" && !list.length) {
+      feed.innerHTML = `<div class="sv-empty"><div class="sv-empty-ico">👀</div><p>${follows.size ? "关注的人还没发视频" : "还没有关注任何人"}</p><small>${follows.size ? "点下面让 TA 们发一批" : "在推荐页点头像下面的 + 关注角色"}</small>${follows.size ? `<button type="button" class="fun-btn solid" data-gen>让关注的人发视频</button>` : ""}</div>`;
+      return;
+    }
     if (!posts.length) {
       feed.innerHTML = `<div class="sv-empty"><div class="sv-empty-ico">📱</div><p>还没有视频</p><small>${cast.length ? `点下面让 ${cast.length} 位角色发视频` : "角色库里还没有角色，先刷路人的视频"}</small>
         <button type="button" class="fun-btn solid" data-gen>开始刷</button></div>`;
       return;
     }
     feed.innerHTML =
-      posts.map(slideHtml).join("") +
+      list.map(({ p, i }) => slideHtml(p, i)).join("") +
       `<article class="sv-slide sv-more"><div class="sv-empty"><div class="sv-empty-ico">✨</div><p>刷完啦</p><button type="button" class="fun-btn solid" data-gen>再刷一批</button></div></article>`;
     bindObserver();
     if (scrollTo != null) {
@@ -273,6 +293,43 @@
     input.addEventListener("keydown", (e) => e.key === "Enter" && send());
   }
 
+  function openProfile(name) {
+    const c = castByName(name);
+    const isMe = name === user.name;
+    const theirs = posts.map((p, i) => ({ p, i })).filter(({ p }) => p.author === name);
+    const likes = theirs.reduce((s, { p }) => s + p.likes + (p.liked ? 1 : 0), 0);
+    const sh = F.openSheet(
+      `<div class="sv-prof">
+        ${avHtml({ name, avatar: avatarOf(name, isMe) }, "fun-av sv-prof-av")}
+        <strong>${esc(name)}</strong>
+        <p class="fun-note">${esc((c?.persona || (isMe ? "这是你自己" : "路人网友")).split("\n")[0].slice(0, 60))}</p>
+        <div class="sv-prof-stats"><span><b>${theirs.length}</b>作品</span><span><b>${fmtNum(likes)}</b>获赞</span></div>
+        ${isMe ? "" : `<button type="button" class="fun-btn ${follows.has(name) ? "ghost" : "solid"}" data-f>${follows.has(name) ? "已关注" : "+ 关注"}</button>`}
+      </div>
+      <div class="sv-prof-grid">${theirs
+        .map(({ p, i }) => `<button type="button" class="sv-prof-item" data-go="${i}" style="--h:${p.hue}">${p.image ? `<img src="${esc(p.image)}" alt=""/>` : `<span>${esc(p.emoji)}</span>`}<small>♥ ${fmtNum(p.likes)}</small></button>`)
+        .join("") || `<p class="fun-note">还没有作品</p>`}</div>`,
+      { title: isMe ? "我的主页" : "主页" }
+    );
+    sh.el.classList.add("fun-sheet--tall");
+    sh.body.addEventListener("click", (e) => {
+      const f = e.target.closest("[data-f]");
+      if (f) {
+        toggleFollow(name);
+        f.className = `fun-btn ${follows.has(name) ? "ghost" : "solid"}`;
+        f.textContent = follows.has(name) ? "已关注" : "+ 关注";
+        renderFeed();
+        return;
+      }
+      const g = e.target.closest("[data-go]");
+      if (g) {
+        sh.close();
+        if (tab === "follow" && !follows.has(name)) tab = "rec";
+        renderFeed(Number(g.dataset.go));
+      }
+    });
+  }
+
   function compressImage(file) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -353,6 +410,8 @@
         toast("发布成功，等大家来评论…");
         try {
           const cm = await aiCommentsForMine(post);
+          const fans = shuffle(cast.filter((c) => cm.some((x) => x.name === c.name) || Math.random() < 0.3).map((c) => c.name)).slice(0, 4);
+          if (fans.length) post.likedBy = fans;
           post.comments.push(...cm.map((c) => ({ name: String(c.name || "网友").slice(0, 20), text: String(c.text).slice(0, 120), at: Date.now() })));
           save();
           const i = posts.indexOf(post);
@@ -372,6 +431,11 @@
     const slide = e.target.closest(".sv-slide[data-i]");
     if (!slide) return;
     const i = Number(slide.dataset.i);
+    if (e.target.closest("[data-follow]")) {
+      toggleFollow(posts[i].author);
+      return renderFeed();
+    }
+    if (e.target.closest("[data-prof]")) return openProfile(posts[i].author);
     if (e.target.closest("[data-like]")) return toggleLike(i);
     if (e.target.closest("[data-cmt]")) return openComments(i);
     if (e.target.closest("[data-share]")) {
@@ -415,7 +479,15 @@
     async mount(body, act) {
       root = document.createElement("div");
       root.className = "sv-root";
-      root.innerHTML = `<div class="sv-feed" id="sv-feed"><div class="sv-empty"><span class="fun-spin"></span></div></div>`;
+      root.innerHTML = `<div class="sv-tabs"><button type="button" data-tab="follow">关注</button><button type="button" data-tab="rec" class="is-on">推荐</button><button type="button" data-tab="me">我</button></div><div class="sv-feed" id="sv-feed"><div class="sv-empty"><span class="fun-spin"></span></div></div>`;
+      root.querySelector(".sv-tabs").addEventListener("click", (e) => {
+        const t = e.target.closest("[data-tab]")?.dataset.tab;
+        if (!t) return;
+        if (t === "me") return user && openProfile(user.name);
+        tab = t;
+        renderFeed();
+        root.querySelector("#sv-feed").scrollTo({ top: 0 });
+      });
       body.appendChild(root);
       root.addEventListener("click", onClick);
       act.innerHTML = `<button type="button" class="fun-icon-btn" id="sv-refresh" aria-label="刷新"><i class="ph ph-arrows-clockwise"></i></button><button type="button" class="fun-icon-btn" id="sv-post" aria-label="发视频"><i class="ph ph-plus"></i></button>`;

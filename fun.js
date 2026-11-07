@@ -287,7 +287,46 @@
     syncMini();
   }
 
-  screen.querySelector("#fun-back").addEventListener("click", closeFunScreen);
+  screen.querySelector("#fun-back").addEventListener("click", () => {
+    if (current && current.parent && apps[current.parent]) openFunApp(current.parent);
+    else closeFunScreen();
+  });
+
+  /* ───────────── 战绩 ───────────── */
+  let records = null;
+  async function loadRecords() {
+    if (records) return records;
+    try {
+      records = (await FunDB.get("game_records")) || [];
+    } catch (_) {
+      records = [];
+    }
+    return records;
+  }
+  /** @param {{game:string, players:string[], winner:string, userWon:boolean, note?:string}} r */
+  async function addRecord(r) {
+    await loadRecords();
+    records.push({ ...r, at: Date.now() });
+    if (records.length > 300) records = records.slice(-300);
+    FunDB.set("game_records", records).catch(() => {});
+  }
+  /** 给 AI 用的「和某角色的过往战绩」 */
+  function recordSummary(name) {
+    if (!records || !name) return "";
+    const mine = records.filter((r) => r.players.includes(name));
+    if (!mine.length) return "";
+    const by = {};
+    for (const r of mine) {
+      const g = (by[r.game] = by[r.game] || { n: 0, userWin: 0, selfWin: 0 });
+      g.n++;
+      if (r.userWon) g.userWin++;
+      if (r.winner === name) g.selfWin++;
+    }
+    const parts = Object.entries(by).map(([g, v]) => `${g}一起玩过${v.n}局（对方赢${v.userWin}局，你赢${v.selfWin}局）`);
+    const last = mine[mine.length - 1];
+    return `你们之前的游戏战绩：${parts.join("；")}。上一局是${last.game}，${last.winner}赢了${last.note ? "（" + last.note + "）" : ""}。可以自然地提起（比如记仇、炫耀、想报仇），但别每句都提。`;
+  }
+  void loadRecords();
 
   function openSheet(inner, opts) {
     const o = opts || {};
@@ -375,7 +414,14 @@
     idx: -1,
     mode: "loop", // loop | one | shuffle
     objUrl: "",
-    loaded: false
+    loaded: false,
+    showLyrics: false,
+    lrc: [], // [{t, text}]
+    lrcIdx: -1,
+    buddy: null, // 一起听的角色
+    buddyLog: [], // [{who:'me'|'buddy', text}]
+    buddyBusy: false,
+    buddyTimer: 0
   };
   const MODE_META = {
     loop: { icon: "ph-repeat", label: "列表循环" },
@@ -437,9 +483,183 @@
         toast("这首歌放不了：链接失效或格式不支持");
       });
     }
+    music.lrc = parseLrc(t.lrc);
+    music.lrcIdx = -1;
     setMediaSession();
     renderMusicUi();
     syncMini();
+    if (music.buddy && autoplay !== false) {
+      clearTimeout(music.buddyTimer);
+      music.buddyTimer = setTimeout(() => void buddySay(null), 1800);
+    }
+  }
+
+  /* ───── 歌词 ───── */
+  function parseLrc(text) {
+    const out = [];
+    const src = String(text || "");
+    if (!src.trim()) return out;
+    let timed = false;
+    for (const line of src.split(/\r?\n/)) {
+      const tags = [...line.matchAll(/\[(\d{1,2}):(\d{1,2}(?:[.:]\d{1,3})?)\]/g)];
+      const body = line.replace(/\[[^\]]*\]/g, "").trim();
+      if (tags.length) {
+        timed = true;
+        for (const m of tags) out.push({ t: Number(m[1]) * 60 + Number(m[2].replace(":", ".")), text: body });
+      } else if (body && !/^\[/.test(line)) out.push({ t: -1, text: body });
+    }
+    if (timed) return out.filter((x) => x.t >= 0).sort((a, b) => a.t - b.t);
+    return out;
+  }
+
+  function renderLyrics() {
+    const box = bodyEl.querySelector("#fm-lyrics");
+    if (!box) return;
+    const t = curTrack();
+    if (!t) {
+      box.innerHTML = `<p class="fm-lrc-empty">还没有在放的歌</p>`;
+      return;
+    }
+    if (!music.lrc.length) {
+      box.innerHTML = `<p class="fm-lrc-empty">这首歌还没有歌词</p><button type="button" class="fun-btn ghost sm" data-lrc-add>导入歌词</button>`;
+      return;
+    }
+    box.innerHTML = `<div class="fm-lrc-lines">${music.lrc.map((l, i) => `<p data-li="${i}">${esc(l.text) || "♪"}</p>`).join("")}</div>`;
+    music.lrcIdx = -1;
+    syncLyric();
+  }
+
+  function syncLyric() {
+    if (!music.showLyrics || !music.lrc.length || music.lrc[0].t < 0) return;
+    const box = bodyEl.querySelector("#fm-lyrics");
+    if (!box) return;
+    const now = audio.currentTime + 0.25;
+    let i = -1;
+    for (let k = 0; k < music.lrc.length; k++) {
+      if (music.lrc[k].t <= now) i = k;
+      else break;
+    }
+    if (i === music.lrcIdx) return;
+    music.lrcIdx = i;
+    box.querySelectorAll(".is-cur").forEach((x) => x.classList.remove("is-cur"));
+    const el = box.querySelector(`[data-li="${i}"]`);
+    if (el) {
+      el.classList.add("is-cur");
+      box.scrollTo({ top: el.offsetTop - box.clientHeight / 2 + el.clientHeight / 2, behavior: "smooth" });
+    }
+  }
+
+  function currentLyricLine() {
+    if (!music.lrc.length) return "";
+    const l = music.lrc[Math.max(0, music.lrcIdx)];
+    return l ? l.text : "";
+  }
+
+  function openLrcEditor() {
+    const t = curTrack();
+    if (!t) return toast("先放一首歌");
+    const sh = openSheet(
+      `<p class="fun-note">支持 .lrc 文件（带时间轴会跟着滚动），也可以直接粘贴纯文本歌词。</p>
+       <button type="button" class="fun-btn ghost sm" data-a="file">选择 .lrc 文件</button>
+       <input type="file" accept=".lrc,.txt,text/plain" hidden />
+       <label class="fun-field"><span>歌词</span><textarea rows="8" placeholder="[00:12.30]第一句歌词…">${esc(t.lrc || "")}</textarea></label>
+       <div class="fun-sheet-actions"><button type="button" class="fun-btn ghost" data-a="clear">清除</button><button type="button" class="fun-btn solid" data-a="ok">保存</button></div>`,
+      { title: `歌词 · ${t.title}` }
+    );
+    const ta = sh.body.querySelector("textarea");
+    const fi = sh.body.querySelector("input[type=file]");
+    fi.onchange = async () => {
+      const f = fi.files?.[0];
+      if (f) ta.value = await f.text();
+    };
+    sh.body.addEventListener("click", async (e) => {
+      const a = e.target.closest("[data-a]")?.dataset.a;
+      if (a === "file") fi.click();
+      if (a === "clear") ta.value = "";
+      if (a === "ok") {
+        t.lrc = ta.value.trim();
+        await FunDB.putTrack(t).catch(() => toast("保存失败"));
+        music.lrc = parseLrc(t.lrc);
+        music.showLyrics = true;
+        sh.close();
+        renderMusicUi();
+      }
+    });
+  }
+
+  /* ───── 一起听 ───── */
+  async function chooseBuddy() {
+    const cast = await loadCast();
+    if (!cast.length) return toast("角色库里还没有角色");
+    const res = await pickCast(cast, { min: 1, max: 1, title: "和谁一起听？", preselect: music.buddy ? [music.buddy.id] : [] });
+    if (!res || !res[0]) return;
+    music.buddy = res[0];
+    music.buddyLog = [];
+    renderBuddy();
+    if (curTrack()) void buddySay(null);
+  }
+
+  async function buddySay(userText) {
+    const b = music.buddy;
+    const t = curTrack();
+    if (!b || music.buddyBusy) return;
+    if (!hasApiKey()) {
+      if (userText) toast("请先在设置里填写 API Key");
+      return;
+    }
+    if (userText) music.buddyLog.push({ who: "me", text: userText });
+    music.buddyBusy = true;
+    renderBuddy();
+    try {
+      const user = await loadUser();
+      const song = t ? `《${t.title}》${t.artist ? " - " + t.artist : ""}` : "（现在没有放歌）";
+      const line = currentLyricLine();
+      const hist = music.buddyLog.slice(-10).map((x) => (x.who === "me" ? `${user.name}：${x.text}` : `${b.name}：${x.text}`)).join("\n");
+      const txt = await aiText(
+        [
+          {
+            role: "system",
+            content: `你是「${b.name}」。${b.persona ? "人设：\n" + b.persona + "\n" : ""}你正和${user.name}戴着同一副耳机一起听歌。像真人一样自然地聊：可以说对这首歌的感受、联想到的回忆、哼一句、问对方为什么喜欢。你可以凭自己知道的去理解这首歌，不确定的不要编造歌词。1~3 句话，口语化，只输出你说的话。`
+          },
+          {
+            role: "user",
+            content: `正在播放：${song}${line ? `\n现在唱到：「${line}」` : ""}${hist ? `\n\n刚才的对话：\n${hist}` : ""}\n\n${userText ? "请回应" + user.name + "。" : "歌刚开始放，说点什么。"}`
+          }
+        ],
+        { maxTokens: 500 }
+      );
+      music.buddyLog.push({ who: "buddy", text: cleanLine(txt, 200, b.name) });
+      if (music.buddyLog.length > 30) music.buddyLog = music.buddyLog.slice(-30);
+    } catch (err) {
+      toast(`${b.name}没听清：${err.message}`);
+    } finally {
+      music.buddyBusy = false;
+      renderBuddy();
+    }
+  }
+
+  function renderBuddy() {
+    const box = bodyEl.querySelector("#fm-buddy");
+    if (!box) return;
+    const b = music.buddy;
+    if (!b) {
+      box.innerHTML = `<button type="button" class="fm-buddy-invite" data-buddy="pick"><span class="fm-buddy-ear">🎧</span><span><strong>和角色一起听</strong><small>TA 会跟你聊正在放的歌</small></span></button>`;
+      return;
+    }
+    const logs = music.buddyLog.slice(-6);
+    box.innerHTML = `
+      <div class="fm-buddy-head">${avHtml(b, "fun-av sm")}<strong>${esc(b.name)}</strong><small>正在和你一起听</small>
+        <button type="button" class="sh-link" data-buddy="pick">换人</button><button type="button" class="sh-link" data-buddy="off">结束</button></div>
+      <div class="fm-buddy-log">${logs
+        .map((x) => `<p class="${x.who === "me" ? "is-me" : ""}">${esc(x.text)}</p>`)
+        .join("")}${music.buddyBusy ? `<p class="is-typing"><i></i><i></i><i></i></p>` : ""}${!logs.length && !music.buddyBusy ? `<p class="fm-buddy-hint">放一首歌，${esc(b.name)}会先开口</p>` : ""}</div>
+      <div class="fm-buddy-input"><input type="text" placeholder="聊聊这首歌…" maxlength="120" /><button type="button" class="fun-btn solid sm" data-buddy="send">发送</button></div>`;
+    const lg = box.querySelector(".fm-buddy-log");
+    lg.scrollTop = lg.scrollHeight;
+    const inp = box.querySelector("input");
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.isComposing) box.querySelector('[data-buddy="send"]').click();
+    });
   }
 
   function togglePlay() {
@@ -552,6 +772,7 @@
     const dur = bodyEl.querySelector("#fm-dur");
     if (cur) cur.textContent = fmtTime(audio.currentTime);
     if (dur) dur.textContent = fmtTime(d);
+    syncLyric();
   }
 
   function renderMusicUi(lightOnly) {
@@ -566,11 +787,14 @@
     root.querySelector("#fm-mode i").className = "ph " + mm.icon;
     root.querySelector("#fm-mode").title = mm.label;
     root.querySelector("#fm-disc").style.setProperty("--disc-h", t ? hue(t.title) : 220);
+    root.classList.toggle("show-lyrics", music.showLyrics);
+    root.querySelector("#fm-lrc-btn").classList.toggle("is-on", music.showLyrics);
     updateProgress();
     if (lightOnly) {
       root.querySelectorAll(".fm-item").forEach((li) => li.classList.toggle("is-on", li.dataset.id === t?.id));
       return;
     }
+    if (music.showLyrics) renderLyrics();
     root.querySelector("#fm-count").textContent = `${music.tracks.length} 首`;
     const list = root.querySelector("#fm-list");
     if (!music.tracks.length) {
@@ -583,6 +807,7 @@
           <span class="fm-item-no">${String(i + 1).padStart(2, "0")}</span>
           <span class="fm-item-meta"><strong>${esc(x.title)}</strong><small>${esc(x.artist || (x.url ? "链接" : "本地"))}</small></span>
           <span class="fm-item-eq"><i></i><i></i><i></i></span>
+          <button type="button" class="fm-item-del" data-lrc="${i}" aria-label="歌词" title="歌词">${x.lrc ? "词✓" : "词"}</button>
           <button type="button" class="fm-item-del" data-del="${esc(x.id)}" aria-label="删除"><i class="ph ph-trash"></i></button>
         </li>`
       )
@@ -667,7 +892,10 @@
       body.innerHTML = `
         <div class="fm">
           <section class="fm-now">
-            <div class="fm-disc" id="fm-disc"><span class="fm-disc-hole"></span></div>
+            <div class="fm-stage">
+              <div class="fm-disc" id="fm-disc"><span class="fm-disc-hole"></span></div>
+              <div class="fm-lyrics" id="fm-lyrics"></div>
+            </div>
             <div class="fm-now-meta"><strong id="fm-title"></strong><span id="fm-artist"></span></div>
             <div class="fm-progress">
               <span id="fm-cur">0:00</span>
@@ -679,9 +907,10 @@
               <button type="button" class="fm-btn" id="fm-prev"><i class="ph ph-skip-back"></i></button>
               <button type="button" class="fm-btn fm-btn--big" id="fm-play"><i class="ph ph-play"></i></button>
               <button type="button" class="fm-btn" id="fm-next"><i class="ph ph-skip-forward"></i></button>
-              <button type="button" class="fm-btn" id="fm-stop" title="停止"><i class="ph ph-stop"></i></button>
+              <button type="button" class="fm-btn fm-btn--txt" id="fm-lrc-btn" title="歌词">词</button>
             </div>
           </section>
+          <section class="fm-buddy" id="fm-buddy"></section>
           <section class="fm-list-wrap">
             <div class="fm-list-head"><span class="fun-kicker">PLAYLIST · <b id="fm-count">0 首</b></span>
               <div class="fm-list-tools">
@@ -711,7 +940,34 @@
       body.querySelector("#fm-play").onclick = togglePlay;
       body.querySelector("#fm-prev").onclick = () => step(-1);
       body.querySelector("#fm-next").onclick = () => step(1);
-      body.querySelector("#fm-stop").onclick = stopMusic;
+      body.querySelector("#fm-lrc-btn").onclick = () => {
+        music.showLyrics = !music.showLyrics;
+        renderMusicUi();
+      };
+      body.querySelector("#fm-lyrics").addEventListener("click", (e) => {
+        if (e.target.closest("[data-lrc-add]")) openLrcEditor();
+        else if (e.target.closest(".fm-lrc-lines")) {
+          music.showLyrics = false;
+          renderMusicUi();
+        }
+      });
+      body.querySelector("#fm-lyrics").addEventListener("dblclick", openLrcEditor);
+      body.querySelector("#fm-buddy").addEventListener("click", (e) => {
+        const a = e.target.closest("[data-buddy]")?.dataset.buddy;
+        if (a === "pick") void chooseBuddy();
+        if (a === "off") {
+          music.buddy = null;
+          renderBuddy();
+        }
+        if (a === "send") {
+          const inp = e.currentTarget.querySelector("input");
+          const v = inp.value.trim();
+          if (!v) return;
+          inp.value = "";
+          void buddySay(v);
+        }
+      });
+      renderBuddy();
       body.querySelector("#fm-mode").onclick = () => {
         const order = ["loop", "one", "shuffle"];
         music.mode = order[(order.indexOf(music.mode) + 1) % order.length];
@@ -732,6 +988,14 @@
           e.stopPropagation();
           const t = music.tracks.find((x) => x.id === del.dataset.del);
           if (t && confirmDelete(t)) void deleteTrack(t.id);
+          return;
+        }
+        const lb = e.target.closest("[data-lrc]");
+        if (lb) {
+          e.stopPropagation();
+          const i = Number(lb.dataset.lrc);
+          if (i !== music.idx) playIndex(i);
+          openLrcEditor();
           return;
         }
         const li = e.target.closest(".fm-item");
@@ -777,6 +1041,10 @@
     openSheet,
     pickCast,
     register,
+    addRecord,
+    loadRecords,
+    recordSummary,
+    open: (k) => openFunApp(k),
     isOpen: (key) => screen.classList.contains("is-open") && current === apps[key],
     get body() {
       return bodyEl;

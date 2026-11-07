@@ -89,6 +89,7 @@
       `你正在参加一局${W.players.length}人狼人杀，板子：${roleList()}。狼人全部出局则好人胜；狼人数量≥好人数量则狼人胜。`,
       `你是${tag(p)}。你的真实身份：${r.name}。${r.tip}`,
       p.persona ? `你的角色人设（发言要符合这个人的性格和说话方式）：\n${p.persona}` : "",
+      F.recordSummary(p.name),
       `只有你知道的私密信息：\n${knowledge(p)}`,
       "要求：只依据公开记录和你的私密信息推理；像真人玩家一样口语化发言；不要用括号描写动作；不要说自己是AI；直接输出发言内容，不要加「x号：」前缀。"
     ]
@@ -465,6 +466,14 @@
     sys("身份公布：" + W.players.map((p) => `${p.seat}号${p.name}-${ROLE[p.role].name}`).join("，"));
     const mine = ROLE[me().role].good ? "good" : "wolf";
     renderAll();
+    const u = me();
+    void F.addRecord({
+      game: "狼人杀",
+      players: W.players.filter((p) => !p.isUser).map((p) => p.name),
+      winner: w === "good" ? "好人阵营" : "狼人阵营",
+      userWon: mine === w,
+      note: `${u.name}当${ROLE[u.role].name}，${mine === w ? "赢了" : "输了"}`
+    });
     const el = setAct(`<p class="ww-ask">${mine === w ? "🎉 你所在的阵营赢了！" : "😵 你所在的阵营输了"}</p><div class="ww-row"><button type="button" class="fun-btn ghost" data-a="setup">换人</button><button type="button" class="fun-btn solid" data-a="again">再来一局</button></div>`);
     el.querySelector('[data-a="setup"]').onclick = () => renderSetup();
     el.querySelector('[data-a="again"]').onclick = () => startGame(W.players.map((p) => ({ id: p.id, name: p.name, persona: p.persona, avatar: p.avatar, isUser: p.isUser })));
@@ -588,6 +597,7 @@
   F.register("狼人杀", {
     title: "狼人杀",
     kicker: "GAME / WEREWOLF",
+    parent: "游戏厅",
     mount(body, act) {
       root = document.createElement("div");
       root.className = "ww-root";

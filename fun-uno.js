@@ -96,7 +96,7 @@
           [
             {
               role: "system",
-              content: `你在扮演「${p.name}」。${p.persona ? "人设：\n" + p.persona + "\n" : ""}你正在和${others}一起玩 UNO 纸牌。用${p.name}的口吻说一句很短的话（不超过20个字），只输出这句台词本身，不要引号、不要动作描写。`
+              content: `你在扮演「${p.name}」。${p.persona ? "人设：\n" + p.persona + "\n" : ""}${F.recordSummary(p.name)}\n你正在和${others}一起玩 UNO 纸牌。用${p.name}的口吻说一句很短的话（不超过20个字），只输出这句台词本身，不要引号、不要动作描写。`
             },
             { role: "user", content: situation }
           ],
@@ -221,6 +221,7 @@
     const w = G.players[winner];
     log(`${w.name} 赢了！`);
     render();
+    void F.addRecord({ game: "UNO", players: G.players.filter((p) => !p.isUser).map((p) => p.name), winner: w.name, userWon: !!w.isUser });
     if (!w.isUser) void say(winner, "win", "你打出最后一张牌，赢了这局 UNO！");
     else {
       const loser = G.players.findIndex((p) => !p.isUser);
@@ -447,6 +448,7 @@
   F.register("UNO", {
     title: "UNO",
     kicker: "GAME / CARDS",
+    parent: "游戏厅",
     mount(body, act) {
       root = document.createElement("div");
       root.className = "uno-root";
