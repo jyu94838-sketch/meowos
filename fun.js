@@ -287,6 +287,15 @@
     syncMini();
   }
 
+  // 输入框聚焦 / 键盘弹出时浏览器可能把整个 #phone 滚上去，露出底下的抽屉；娱乐页打开期间保持复位
+  phone.addEventListener(
+    "scroll",
+    () => {
+      if (screen.classList.contains("is-open") && phone.scrollTop) phone.scrollTop = 0;
+    },
+    { passive: true }
+  );
+
   screen.querySelector("#fun-back").addEventListener("click", () => {
     if (current && current.parent && apps[current.parent]) openFunApp(current.parent);
     else closeFunScreen();

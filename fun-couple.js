@@ -86,10 +86,10 @@
         <p class="cp-days">我们在一起 <b>${together}</b> 天</p>
         <small>${esc(user.name)} & ${esc(partner.name)} · 从 ${R.start.replace(/-/g, ".")} 开始</small>
       </div>
-      <div class="cp-tabs">${[["home", "🏠", "小屋"], ["diary", "📔", "日记"], ["list", "✅", "清单"], ["qa", "💬", "一问"], ["anniv", "📅", "纪念日"], ["album", "📷", "相册"]].map(([k, i, n]) => `<button type="button" data-tab="${k}" class="${tab === k ? "is-on" : ""}"><span>${i}</span>${n}</button>`).join("")}</div>
+      <div class="cp-tabs">${[["home", "🏠", "小屋"], ["diary", "📔", "日记"], ["list", "✅", "清单"], ["qa", "💬", "一问"], ["pet", "🐾", "宠物"], ["anniv", "📅", "纪念日"], ["album", "📷", "相册"]].map(([k, i, n]) => `<button type="button" data-tab="${k}" class="${tab === k ? "is-on" : ""}"><span>${i}</span>${n}</button>`).join("")}</div>
       <div class="cp-panel" id="cp-panel"></div></div>`;
     const p = root.querySelector("#cp-panel");
-    ({ home: renderHome, diary: renderDiary, list: renderList, qa: renderQa, anniv: renderAnniv, album: renderAlbum })[tab](p);
+    ({ home: renderHome, diary: renderDiary, list: renderList, qa: renderQa, pet: renderPet, anniv: renderAnniv, album: renderAlbum })[tab](p);
   }
 
   function nextAnniv() {
@@ -188,6 +188,104 @@
             : `<textarea id="cp-qa" rows="2" maxlength="300" placeholder="先写下你的答案，才能看到 TA 的"></textarea><button type="button" class="fun-btn solid sm" data-a="answer">提交答案</button>`
         }</div>
       ${past.length ? `<p class="fun-kicker">往期</p>${past.map(([d, v]) => `<div class="cp-card cp-past"><small>${d.replace(/-/g, ".")}</small><strong>${esc(v.q)}</strong><p><b>${esc(user.name)}：</b>${esc(v.me)}</p><p><b>${esc(partner.name)}：</b>${esc(v.ta)}</p></div>`).join("")}` : ""}`;
+  }
+
+  /* ───── 宠物窝 ───── */
+  const PETS = [
+    { k: "cat", n: "小猫", e: ["🐱", "🐈", "🐈‍⬛"] },
+    { k: "dog", n: "小狗", e: ["🐶", "🐕", "🦮"] },
+    { k: "rabbit", n: "兔兔", e: ["🐰", "🐇", "🐇"] },
+    { k: "hamster", n: "仓鼠", e: ["🐹", "🐹", "🐹"] },
+    { k: "penguin", n: "企鹅", e: ["🐧", "🐧", "🐧"] },
+    { k: "fox", n: "小狐狸", e: ["🦊", "🦊", "🦊"] },
+    { k: "duck", n: "小鸭", e: ["🐣", "🐥", "🦆"] },
+    { k: "panda", n: "熊猫", e: ["🐼", "🐼", "🐼"] }
+  ];
+  const ACTS = {
+    feed: { n: "喂饭", i: "🍖", d: { hunger: 35, mood: 5 }, say: ["吃得肚子圆滚滚", "狼吞虎咽", "吃完舔了舔嘴巴"] },
+    bath: { n: "洗澡", i: "🛁", d: { clean: 45, mood: -5 }, say: ["一开始不情愿，洗完香喷喷", "甩了一身水", "泡泡糊了一脸"] },
+    play: { n: "陪玩", i: "🧶", d: { mood: 30, hunger: -8, energy: -15 }, say: ["玩得满屋跑", "叼着玩具不肯放", "开心得转圈圈"] },
+    sleep: { n: "哄睡", i: "🌙", d: { energy: 45 }, say: ["打着小呼噜睡着了", "缩成一团睡着了", "睡着了还在吧唧嘴"] },
+    pet: { n: "摸摸", i: "🤲", d: { mood: 12 }, say: ["蹭了蹭手心", "舒服得眯起眼", "翻出肚皮"] }
+  };
+  const STAGE = (lv) => (lv >= 10 ? 2 : lv >= 4 ? 1 : 0);
+  const STAGE_NAME = ["幼崽", "少年", "成年"];
+  const clamp = (v) => Math.max(0, Math.min(100, Math.round(v)));
+
+  /** 按真实时间流逝衰减；离开太久 TA 会帮忙照顾 */
+  function tickPet(pet) {
+    const now = Date.now();
+    const h = Math.max(0, (now - (pet.tick || now)) / 3600000);
+    if (h > 0) {
+      pet.hunger = clamp(pet.hunger - h * 6);
+      pet.clean = clamp(pet.clean - h * 3);
+      pet.mood = clamp(pet.mood - h * 4);
+      pet.energy = clamp(pet.energy + h * 5);
+      pet.tick = now;
+    }
+    // TA 每隔 5 小时以上会来照顾一次
+    if (now - (pet.taAt || 0) > 5 * 3600000 && (pet.hunger < 60 || pet.clean < 60 || pet.mood < 60)) {
+      const k = pet.hunger <= Math.min(pet.clean, pet.mood) ? "feed" : pet.clean <= pet.mood ? "bath" : "play";
+      applyAct(pet, k, "ta");
+      pet.taAt = now;
+    }
+  }
+  function applyAct(pet, k, who) {
+    const a = ACTS[k];
+    for (const [stat, v] of Object.entries(a.d)) pet[stat] = clamp(pet[stat] + v);
+    pet.exp += who === "me" ? 10 : 8;
+    while (pet.exp >= pet.level * 30) {
+      pet.exp -= pet.level * 30;
+      pet.level++;
+      pet.log.push({ at: Date.now(), who: "sys", text: `🎉 ${pet.name} 升到了 Lv.${pet.level}${STAGE(pet.level) !== STAGE(pet.level - 1) ? `，长成了${STAGE_NAME[STAGE(pet.level)]}！` : ""}` });
+    }
+    pet.log.push({ at: Date.now(), who, text: `${who === "me" ? user.name : partner.name}给${pet.name}${a.n}：${pick(a.say)}` });
+    if (pet.log.length > 40) pet.log = pet.log.slice(-40);
+  }
+
+  function renderPet(p) {
+    const R = room();
+    if (!R.pet) {
+      p.innerHTML = `<div class="cp-card cp-center"><p class="fun-kicker">🐾 一起养一只小宠物吧</p><div class="cp-pet-types">${PETS.map((x) => `<button type="button" class="cp-pet-type" data-pt="${x.k}"><span>${x.e[0]}</span>${x.n}</button>`).join("")}</div>
+        <input id="cp-pname" maxlength="8" placeholder="给 TA 起个名字" /><button type="button" class="fun-btn solid" data-a="adopt">领养</button></div>`;
+      let sel = PETS[0].k;
+      const mark = () => p.querySelectorAll("[data-pt]").forEach((b) => b.classList.toggle("is-on", b.dataset.pt === sel));
+      p.querySelectorAll("[data-pt]").forEach((b) => (b.onclick = () => ((sel = b.dataset.pt), mark())));
+      mark();
+      p.querySelector('[data-a="adopt"]').onclick = async () => {
+        const type = PETS.find((x) => x.k === sel);
+        const name = p.querySelector("#cp-pname").value.trim() || type.n;
+        R.pet = { type: sel, name, born: dayKey(), level: 1, exp: 0, hunger: 80, clean: 80, mood: 80, energy: 80, tick: Date.now(), taAt: Date.now(), log: [{ at: Date.now(), who: "sys", text: `${user.name}和${partner.name}领养了${type.n}「${name}」🎀` }] };
+        save();
+        render();
+        if (F.hasApiKey()) {
+          try {
+            R.pet.log.push({ at: Date.now(), who: "ta", text: await say(`你和${user.name}刚刚一起领养了一只${type.n}，取名「${name}」。说一句话（25字内）。`, 300) });
+            save();
+            if (tab === "pet") render();
+          } catch (_) {
+            /* ignore */
+          }
+        }
+      };
+      return;
+    }
+    const pet = R.pet;
+    tickPet(pet);
+    save();
+    const type = PETS.find((x) => x.k === pet.type) || PETS[0];
+    const st = STAGE(pet.level);
+    const low = pet.hunger < 30 ? "饿了…" : pet.clean < 30 ? "有点脏脏的" : pet.mood < 30 ? "好无聊" : pet.energy < 25 ? "困困" : "";
+    const bar = (k, n, c) => `<div class="cp-stat"><span>${n}</span><i><b style="width:${pet[k]}%;background:${c}"></b></i><em>${pet[k]}</em></div>`;
+    p.innerHTML = `<div class="cp-card cp-pethome">
+        <div class="cp-pet-stage"><span class="cp-pet-emoji st-${st}${pet.energy < 25 ? " is-sleepy" : ""}">${type.e[st]}</span>${low ? `<span class="cp-pet-bubble">${low}</span>` : ""}</div>
+        <strong>${esc(pet.name)}</strong><small>${type.n} · ${STAGE_NAME[st]} · Lv.${pet.level}（${pet.exp}/${pet.level * 30}）· 第 ${daysBetween(pet.born, dayKey()) + 1} 天</small>
+        ${bar("hunger", "饱腹", "#ffb86b")}${bar("clean", "清洁", "#7cc4e8")}${bar("mood", "心情", "#ff8fab")}${bar("energy", "精力", "#a78bfa")}
+        <div class="cp-acts">${Object.entries(ACTS).map(([k, a]) => `<button type="button" data-act="${k}"><span>${a.i}</span>${a.n}</button>`).join("")}</div>
+      </div>
+      <div class="ww-row"><button type="button" class="fun-btn ghost sm" data-a="petask">问问 ${esc(partner.name)} 关于${esc(pet.name)}</button></div>
+      <p class="fun-kicker" style="margin-top:12px">养育日记</p>
+      <div class="cp-petlog">${pet.log.slice().reverse().map((l) => `<p class="${l.who}"><small>${new Date(l.at).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</small>${esc(l.text)}</p>`).join("")}</div>`;
   }
 
   function renderAnniv(p) {
@@ -438,6 +536,27 @@
         return render();
       }
       if (a === "photo") return root.querySelector("#cp-file").click();
+      const act = e.target.closest("[data-act]")?.dataset.act;
+      if (act && R.pet) {
+        tickPet(R.pet);
+        applyAct(R.pet, act, "me");
+        save();
+        render();
+        const emo = root.querySelector(".cp-pet-emoji");
+        if (emo) emo.classList.add("is-hop");
+        return;
+      }
+      if (a === "petask") {
+        if (needKey()) return;
+        busy("TA 在想…");
+        const pet = R.pet;
+        const type = PETS.find((x) => x.k === pet.type) || PETS[0];
+        const recent = pet.log.slice(-6).map((l) => l.text).join("；");
+        const t = await say(`你们一起养的${type.n}「${pet.name}」现在 Lv.${pet.level}，饱腹${pet.hunger}、清洁${pet.clean}、心情${pet.mood}、精力${pet.energy}。最近：${recent}。说说你对它的看法、照顾它时的小事，或者提醒${user.name}一起照顾它（40字内）。`, 400);
+        pet.log.push({ at: Date.now(), who: "ta", text: `${partner.name}：${t}` });
+        save();
+        return render();
+      }
     } catch (err) {
       toast("出错了：" + err.message);
       render();
