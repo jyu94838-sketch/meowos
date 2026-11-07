@@ -7625,3 +7625,67 @@ html body #chat-screen#chat-screen.mx-hide-av .chat-msg-avatar-col {
   font-weight: 600;
   cursor: pointer;
 }
+
+/* ═════════ 小组件放进桌面格子：多大占多大 ═════════ */
+.desk-apps-grid {
+  grid-auto-flow: row dense;
+}
+.desk-apps-grid > #desk-widgets-slot,
+.desk-apps-grid > #desk-widgets-slot .wg-grid {
+  display: contents;
+}
+.desk-apps-grid > #desk-widgets-slot .wg-head {
+  display: none;
+}
+.desk-apps-grid > #desk-widgets-slot .wg-s {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+.desk-apps-grid > #desk-widgets-slot .wg-m {
+  grid-column: span 4;
+  grid-row: span 2;
+}
+.desk-apps-grid > #desk-widgets-slot .wg-l {
+  grid-column: span 4;
+  grid-row: span 4;
+}
+.desk-apps-grid > #desk-widgets-slot .wg {
+  margin: 4px;
+}
+.desk-apps-grid > #desk-widgets-slot .wg-add-tile {
+  grid-column: 1 / -1;
+  height: auto;
+  margin: 0 4px;
+}
+.desk-icons-btn + .desk-icons-btn {
+  margin-left: 0;
+}
+.mxc-photo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mxc-photo-btn {
+  padding: 10px 14px;
+  border: 1.5px dashed var(--line);
+  border-radius: 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.mxc-photo-pv {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+.mxc-photo-x {
+  border: 0;
+  background: none;
+  color: var(--text-sub);
+  font-size: 1rem;
+  cursor: pointer;
+}
+.mxc-photo-tip {
+  margin-top: -4px;
+  font-size: 0.66rem;
+}

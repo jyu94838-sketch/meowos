@@ -117,7 +117,7 @@
 
   const editBar = document.createElement("div");
   editBar.className = "desk-editbar";
-  editBar.innerHTML = `<span>拖到任意格子 · 拖到边缘可以翻页</span><button type="button" class="desk-icons-btn">图标</button><button type="button" class="desk-done">完成</button>`;
+  editBar.innerHTML = `<span>拖到任意格子 · 拖到边缘可以翻页</span><button type="button" class="desk-icons-btn" data-wg>小组件</button><button type="button" class="desk-icons-btn">图标</button><button type="button" class="desk-done">完成</button>`;
   phone.appendChild(editBar);
 
   const dots = document.createElement("div");
@@ -133,11 +133,18 @@
 
   const ROW_H = 92; // 一行格子的高度（图标 + 名字 + 行距）
   /** 这一页一屏放得下几个格子 */
-  function slotsFor(pgEl, grid) {
+  /** 小组件占了多少个格子（小 2×2、中 4×2、大 4×4；还没添加时那条「添加小组件」占一行） */
+  function widgetCells() {
+    let n = 0;
+    widgetSlot.querySelectorAll(".wg").forEach((w) => (n += w.classList.contains("wg-l") ? 16 : w.classList.contains("wg-m") ? 8 : 4));
+    if (widgetSlot.querySelector(".wg-add-tile")) n += 4;
+    return n;
+  }
+  function slotsFor(pgEl, grid, withWidgets) {
     const h = pager.clientHeight || 600;
     const top = grid.getBoundingClientRect().top - pgEl.getBoundingClientRect().top;
     const rows = Math.max(3, Math.floor((h - top - 26 + 10) / ROW_H));
-    return rows * 4;
+    return Math.max(4, rows * 4 - (withWidgets ? widgetCells() : 0));
   }
   function render() {
     const keepLeft = pager.scrollLeft;
@@ -147,10 +154,11 @@
       pg.className = "desk-page desk-apps";
       pg.dataset.pg = String(i);
       pg.innerHTML = `${editing && i > 0 ? `<button type="button" class="desk-delpage" data-delpage="${i}">删除这一页</button>` : ""}<div class="desk-apps-grid" data-grid="${i}"></div>`;
-      if (i === 0) pg.insertBefore(widgetSlot, pg.firstChild);
       pager.appendChild(pg);
       const grid = pg.querySelector(".desk-apps-grid");
-      let n = slotsFor(pg, grid);
+      // 小组件放进格子里：多大占多大，旁边空出来的格子放图标
+      if (i === 0) grid.appendChild(widgetSlot);
+      let n = slotsFor(pg, grid, i === 0);
       // 屏幕变小、放不下的图标挪进前面的空位
       for (let j = n; j < keys.length; j++) {
         if (!keys[j]) continue;
@@ -163,7 +171,7 @@
       while (keys.length && keys.length > n && !keys[keys.length - 1]) keys.pop();
       n = Math.max(n, Math.ceil(keys.length / 4) * 4);
       while (keys.length < n) keys.push(null);
-      grid.innerHTML = keys.map((k, j) => `<div class="desk-slot" data-pg="${i}" data-s="${j}">${k ? iconHtml(k) : ""}</div>`).join("");
+      grid.insertAdjacentHTML("beforeend", keys.map((k, j) => `<div class="desk-slot" data-pg="${i}" data-s="${j}">${k ? iconHtml(k) : ""}</div>`).join(""));
       if (!editing && !keys.some(Boolean)) grid.insertAdjacentHTML("beforebegin", `<p class="desk-empty">这一页还空着，长按别的图标进入编辑，把图标拖过来</p>`);
     });
     if (editing) {
@@ -177,17 +185,17 @@
     pager.scrollLeft = keepLeft;
     renderDots();
   }
-  // 小组件高度变了（加了 / 删了小组件）→ 重新算格子
-  let lastWgH = -1;
-  if (window.ResizeObserver)
-    new ResizeObserver(() => {
-      const h = widgetSlot.offsetHeight;
-      if (Math.abs(h - lastWgH) < 4 || drag) return;
-      lastWgH = h;
+  // 小组件加了 / 删了 / 换大小 → 重新算格子
+  let lastWgSig = "";
+  let roT = 0;
+  if (window.MutationObserver)
+    new MutationObserver(() => {
+      const sig = [...widgetSlot.querySelectorAll(".wg, .wg-add-tile")].map((w) => w.className).join("|");
+      if (sig === lastWgSig || drag) return;
+      lastWgSig = sig;
       clearTimeout(roT);
       roT = setTimeout(() => !drag && render(), 120);
-    }).observe(widgetSlot);
-  let roT = 0;
+    }).observe(widgetSlot, { childList: true, subtree: true });
 
   function pageCount() {
     return pager.querySelectorAll(".desk-page").length;
@@ -247,7 +255,11 @@
     }
   }
   editBar.querySelector(".desk-done").addEventListener("click", () => setEditing(false));
-  editBar.querySelector(".desk-icons-btn").addEventListener("click", () => {
+  editBar.querySelector("[data-wg]").addEventListener("click", () => {
+    setEditing(false);
+    if (typeof window.openFunApp === "function") window.openFunApp("小组件");
+  });
+  editBar.querySelector(".desk-icons-btn:not([data-wg])").addEventListener("click", () => {
     setEditing(false);
     if (typeof window.openDeskIcons === "function") window.openDeskIcons(false);
   });
@@ -383,7 +395,7 @@
         slot = null;
         if (grid) {
           let best = Infinity;
-          for (const c of grid.children) {
+          for (const c of grid.querySelectorAll(".desk-slot")) {
             const r = c.getBoundingClientRect();
             const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
             if (d < best) {

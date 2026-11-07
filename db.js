@@ -1780,8 +1780,8 @@
     "fun-weibo.js?v=1",
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
-    "fun-widgets.js?v=3", "fun-icons.js?v=5", "mx-chatsearch.js?v=1", "fun-mimi.js?v=3", "mx-choose.js?v=2", "fun-yuzu.js?v=1", "fun-names.js?v=1",
-    "changelog.js?v=26",
+    "fun-widgets.js?v=3", "fun-icons.js?v=5", "mx-chatsearch.js?v=1", "fun-mimi.js?v=3", "mx-choose.js?v=3", "fun-yuzu.js?v=1", "fun-names.js?v=1",
+    "changelog.js?v=27",
     "share-config.js?v=3", "st-gate.js?v=1",
     "fun-share.js?v=7"
   ];

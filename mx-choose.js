@@ -29,8 +29,9 @@
     const opts = splitOpts(f.opts);
     const note = String(f.note || "").trim();
     const img = String(f.img || "").trim();
+    const seeImg = img || f.photo; // 上传了真图或写了图片描述
     if (type === "music") {
-      let t = `【让你帮我选】${img ? "看看这张图，" : ""}帮我挑一首歌听吧${note ? `，${note}` : ""}～说一下歌名和歌手哦`;
+      let t = `【让你帮我选】${seeImg ? "看看这张图，" : ""}帮我挑一首歌听吧${note ? `，${note}` : ""}～说一下歌名和歌手哦`;
       if (opts.length) t += `\n我在这几首里纠结：${opts.join(" / ")}`;
       if (img) t += `\n【图片】${img}`;
       return t;
@@ -38,8 +39,8 @@
     if (type === "copy") {
       const use = String(f.use || "朋友圈").trim();
       const what = String(f.what || "").trim();
-      if (!what && !img) return "";
-      let t = `【让你帮我想】帮我想几条${use}文案吧${what ? `，是关于：${what}` : ""}`;
+      if (!what && !seeImg) return "";
+      let t = `【让你帮我想】${seeImg ? "看看这张图，" : ""}帮我想几条${use}文案吧${what ? `，是关于：${what}` : ""}`;
       if (note) t += `，想要${note}一点的`;
       t += "，你最懂我了～";
       if (img) t += `\n【图片】${img}`;
@@ -47,11 +48,15 @@
     }
     const what = type === "custom" ? String(f.what || "").trim() : TYPES[type].q;
     if (!what) return "";
-    let t = `【让你帮我选】${what}？`;
+    let t = `【让你帮我选】${seeImg ? "看看这张图，" : ""}${what}？`;
     t += opts.length ? `我在纠结：${opts.join(" / ")}，你帮我挑一个` : "你帮我想一个吧";
     if (note) t += `（${note}）`;
+    if (img) t += `\n【图片】${img}`;
     return t;
   }
+
+  const PHOTO_HTML = `<div class="mxc-photo"><label class="mxc-photo-btn"><input type="file" accept="image/*" class="mxc-file" hidden />📷 上传一张图片</label><img class="mxc-photo-pv" alt="" hidden /><button type="button" class="mxc-photo-x" hidden>✕</button></div>
+    <p class="fun-note mxc-photo-tip">图片会真的发进聊天，TA 能直接看图（要你的模型支持识图，比如 GPT-4o、Claude、Gemini）。模型不支持的话，就在下面写写图里是什么。</p>`;
 
   function open() {
     if (typeof sendChatFromInput !== "function") return toast("还在加载，稍等一下");
@@ -61,6 +66,7 @@
       /* ignore */
     }
     let type = "music";
+    let photo = null; // 选的图片文件
     const sh = F.openSheet(`<div class="mxc"><div class="mxc-types"></div><div class="mxc-form"></div>
       <p class="fun-note">会用你的口吻发一条消息给 TA，TA 按自己的性格帮你选，聊天记录和记忆都在这个聊天里。</p>
       <button type="button" class="fun-btn solid mxc-go">发给 TA</button></div>`, { title: "让 TA 帮你选" });
@@ -74,13 +80,14 @@
         type === "copy"
           ? `<div class="mxc-uses">${["朋友圈", "小红书", "微博", "个性签名", "生日祝福", "表白"].map((u, i) => `<button type="button" class="fun-chip-btn${i === 0 ? " is-on" : ""}" data-use="${u}">${u}</button>`).join("")}</div>
              <label class="fun-field"><span>想发什么？</span><input class="mxc-what" placeholder="比如：今天去海边玩了 / 闺蜜生日" /></label>
-             <label class="fun-field"><span>配的图（可选）：写写图里是什么</span><textarea class="mxc-img" rows="2" placeholder="比如：夕阳下的自拍，风把头发吹乱了"></textarea></label>
+             ${PHOTO_HTML}<label class="fun-field"><span>或者写写图里是什么（可选）</span><textarea class="mxc-img" rows="2" placeholder="比如：夕阳下的自拍，风把头发吹乱了"></textarea></label>
              <label class="fun-field"><span>想要什么风格（可选）</span><input class="mxc-note" placeholder="比如：可爱 / 文艺 / 搞笑 / 高冷" /></label>`
           : type === "music"
-          ? `<label class="fun-field"><span>配一张图（可选）：写写图里是什么</span><textarea class="mxc-img" rows="2" placeholder="比如：傍晚的海边，天空是粉色的"></textarea></label>
+          ? `${PHOTO_HTML}<label class="fun-field"><span>或者写写图里是什么（可选）</span><textarea class="mxc-img" rows="2" placeholder="比如：傍晚的海边，天空是粉色的"></textarea></label>
              <label class="fun-field"><span>现在的心情 / 场景（可选）</span><input class="mxc-note" placeholder="比如：下雨天一个人在家" /></label>
              <label class="fun-field"><span>候选歌曲（可选）</span><input class="mxc-opts" placeholder="不填就让 TA 自己推荐" /></label>`
           : `${type === "custom" ? `<label class="fun-field"><span>让 TA 帮你选什么？</span><input class="mxc-what" placeholder="比如：周末去哪玩" /></label>` : ""}
+             ${type === "wear" || type === "custom" ? PHOTO_HTML : ""}
              <label class="fun-field"><span>候选（可选，用空格或逗号隔开）</span><input class="mxc-opts" placeholder="${type === "food" ? "火锅 烧烤 寿司" : type === "wear" ? "白裙子 牛仔裤 卫衣" : type === "drink" ? "奶茶 咖啡 柠檬水" : "选项 A 选项 B"}" /></label>
              <label class="fun-field"><span>补充一句（可选）</span><input class="mxc-note" placeholder="${type === "wear" ? "比如：今天要去约会，外面有点冷" : "比如：不想太辣 / 在减肥"}" /></label>`;
     }
@@ -90,16 +97,41 @@
       if (!u) return;
       form.querySelectorAll("[data-use]").forEach((x) => x.classList.toggle("is-on", x === u));
     });
+    const syncPhoto = () => {
+      const pv = form.querySelector(".mxc-photo-pv");
+      if (!pv) return;
+      const x = form.querySelector(".mxc-photo-x");
+      if (photo) {
+        pv.src = URL.createObjectURL(photo);
+        pv.hidden = false;
+        x.hidden = false;
+      } else {
+        pv.hidden = true;
+        x.hidden = true;
+      }
+    };
+    form.addEventListener("change", (e) => {
+      if (!e.target.classList.contains("mxc-file")) return;
+      photo = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+      syncPhoto();
+    });
+    form.addEventListener("click", (e) => {
+      if (!e.target.closest(".mxc-photo-x")) return;
+      photo = null;
+      syncPhoto();
+    });
     typesEl.addEventListener("click", (e) => {
       const b = e.target.closest("[data-t]");
       if (!b) return;
       type = b.dataset.t;
       draw();
+      syncPhoto();
     });
     sh.body.querySelector(".mxc-go").onclick = async () => {
       const val = (c) => sh.body.querySelector(c)?.value || "";
       const use = sh.body.querySelector("[data-use].is-on")?.dataset.use || "朋友圈";
-      const text = compose(type, { img: val(".mxc-img"), note: val(".mxc-note"), opts: val(".mxc-opts"), what: val(".mxc-what"), use });
+      const usePhoto = !!sh.body.querySelector(".mxc-file") && photo;
+      const text = compose(type, { img: val(".mxc-img"), note: val(".mxc-note"), opts: val(".mxc-opts"), what: val(".mxc-what"), use, photo: !!usePhoto });
       if (!text) return toast(type === "copy" ? "写一下想发什么" : "写一下要 TA 帮你选什么");
       const input = document.getElementById("chat-input");
       if (!input) return toast("先打开一个聊天");
@@ -107,7 +139,9 @@
       input.value = text;
       input.dispatchEvent(new Event("input", { bubbles: true }));
       const before = lastAssistantIdx();
-      await sendChatFromInput(); // 先把你的消息发出去
+      // 先发图片（真图，TA 能看）
+      if (usePhoto && typeof sendChatUploadedImageFromFile === "function") await sendChatUploadedImageFromFile(photo);
+      await sendChatFromInput(); // 再发你的话
       let offline = false;
       try {
         offline = typeof getActiveChatDmSurfaceForContext === "function" && getActiveChatDmSurfaceForContext() === "offline";
