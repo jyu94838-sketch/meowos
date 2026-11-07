@@ -8007,3 +8007,41 @@ img.cp-pet-img.is-sleepy { filter: brightness(0.85) saturate(0.8); }
 .cp-pet-photos img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cp-pet-big { width: 100%; border-radius: 16px; display: block; }
 .cp-pet-stage:has(img.cp-pet-img) { height: auto; padding: 4px 0 12px; }
+
+/* iPhone：头像要有 cursor:pointer，点击才会触发（看心声） */
+#chat-screen .chat-msg-avatar, #chat-screen .mx-av-rep { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* 聊天顶栏 Aa 弹层 */
+.mx-fs-pop { position: absolute; top: calc(64px + env(safe-area-inset-top, 0px)); right: 12px; z-index: 50; width: min(300px, calc(100% - 24px)); padding: 14px 16px 12px; border-radius: 18px; background: var(--bg-card); color: var(--text-main); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22); border: 1px solid var(--line); box-sizing: border-box; }
+.mx-fs-pop-k { font-size: 0.85rem; font-weight: 600; }
+.mx-fs-pop-k b { color: var(--text-sub); font-weight: 500; margin-left: 4px; }
+.mx-fs-pop-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.mx-fs-pop-btns button { border: 1px solid var(--line); background: none; color: var(--text-main); border-radius: 99px; padding: 5px 14px; font: inherit; font-size: 0.78rem; cursor: pointer; }
+
+/* ═════════ 刷刷 · 镜头画面像视频一样播放 ═════════ */
+.sv-reel { animation: none !important; inset: 0 !important; overflow: hidden; background: #000; display: block; }
+.sv-reel img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transform-origin: 50% 40%; animation-play-state: paused !important; }
+.sv-slide.is-active .sv-reel img { animation-play-state: running !important; }
+.sv-reel.n1 img { opacity: 1; animation: sv-push 9s ease-in-out infinite alternate; }
+.sv-reel.n2 img { animation: sv-x2 12s linear infinite; animation-delay: calc(var(--k) * -6s); }
+.sv-reel.n3 img { animation: sv-x3 15s linear infinite; animation-delay: calc(var(--k) * -5s + 0s); }
+.sv-reel.n2 img.kb0, .sv-reel.n3 img.kb0 { animation-delay: 0s; }
+.sv-reel.n2 img.kb1 { animation-delay: -6s; }
+.sv-reel.n3 img.kb1 { animation-delay: -10s; }
+.sv-reel.n3 img.kb2 { animation-delay: -5s; }
+@keyframes sv-push { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.16) translate(-2%, -3%); } }
+@keyframes sv-x2 {
+  0% { opacity: 0; transform: scale(1.03) translate(1%, 0); }
+  6% { opacity: 1; }
+  50% { opacity: 1; }
+  56% { opacity: 0; transform: scale(1.15) translate(-2%, -2%); }
+  100% { opacity: 0; transform: scale(1.15) translate(-2%, -2%); }
+}
+@keyframes sv-x3 {
+  0% { opacity: 0; transform: scale(1.04) translate(-1%, 1%); }
+  5% { opacity: 1; }
+  33% { opacity: 1; }
+  38% { opacity: 0; transform: scale(1.16) translate(2%, -2%); }
+  100% { opacity: 0; transform: scale(1.16) translate(2%, -2%); }
+}
+.sv-reel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0, 0, 0, 0.28), transparent 22%, transparent 62%, rgba(0, 0, 0, 0.55)); pointer-events: none; }
+.sv-genning { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 0.8rem; white-space: nowrap; }

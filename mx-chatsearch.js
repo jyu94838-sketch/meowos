@@ -124,7 +124,42 @@
     b.innerHTML = `<i class="ph ph-magnifying-glass" aria-hidden="true"></i>`;
     b.addEventListener("click", open);
     right.insertBefore(b, right.firstChild);
+    // Aa：调聊天字体和头像大小
+    const fs = document.createElement("button");
+    fs.type = "button";
+    fs.id = "mx-chat-fs-btn";
+    fs.className = "mx-chat-search-btn";
+    fs.setAttribute("aria-label", "调字体大小");
+    fs.innerHTML = `<span style="font-weight:700;font-size:0.95rem;letter-spacing:-0.02em">Aa</span>`;
+    fs.addEventListener("click", openFs);
+    right.insertBefore(fs, b);
     return true;
+  }
+  function openFs() {
+    const KEY = "meowos_chat_fs";
+    let pop = document.getElementById("mx-fs-pop");
+    if (pop) return pop.remove();
+    pop = document.createElement("div");
+    pop.id = "mx-fs-pop";
+    pop.className = "mx-fs-pop";
+    const v = Math.min(150, Math.max(80, Number(localStorage.getItem(KEY)) || 100));
+    pop.innerHTML = `<div class="mx-fs-pop-k">聊天字体和头像大小 <b>${v}%</b></div>
+      <div class="mx-fs-row"><span class="mx-fs-a sm">A</span><input type="range" min="80" max="150" step="5" value="${v}" /><span class="mx-fs-a lg">A</span></div>
+      <div class="mx-fs-pop-btns"><button type="button" data-r>还原</button><button type="button" data-x>好了</button></div>`;
+    (document.getElementById("chat-screen") || document.body).appendChild(pop);
+    const r = pop.querySelector("input");
+    const lab = pop.querySelector("b");
+    const apply = () => {
+      localStorage.setItem(KEY, r.value);
+      lab.textContent = r.value + "%";
+      window.XXJ_SKINS?.apply();
+    };
+    r.addEventListener("input", apply);
+    pop.querySelector("[data-r]").onclick = () => {
+      r.value = "100";
+      apply();
+    };
+    pop.querySelector("[data-x]").onclick = () => pop.remove();
   }
   if (!inject()) {
     let n = 0;

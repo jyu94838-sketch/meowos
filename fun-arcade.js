@@ -3,7 +3,7 @@
 /**
  * 游戏厅 · 单人小游戏
  *   - 喵了个喵：叠层消除，点没被压住的牌放进下面的 7 格槽，凑够 3 张一样的就消掉；槽满就输
- *   - 钢琴块：只点黑块，别点白块、别漏掉；越弹越快，弹的时候会放出旋律
+ *   - 猫爪琴键：只点黑块，别点白块、别漏掉；越弹越快，弹的时候会放出旋律
  */
 (function () {
   const F = window.XXJ_FUN;
@@ -241,7 +241,7 @@
     });
   })();
 
-  /* ═════════════ 钢琴块 ═════════════ */
+  /* ═════════════ 猫爪琴键 ═════════════ */
   (function () {
     // 曲子都是公有领域的旋律（音名 → 频率）
     const NOTE = { C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.0, A4: 440.0, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.0 };
@@ -307,7 +307,7 @@
     function drawMenu() {
       cancelAnimationFrame(raf);
       if (!root) return;
-      root.innerHTML = `<div class="pt-menu"><div class="mlm-logo">🎹<span>钢琴块</span></div>
+      root.innerHTML = `<div class="pt-menu"><div class="mlm-logo">🐾<span>猫爪琴键</span></div>
         <p class="fun-note">只点<b>黑块</b>，从最下面那块开始点。点到白块、或者让黑块溜出屏幕就输了。越弹越快，弹对的时候会放出整首曲子。</p>
         <p class="fun-kicker">选一首曲子</p>
         <div class="pt-songs">${Object.keys(SONGS).map((k) => `<button type="button" data-song="${esc(k)}" class="${k === song ? "is-on" : ""}">${esc(k)}${best["pt" + k] ? `<small>最高 ${best["pt" + k]}</small>` : ""}</button>`).join("")}</div>
@@ -348,6 +348,21 @@
           const x = (r.col * W) / 4;
           ctx.fillStyle = r.hit ? "rgba(30,30,40,0.12)" : "#16161c";
           ctx.fillRect(x + 1, y + 1, W / 4 - 2, rowH - 2);
+          if (!r.hit && (P.started || i !== 0)) {
+            // 黑键上画一个小猫爪
+            const cx = x + W / 8;
+            const cy = y + rowH * 0.62;
+            const u = Math.min(W / 4, rowH) * 0.09;
+            ctx.fillStyle = "rgba(255,255,255,0.16)";
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, u * 1.6, u * 1.3, 0, 0, 7);
+            ctx.fill();
+            [[-1.7, -1.5], [-0.6, -2.4], [0.6, -2.4], [1.7, -1.5]].forEach(([dx, dy]) => {
+              ctx.beginPath();
+              ctx.ellipse(cx + dx * u, cy + dy * u, u * 0.55, u * 0.7, 0, 0, 7);
+              ctx.fill();
+            });
+          }
           if (!P.started && i === 0) {
             ctx.fillStyle = "#fff";
             ctx.font = "600 16px system-ui, sans-serif";
@@ -453,7 +468,7 @@
         const sh = F.openSheet(
           `<div class="mlm-end">${rec ? "🏆" : "🎹"}<h3>${P.score} 块</h3><p>${esc(why)}${rec ? " · 新纪录！" : best[k] ? ` · 最高 ${best[k]}` : ""}</p></div>
            <div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-e="retry">再来</button><button type="button" class="fun-btn ghost" data-e="menu">换曲子</button></div>`,
-          { title: "钢琴块" }
+          { title: "猫爪琴键" }
         );
         sh.body.addEventListener("click", (e) => {
           const a = e.target.closest("[data-e]")?.dataset.e;
@@ -482,9 +497,9 @@
         drawMenu();
       }
     }
-    F.register("钢琴块", {
-      title: "钢琴块",
-      kicker: "PIANO TILES",
+    F.register("猫爪琴键", {
+      title: "猫爪琴键",
+      kicker: "CAT PAW KEYS",
       async mount(body) {
         root = document.createElement("div");
         root.className = "pt-root";

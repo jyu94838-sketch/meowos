@@ -24,138 +24,201 @@
   };
   const ink = "#3a2a2a";
 
-  /* ───── 衣柜（每样都是一段 SVG） ───── */
-  const BANGS = (c) => `<path d="M44 96 Q46 30 100 28 Q154 30 156 96 Q146 66 124 68 Q112 52 100 64 Q86 52 74 66 Q56 66 44 96Z" fill="${c}"/>`;
-  const SWEEP = (c) => `<path d="M42 100 Q40 26 104 26 Q160 30 158 98 Q150 70 132 62 Q110 74 80 60 Q62 70 42 100Z" fill="${c}"/>`;
+  /* ───── 衣柜（每样都是一段 SVG，Q 版二头身） ───── */
+  // 坐标：头在 (100,100) 附近，身体 158~214，腿 214~262，鞋 262~276
+  const ol = (c) => shade(c, 0.72); // 描边色
+  const stk = (c, w) => `stroke="${ol(c)}" stroke-width="${w || 1.6}" stroke-linejoin="round"`;
+  const FACE = "M50 96 Q50 40 100 40 Q150 40 150 96 Q150 134 120 150 Q100 160 80 150 Q50 134 50 96Z";
+  const BANG_PTS = "M48 100 Q44 40 100 34 Q156 40 152 100 L146 82 L136 96 L128 70 L116 90 L104 64 L92 90 L80 68 L70 94 L58 80Z";
+  const bangs = (c) => `<path d="${BANG_PTS}" fill="${c}" ${stk(c)}/><path d="M66 56 Q100 40 134 56" stroke="#fff" stroke-width="5" opacity=".28" fill="none" stroke-linecap="round"/>`;
+  const sideLocks = (c) => `<path d="M50 90 Q44 128 58 152 Q62 124 62 98Z" fill="${c}" ${stk(c, 1.2)}/><path d="M150 90 Q156 128 142 152 Q138 124 138 98Z" fill="${c}" ${stk(c, 1.2)}/>`;
+  const sweep = (c) => `<path d="M46 102 Q40 34 104 32 Q160 38 154 100 Q148 74 128 66 Q120 84 100 80 Q74 76 64 72 Q52 84 46 102Z" fill="${c}" ${stk(c)}/><path d="M70 52 Q104 38 138 54" stroke="#fff" stroke-width="5" opacity=".28" fill="none" stroke-linecap="round"/>`;
   const HAIR = {
-    short: { name: "短发", back: (c) => `<circle cx="100" cy="86" r="61" fill="${c}"/>`, front: BANGS },
-    long: { name: "长直发", back: (c) => `<path d="M38 92 Q38 22 100 22 Q162 22 162 92 L168 206 Q100 220 32 206Z" fill="${c}"/>`, front: BANGS },
+    short: { name: "短发", back: (c) => `<path d="M42 104 Q38 30 100 28 Q162 30 158 104 Q160 132 148 148 L52 148 Q40 132 42 104Z" fill="${c}" ${stk(c)}/>`, front: (c) => bangs(c) },
+    long: {
+      name: "长直发",
+      back: (c) => `<path d="M40 100 Q36 26 100 26 Q164 26 160 100 L166 222 Q100 236 34 222Z" fill="${c}" ${stk(c)}/><path d="M60 150 L58 216 M140 150 L142 216" stroke="${ol(c)}" stroke-width="1.2" opacity=".5"/>`,
+      front: (c) => bangs(c) + sideLocks(c)
+    },
     twin: {
       name: "双马尾",
-      back: (c) => `<circle cx="100" cy="86" r="61" fill="${c}"/><ellipse cx="34" cy="138" rx="18" ry="46" fill="${c}"/><ellipse cx="166" cy="138" rx="18" ry="46" fill="${c}"/><circle cx="44" cy="92" r="7" fill="#e85a5a"/><circle cx="156" cy="92" r="7" fill="#e85a5a"/>`,
-      front: BANGS
+      back: (c) =>
+        `<path d="M42 104 Q38 30 100 28 Q162 30 158 104 L150 140 L50 140Z" fill="${c}" ${stk(c)}/><path d="M48 70 Q8 96 18 160 Q22 196 40 206 Q34 170 48 136 Q56 108 56 84Z" fill="${c}" ${stk(c)}/><path d="M152 70 Q192 96 182 160 Q178 196 160 206 Q166 170 152 136 Q144 108 144 84Z" fill="${c}" ${stk(c)}/>`,
+      front: (c) => bangs(c) + `<circle cx="50" cy="72" r="7" fill="#ff7a93" stroke="#d9506c" stroke-width="1.4"/><circle cx="150" cy="72" r="7" fill="#ff7a93" stroke="#d9506c" stroke-width="1.4"/>`
     },
-    bun: { name: "丸子头", back: (c) => `<circle cx="100" cy="86" r="61" fill="${c}"/><circle cx="100" cy="26" r="22" fill="${c}"/>`, front: BANGS },
+    bun: {
+      name: "丸子头",
+      back: (c) => `<circle cx="100" cy="24" r="22" fill="${c}" ${stk(c)}/><path d="M42 104 Q38 30 100 28 Q162 30 158 104 Q160 132 148 146 L52 146 Q40 132 42 104Z" fill="${c}" ${stk(c)}/>`,
+      front: (c) => bangs(c) + `<path d="M84 16 Q100 8 116 16" stroke="#fff" stroke-width="3" opacity=".3" fill="none" stroke-linecap="round"/>`
+    },
     wavy: {
       name: "大波浪",
-      back: (c) => `<path d="M36 92 Q36 20 100 20 Q164 20 164 92 Q176 120 164 150 Q178 180 160 206 Q130 222 100 214 Q70 222 40 206 Q22 180 36 150 Q24 120 36 92Z" fill="${c}"/>`,
-      front: SWEEP
+      back: (c) =>
+        `<path d="M38 100 Q34 24 100 24 Q166 24 162 100 Q178 130 164 160 Q180 192 160 218 Q132 236 100 226 Q68 236 40 218 Q20 192 36 160 Q22 130 38 100Z" fill="${c}" ${stk(c)}/>`,
+      front: (c) => sweep(c) + `<path d="M48 96 Q40 124 52 146 Q44 168 58 184 Q62 150 64 112Z" fill="${c}" ${stk(c, 1.2)}/><path d="M152 96 Q160 124 148 146 Q156 168 142 184 Q138 150 136 112Z" fill="${c}" ${stk(c, 1.2)}/>`
     },
     spiky: {
       name: "刺猬头",
-      back: (c) => `<circle cx="100" cy="86" r="61" fill="${c}"/>`,
-      front: (c) => `<path d="M42 98 L40 50 L60 62 L64 26 L84 46 L100 16 L116 46 L136 26 L140 62 L160 50 L158 98 Q144 70 124 72 Q110 60 100 70 Q90 60 76 72 Q56 70 42 98Z" fill="${c}"/>`
+      back: (c) => `<path d="M42 104 Q38 30 100 28 Q162 30 158 104 Q160 126 150 140 L50 140 Q40 126 42 104Z" fill="${c}" ${stk(c)}/>`,
+      front: (c) => `<path d="M44 104 L34 62 L58 70 L54 30 L78 50 L88 16 L104 46 L120 18 L128 50 L150 32 L146 70 L168 62 L156 104 L144 82 L132 96 L122 72 L110 90 L98 68 L86 90 L74 72 L64 94 L56 80Z" fill="${c}" ${stk(c)}/>`
     },
-    bob: { name: "波波头", back: (c) => `<path d="M36 96 Q36 22 100 22 Q164 22 164 96 L164 150 Q150 160 136 150 L64 150 Q50 160 36 150Z" fill="${c}"/>`, front: BANGS }
+    bob: {
+      name: "波波头",
+      back: (c) => `<path d="M38 100 Q34 26 100 26 Q166 26 162 100 L164 156 Q150 166 134 158 L66 158 Q50 166 36 156Z" fill="${c}" ${stk(c)}/>`,
+      front: (c) => bangs(c) + `<path d="M50 96 Q46 134 52 156 Q60 140 62 104Z" fill="${c}" ${stk(c, 1.2)}/><path d="M150 96 Q154 134 148 156 Q140 140 138 104Z" fill="${c}" ${stk(c, 1.2)}/>`
+    }
   };
+  // 眼睛：(80,110) 和 (120,110)
+  const EYE_L = 80;
+  const EYE_R = 120;
+  const EY = 110;
+  let gid = 0;
+  const animeEye = (cx, c, id, opt) => {
+    const o = opt || {};
+    return `<ellipse cx="${cx}" cy="${EY}" rx="10" ry="12.5" fill="#fff"/>
+      <ellipse cx="${cx}" cy="${EY + 1}" rx="8.6" ry="11.2" fill="url(#${id})"/>
+      ${o.slit ? `<ellipse cx="${cx}" cy="${EY + 1}" rx="1.8" ry="8" fill="#1d1420"/>` : `<ellipse cx="${cx}" cy="${EY + 2}" rx="4.2" ry="5.8" fill="#1d1420"/>`}
+      ${o.star ? `<path d="M${cx} ${EY - 7} l2.4 5.2 5.6 .8 -4.1 3.8 1 5.6 -4.9 -2.7 -4.9 2.7 1 -5.6 -4.1 -3.8 5.6 -.8z" fill="#fff" opacity=".95"/>` : `<circle cx="${cx + 3.5}" cy="${EY - 4}" r="3.4" fill="#fff"/><circle cx="${cx - 3.5}" cy="${EY + 6}" r="1.6" fill="#fff" opacity=".9"/>`}
+      <path d="M${cx - 12} ${EY - 6} Q${cx} ${EY - 17} ${cx + 12} ${EY - 7}" stroke="#2a1d24" stroke-width="3.6" fill="none" stroke-linecap="round"/>
+      <path d="M${cx + (cx < 100 ? -12 : 12)} ${EY - 7} l${cx < 100 ? -4 : 4} -3" stroke="#2a1d24" stroke-width="2.4" stroke-linecap="round"/>`;
+  };
+  const irisGrad = (id, c) => `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${shade(c, 0.45)}"/><stop offset=".55" stop-color="${c}"/><stop offset="1" stop-color="${shade(c, 1.35)}"/></linearGradient>`;
+  const closedArc = (cx, up) => `<path d="M${cx - 10} ${EY + (up ? 2 : -1)} Q${cx} ${EY + (up ? -9 : 6)} ${cx + 10} ${EY + (up ? 2 : -1)}" stroke="#2a1d24" stroke-width="3.4" fill="none" stroke-linecap="round"/>`;
   const EYES = {
-    round: { name: "圆眼", draw: (c) => `<ellipse cx="78" cy="102" rx="9" ry="11" fill="${c}"/><ellipse cx="122" cy="102" rx="9" ry="11" fill="${c}"/><circle cx="81" cy="98" r="3.2" fill="#fff"/><circle cx="125" cy="98" r="3.2" fill="#fff"/>` },
-    sparkle: {
-      name: "星星眼",
-      draw: (c) =>
-        `<ellipse cx="78" cy="102" rx="11" ry="13" fill="${c}"/><ellipse cx="122" cy="102" rx="11" ry="13" fill="${c}"/><path d="M78 94 l2 5 5 1 -5 2 -2 5 -2 -5 -5 -2 5 -1z" fill="#fff"/><path d="M122 94 l2 5 5 1 -5 2 -2 5 -2 -5 -5 -2 5 -1z" fill="#fff"/><circle cx="72" cy="108" r="2" fill="#fff"/><circle cx="116" cy="108" r="2" fill="#fff"/>`
+    round: { name: "圆眼", draw: (c, id) => irisGrad(id, c) + animeEye(EYE_L, c, id) + animeEye(EYE_R, c, id) },
+    sparkle: { name: "星星眼", draw: (c, id) => irisGrad(id, c) + animeEye(EYE_L, c, id, { star: 1 }) + animeEye(EYE_R, c, id, { star: 1 }) },
+    smile: { name: "笑眼", draw: () => closedArc(EYE_L, true) + closedArc(EYE_R, true) },
+    sleepy: {
+      name: "困困眼",
+      draw: (c, id, sk) =>
+        irisGrad(id, c) +
+        animeEye(EYE_L, c, id) +
+        animeEye(EYE_R, c, id) +
+        `<path d="M66 94 Q80 90 94 94 L94 108 Q80 104 66 108Z M106 94 Q120 90 134 94 L134 108 Q120 104 106 108Z" fill="${sk || "#ffe6d5"}"/><path d="M68 108 Q80 104 92 108 M108 108 Q120 104 132 108" stroke="#2a1d24" stroke-width="3" fill="none" stroke-linecap="round"/>`
     },
-    smile: { name: "笑眼", draw: () => `<path d="M68 104 Q78 92 88 104" stroke="${ink}" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M112 104 Q122 92 132 104" stroke="${ink}" stroke-width="3.5" fill="none" stroke-linecap="round"/>` },
-    sleepy: { name: "困困眼", draw: () => `<path d="M68 102 Q78 108 88 102" stroke="${ink}" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M112 102 Q122 108 132 102" stroke="${ink}" stroke-width="3.5" fill="none" stroke-linecap="round"/>` },
-    cat: {
-      name: "猫猫眼",
-      draw: (c) =>
-        `<path d="M66 102 Q78 88 90 102 Q78 114 66 102Z" fill="${c}"/><path d="M110 102 Q122 88 134 102 Q122 114 110 102Z" fill="${c}"/><ellipse cx="78" cy="102" rx="2" ry="7" fill="${ink}"/><ellipse cx="122" cy="102" rx="2" ry="7" fill="${ink}"/>`
-    },
-    wink: { name: "眨眼", draw: (c) => `<ellipse cx="78" cy="102" rx="9" ry="11" fill="${c}"/><circle cx="81" cy="98" r="3.2" fill="#fff"/><path d="M112 102 l20 -4 M112 102 l20 4" stroke="${ink}" stroke-width="3.5" stroke-linecap="round"/>` }
+    cat: { name: "猫猫眼", draw: (c, id) => irisGrad(id, c) + animeEye(EYE_L, c, id, { slit: 1 }) + animeEye(EYE_R, c, id, { slit: 1 }) },
+    wink: { name: "眨眼", draw: (c, id) => irisGrad(id, c) + animeEye(EYE_L, c, id) + `<path d="M110 106 L130 102 M110 106 L130 112" stroke="#2a1d24" stroke-width="3.4" stroke-linecap="round"/>` }
   };
   const MOUTH = {
-    smile: { name: "微笑", draw: () => `<path d="M90 124 Q100 132 110 124" stroke="${ink}" stroke-width="3" fill="none" stroke-linecap="round"/>` },
-    open: { name: "张嘴笑", draw: () => `<path d="M90 122 Q100 138 110 122Z" fill="#c4474e"/>` },
-    cat: { name: "ω 嘴", draw: () => `<path d="M88 122 Q94 130 100 122 Q106 130 112 122" stroke="${ink}" stroke-width="3" fill="none" stroke-linecap="round"/>` },
-    pout: { name: "嘟嘴", draw: () => `<circle cx="100" cy="126" r="4" fill="#d9606a"/>` },
-    tongue: { name: "吐舌头", draw: () => `<path d="M90 122 Q100 130 110 122" stroke="${ink}" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M98 126 Q103 136 108 126Z" fill="#f08a9a"/>` }
+    smile: { name: "微笑", draw: () => `<path d="M93 134 Q100 140 107 134" stroke="#7a3a3a" stroke-width="2.4" fill="none" stroke-linecap="round"/>` },
+    open: { name: "张嘴笑", draw: () => `<path d="M91 132 Q100 133 109 132 Q107 145 100 145 Q93 145 91 132Z" fill="#b8434f" stroke="#7a3a3a" stroke-width="1.6"/><path d="M95 141 Q100 137 105 141" fill="#f08a9a"/>` },
+    cat: { name: "ω 嘴", draw: () => `<path d="M90 133 Q95 139 100 133 Q105 139 110 133" stroke="#7a3a3a" stroke-width="2.4" fill="none" stroke-linecap="round"/>` },
+    pout: { name: "嘟嘴", draw: () => `<ellipse cx="100" cy="136" rx="3.4" ry="3" fill="#e0707c"/>` },
+    tongue: { name: "吐舌头", draw: () => `<path d="M92 133 Q100 139 108 133" stroke="#7a3a3a" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M98 136 Q103 146 108 136Z" fill="#f08a9a" stroke="#c45a6a" stroke-width="1.2"/>` }
   };
-  const SLEEVE_S = (c) => `<rect x="53" y="148" width="21" height="26" rx="9" fill="${c}" transform="rotate(10 63 152)"/><rect x="126" y="148" width="21" height="26" rx="9" fill="${c}" transform="rotate(-10 137 152)"/>`;
-  const SLEEVE_L = (c) => `<rect x="54" y="148" width="19" height="62" rx="9" fill="${c}" transform="rotate(10 63 152)"/><rect x="127" y="148" width="19" height="62" rx="9" fill="${c}" transform="rotate(-10 137 152)"/>`;
-  const TORSO = (c, h) => `<rect x="70" y="144" width="60" height="${h || 60}" rx="18" fill="${c}"/>`;
+  // 衣服
+  const TORSO = "M74 168 Q74 158 88 157 L112 157 Q126 158 126 168 L128 216 Q100 222 72 216Z";
+  const sleeves = (c, long) => {
+    const L = long ? "M80 164 Q69 188 66 210" : "M80 164 Q75 176 73 184";
+    const R = long ? "M120 164 Q131 188 134 210" : "M120 164 Q125 176 127 184";
+    return `<path d="${L}" stroke="${ol(c)}" stroke-width="18" stroke-linecap="round" fill="none"/><path d="${R}" stroke="${ol(c)}" stroke-width="18" stroke-linecap="round" fill="none"/><path d="${L}" stroke="${c}" stroke-width="15" stroke-linecap="round" fill="none"/><path d="${R}" stroke="${c}" stroke-width="15" stroke-linecap="round" fill="none"/>`;
+  };
+  const torso = (c, d) => `<path d="${d || TORSO}" fill="${c}" ${stk(c)}/>`;
   const TOP = {
-    tee: { name: "T 恤", draw: (c) => SLEEVE_S(c) + TORSO(c) + `<path d="M90 146 Q100 154 110 146" stroke="${shade(c, 0.8)}" stroke-width="3" fill="none"/>` },
+    tee: { name: "T 恤", draw: (c) => sleeves(c) + torso(c) + `<path d="M90 158 Q100 168 110 158" stroke="${ol(c)}" stroke-width="2" fill="none"/>` },
     hoodie: {
       name: "卫衣",
       draw: (c) =>
-        `<ellipse cx="100" cy="148" rx="32" ry="11" fill="${shade(c, 0.78)}"/>` + SLEEVE_L(c) + TORSO(c, 70) + `<rect x="84" y="180" width="32" height="18" rx="6" fill="${shade(c, 0.85)}"/><path d="M93 152 v14 M107 152 v14" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>`
+        `<ellipse cx="100" cy="160" rx="28" ry="9" fill="${shade(c, 0.8)}" ${stk(c)}/>` +
+        sleeves(c, true) +
+        torso(c, "M72 168 Q72 158 88 157 L112 157 Q128 158 128 168 L130 222 Q100 228 70 222Z") +
+        `<path d="M84 196 L116 196 L118 212 L82 212Z" fill="${shade(c, 0.88)}" ${stk(c, 1.2)}/><path d="M94 162 v16 M106 162 v16" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>`
     },
     sailor: {
       name: "水手服",
       draw: (c) =>
-        SLEEVE_S("#fff") + TORSO("#fff") + `<path d="M70 150 L100 184 L130 150 L130 168 L100 196 L70 168Z" fill="${c}"/><path d="M74 158 L100 188 L126 158" stroke="#fff" stroke-width="2" fill="none"/><path d="M92 186 l-10 8 10 2z M108 186 l10 8 -10 2z" fill="#e85a5a"/><circle cx="100" cy="188" r="4" fill="#e85a5a"/>`
+        sleeves("#ffffff") +
+        torso("#ffffff") +
+        `<path d="M74 162 L100 194 L126 162 L126 176 L100 204 L74 176Z" fill="${c}" ${stk(c, 1.2)}/><path d="M78 168 L100 194 L122 168" stroke="#fff" stroke-width="1.6" fill="none"/><path d="M100 196 l-12 9 4 3z M100 196 l12 9 -4 3z" fill="#ff6b81" stroke="#d94a62" stroke-width="1"/><circle cx="100" cy="197" r="3.6" fill="#ff6b81"/>`
     },
-    shirt: { name: "衬衫领带", draw: (c) => SLEEVE_L("#f7f7fb") + TORSO("#f7f7fb") + `<path d="M88 146 L100 156 L112 146" stroke="#ccc" stroke-width="2" fill="none"/><path d="M96 156 h8 l3 34 -7 8 -7 -8z" fill="${c}"/>` },
+    shirt: {
+      name: "衬衫领带",
+      draw: (c) =>
+        sleeves("#f7f7fb", true) +
+        torso("#f7f7fb") +
+        `<path d="M88 157 L100 168 L112 157 L108 170 L100 168 L92 170Z" fill="#fff" stroke="#c9c9d6" stroke-width="1.2"/><path d="M97 168 h6 l3 30 -6 7 -6 -7z" fill="${c}" ${stk(c, 1.2)}/>`
+    },
     sweater: {
       name: "毛衣",
-      draw: (c) => SLEEVE_L(c) + TORSO(c, 64) + [160, 172, 184, 196].map((y) => `<path d="M74 ${y} Q100 ${y + 4} 126 ${y}" stroke="${shade(c, 0.82)}" stroke-width="3" fill="none"/>`).join("") + `<rect x="80" y="142" width="40" height="8" rx="4" fill="${shade(c, 0.85)}"/>`
+      draw: (c) =>
+        sleeves(c, true) +
+        torso(c) +
+        `<path d="M86 157 Q100 166 114 157" stroke="${shade(c, 0.8)}" stroke-width="5" fill="none"/>` +
+        [176, 188, 200].map((y) => `<path d="M80 ${y} q5 4 10 0 q5 4 10 0 q5 4 10 0 q5 4 10 0" stroke="${shade(c, 0.82)}" stroke-width="1.6" fill="none"/>`).join("") +
+        `<path d="M73 210 Q100 216 127 210 L128 216 Q100 222 72 216Z" fill="${shade(c, 0.85)}"/>`
     },
     dress: {
       name: "连衣裙",
       dress: true,
       draw: (c) =>
-        `<circle cx="64" cy="156" r="12" fill="${c}"/><circle cx="136" cy="156" r="12" fill="${c}"/>` + TORSO(c, 50) + `<path d="M72 186 L128 186 L146 248 Q100 258 54 248Z" fill="${c}"/><path d="M60 240 Q100 250 140 240" stroke="#fff" stroke-width="3" fill="none" opacity=".7"/><rect x="72" y="182" width="56" height="7" rx="3" fill="${shade(c, 0.8)}"/>`
+        `<circle cx="80" cy="166" r="9" fill="${c}" ${stk(c)}/><circle cx="120" cy="166" r="9" fill="${c}" ${stk(c)}/>` +
+        torso(c, "M76 166 Q76 158 88 157 L112 157 Q124 158 124 166 L124 196 L76 196Z") +
+        `<path d="M76 194 L124 194 L144 250 Q100 260 56 250Z" fill="${c}" ${stk(c)}/><path d="M56 250 q6 6 11 0 q6 6 11 0 q6 6 11 0 q6 6 11 0 q6 6 11 0 q6 6 11 0 q6 6 11 0 q6 6 11 0" fill="#fff" stroke="${ol(c)}" stroke-width="1"/><path d="M76 192 L124 192 L124 198 L76 198Z" fill="${shade(c, 0.8)}"/><path d="M100 192 l-8 -5 v10z M100 192 l8 -5 v10z" fill="${shade(c, 0.75)}"/>`
     },
     suit: {
       name: "西装",
-      draw: (c) => SLEEVE_L(c) + TORSO(c, 66) + `<path d="M90 144 L100 176 L110 144Z" fill="#fff"/><path d="M84 144 L100 182 L92 144Z M116 144 L100 182 L108 144Z" fill="${shade(c, 0.75)}"/><circle cx="100" cy="194" r="2.5" fill="${shade(c, 0.6)}"/>`
+      draw: (c) =>
+        sleeves(c, true) +
+        torso(c) +
+        `<path d="M90 157 L100 186 L110 157Z" fill="#fff"/><path d="M98 166 h4 l2 22 -4 4 -4 -4z" fill="#3b2b3b"/><path d="M86 157 L100 190 L94 157Z M114 157 L100 190 L106 157Z" fill="${shade(c, 0.78)}" ${stk(c, 1)}/><circle cx="100" cy="204" r="2.4" fill="${ol(c)}"/>`
     },
     kimono: {
       name: "和风上衣",
       draw: (c) =>
-        `<path d="M48 150 L72 146 L72 196 L44 196Z M152 150 L128 146 L128 196 L156 196Z" fill="${c}"/>` + TORSO(c, 64) + `<path d="M80 144 L104 186 M120 144 L96 186" stroke="#fff" stroke-width="4"/><rect x="70" y="182" width="60" height="12" fill="${shade(c, 0.7)}"/>`
+        `<path d="M78 162 L52 178 L58 212 L80 206Z M122 162 L148 178 L142 212 L120 206Z" fill="${c}" ${stk(c)}/>` +
+        torso(c) +
+        `<path d="M84 157 L106 196 M116 157 L94 196" stroke="#fff" stroke-width="3.4"/><path d="M73 194 L127 194 L127 206 L73 206Z" fill="${shade(c, 0.7)}"/><path d="M96 194 h8 v12 h-8z" fill="#f2d17a"/>`
     }
   };
   const BOTTOM = {
     none: { name: "不穿（配连衣裙）", draw: () => "" },
-    shorts: { name: "短裤", draw: (c) => `<path d="M72 198 L128 198 L130 228 L104 228 L100 214 L96 228 L70 228Z" fill="${c}"/>` },
-    skirt: { name: "半身裙", draw: (c) => `<path d="M72 198 L128 198 L138 238 Q100 246 62 238Z" fill="${c}"/>` },
+    shorts: { name: "短裤", draw: (c) => `<path d="M74 210 L126 210 L128 238 L103 238 L100 226 L97 238 L72 238Z" fill="${c}" ${stk(c)}/>` },
+    skirt: { name: "半身裙", draw: (c) => `<path d="M74 210 L126 210 L138 246 Q100 254 62 246Z" fill="${c}" ${stk(c)}/>` },
     pleated: {
       name: "百褶裙",
-      draw: (c) => `<path d="M72 198 L128 198 L138 238 Q100 246 62 238Z" fill="${c}"/>` + [80, 92, 104, 116].map((x, i) => `<path d="M${x + 4} 200 L${x - 2 + i * 3} 240" stroke="${shade(c, 0.8)}" stroke-width="2"/>`).join("")
+      draw: (c) => `<path d="M74 210 L126 210 L138 246 Q100 254 62 246Z" fill="${c}" ${stk(c)}/>` + [[84, 70], [94, 86], [106, 114], [116, 130]].map(([a, b]) => `<path d="M${a} 212 L${b} 249" stroke="${ol(c)}" stroke-width="1.4"/>`).join("") + `<path d="M74 210 L126 210 L126 216 L74 216Z" fill="${shade(c, 0.85)}"/>`
     },
-    pants: { name: "长裤", draw: (c) => `<rect x="74" y="196" width="52" height="24" rx="8" fill="${c}"/><rect x="77" y="212" width="20" height="58" rx="7" fill="${c}"/><rect x="103" y="212" width="20" height="58" rx="7" fill="${c}"/>` },
+    pants: { name: "长裤", draw: (c) => `<path d="M74 210 L126 210 L125 264 L104 264 L100 228 L96 264 L75 264Z" fill="${c}" ${stk(c)}/>` },
     jeans: {
       name: "背带裤",
       draw: (c) =>
-        `<rect x="76" y="168" width="48" height="40" rx="8" fill="${c}"/><path d="M80 170 L74 146 M120 170 L126 146" stroke="${c}" stroke-width="6" stroke-linecap="round"/><rect x="74" y="200" width="52" height="24" rx="8" fill="${c}"/><rect x="77" y="214" width="20" height="40" rx="7" fill="${c}"/><rect x="103" y="214" width="20" height="40" rx="7" fill="${c}"/><circle cx="84" cy="176" r="2.5" fill="#f2d17a"/><circle cx="116" cy="176" r="2.5" fill="#f2d17a"/>`
+        `<path d="M80 180 L120 180 L122 210 L78 210Z" fill="${c}" ${stk(c)}/><path d="M82 182 L78 160 M118 182 L122 160" stroke="${c}" stroke-width="5" stroke-linecap="round"/><path d="M74 208 L126 208 L125 250 L104 250 L100 228 L96 250 L75 250Z" fill="${c}" ${stk(c)}/><circle cx="84" cy="186" r="2.4" fill="#f2d17a"/><circle cx="116" cy="186" r="2.4" fill="#f2d17a"/><path d="M92 190 h16 v10 h-16z" fill="${shade(c, 0.85)}"/>`
     }
   };
   const SHOES = {
-    sneakers: { name: "运动鞋", draw: (c) => `<ellipse cx="86" cy="276" rx="13" ry="8" fill="${c}"/><ellipse cx="114" cy="276" rx="13" ry="8" fill="${c}"/><rect x="72" y="279" width="28" height="4" rx="2" fill="#fff"/><rect x="100" y="279" width="28" height="4" rx="2" fill="#fff"/>` },
-    boots: { name: "靴子", draw: (c) => `<rect x="77" y="246" width="19" height="34" rx="6" fill="${c}"/><rect x="104" y="246" width="19" height="34" rx="6" fill="${c}"/><ellipse cx="86" cy="279" rx="13" ry="6" fill="${c}"/><ellipse cx="114" cy="279" rx="13" ry="6" fill="${c}"/>` },
-    maryjane: { name: "玛丽珍鞋", draw: (c) => `<ellipse cx="86" cy="277" rx="12" ry="7" fill="${c}"/><ellipse cx="114" cy="277" rx="12" ry="7" fill="${c}"/><path d="M78 270 h16 M106 270 h16" stroke="${c}" stroke-width="3"/>` },
-    slippers: { name: "毛拖鞋", draw: (c) => `<ellipse cx="86" cy="277" rx="14" ry="8" fill="${c}"/><ellipse cx="114" cy="277" rx="14" ry="8" fill="${c}"/><circle cx="86" cy="271" r="6" fill="#fff"/><circle cx="114" cy="271" r="6" fill="#fff"/>` },
+    sneakers: { name: "运动鞋", draw: (c) => `<path d="M78 262 h20 q4 0 4 6 v4 h-28 q0 -10 4 -10z M102 262 h20 q4 0 4 10 h-28 v-4 q0 -6 4 -6z" fill="${c}" ${stk(c)}/><path d="M74 272 h28 M98 272 h28" stroke="#fff" stroke-width="3"/>` },
+    boots: { name: "靴子", draw: (c) => `<path d="M80 240 h16 v26 q6 0 8 6 h-28 q0 -6 4 -6z M104 240 h16 v26 q4 0 4 6 h-28 q2 -6 8 -6z" fill="${c}" ${stk(c)}/><path d="M80 244 h16 M104 244 h16" stroke="${shade(c, 1.25)}" stroke-width="2"/>` },
+    maryjane: { name: "玛丽珍鞋", draw: (c) => `<ellipse cx="88" cy="268" rx="12" ry="6" fill="${c}" ${stk(c)}/><ellipse cx="112" cy="268" rx="12" ry="6" fill="${c}" ${stk(c)}/><path d="M82 262 h12 M106 262 h12" stroke="${c}" stroke-width="3"/>` },
+    slippers: { name: "毛拖鞋", draw: (c) => `<ellipse cx="88" cy="269" rx="14" ry="7" fill="${c}" ${stk(c)}/><ellipse cx="112" cy="269" rx="14" ry="7" fill="${c}" ${stk(c)}/><circle cx="88" cy="263" r="5.5" fill="#fff" stroke="#ddd"/><circle cx="112" cy="263" r="5.5" fill="#fff" stroke="#ddd"/>` },
     barefoot: { name: "光脚", draw: () => "" }
   };
   const ACC = {
     none: { name: "不戴", draw: () => "" },
-    catears: { name: "猫耳", draw: (c) => `<path d="M48 58 L58 14 L86 40Z M152 58 L142 14 L114 40Z" fill="${c}"/><path d="M58 50 L62 28 L76 42Z M142 50 L138 28 L124 42Z" fill="#f4a7b9"/>` },
-    bow: { name: "蝴蝶结", draw: () => `<path d="M132 44 L112 30 L114 58Z M132 44 L152 30 L150 58Z" fill="#e85a5a"/><circle cx="132" cy="44" r="6" fill="#c43c3c"/>` },
-    crown: { name: "小皇冠", draw: () => `<path d="M76 34 L76 12 L88 24 L100 6 L112 24 L124 12 L124 34Z" fill="#f2c94c" stroke="#d4a72c" stroke-width="2"/><circle cx="100" cy="24" r="3.5" fill="#e85a5a"/>` },
-    glasses: { name: "圆眼镜", draw: () => `<circle cx="78" cy="102" r="15" fill="none" stroke="${ink}" stroke-width="3"/><circle cx="122" cy="102" r="15" fill="none" stroke="${ink}" stroke-width="3"/><path d="M93 102 h14" stroke="${ink}" stroke-width="3"/>` },
-    beret: { name: "贝雷帽", draw: () => `<ellipse cx="94" cy="34" rx="50" ry="17" fill="#e85a5a" transform="rotate(-8 94 34)"/><circle cx="94" cy="18" r="4" fill="#c43c3c"/>` },
-    flower: { name: "小花", draw: () => `${[0, 72, 144, 216, 288].map((a) => `<circle cx="${140 + 9 * Math.cos((a * Math.PI) / 180)}" cy="${54 + 9 * Math.sin((a * Math.PI) / 180)}" r="7" fill="#f4a7b9"/>`).join("")}<circle cx="140" cy="54" r="5" fill="#f2d17a"/>` },
-    headphones: { name: "耳机", draw: () => `<path d="M42 96 Q42 20 100 20 Q158 20 158 96" stroke="#5c4b8a" stroke-width="7" fill="none"/><rect x="32" y="84" width="18" height="30" rx="8" fill="#5c4b8a"/><rect x="150" y="84" width="18" height="30" rx="8" fill="#5c4b8a"/>` },
-    halo: { name: "光环", draw: () => `<ellipse cx="100" cy="16" rx="34" ry="8" fill="none" stroke="#f2d17a" stroke-width="5"/>` },
-    horns: { name: "小恶魔角", draw: () => `<path d="M64 40 Q56 14 70 6 Q66 26 80 34Z M136 40 Q144 14 130 6 Q134 26 120 34Z" fill="#5c4b8a"/>` }
+    catears: { name: "猫耳", draw: (c) => `<path d="M52 66 L60 18 L90 44Z M148 66 L140 18 L110 44Z" fill="${c}" ${stk(c)}/><path d="M60 56 L63 30 L80 46Z M140 56 L137 30 L120 46Z" fill="#ffb3c4"/>` },
+    bow: { name: "蝴蝶结", draw: () => `<path d="M136 48 L114 34 L116 62Z M136 48 L158 34 L156 62Z" fill="#ff6b81" stroke="#d94a62" stroke-width="1.6"/><circle cx="136" cy="48" r="6" fill="#e04a62"/>` },
+    crown: { name: "小皇冠", draw: () => `<path d="M76 38 L74 14 L88 26 L100 8 L112 26 L126 14 L124 38Z" fill="#f6cf52" stroke="#c99a1e" stroke-width="1.8"/><circle cx="100" cy="26" r="3.6" fill="#ff6b81"/><circle cx="84" cy="32" r="2" fill="#8fc5f2"/><circle cx="116" cy="32" r="2" fill="#8fc5f2"/>` },
+    glasses: { name: "圆眼镜", draw: () => `<circle cx="${EYE_L}" cy="${EY}" r="15" fill="rgba(255,255,255,.12)" stroke="#3a2a2a" stroke-width="2.6"/><circle cx="${EYE_R}" cy="${EY}" r="15" fill="rgba(255,255,255,.12)" stroke="#3a2a2a" stroke-width="2.6"/><path d="M95 108 q5 -3 10 0" stroke="#3a2a2a" stroke-width="2.6" fill="none"/>` },
+    beret: { name: "贝雷帽", draw: () => `<ellipse cx="94" cy="36" rx="54" ry="18" fill="#e85a5a" stroke="#b83c3c" stroke-width="1.8" transform="rotate(-8 94 36)"/><circle cx="92" cy="19" r="4" fill="#b83c3c"/>` },
+    flower: { name: "小花", draw: () => `${[0, 72, 144, 216, 288].map((a) => `<ellipse cx="${140 + 8 * Math.cos((a * Math.PI) / 180)}" cy="${58 + 8 * Math.sin((a * Math.PI) / 180)}" rx="6.5" ry="6.5" fill="#ffb3c4" stroke="#e88aa0" stroke-width="1"/>`).join("")}<circle cx="140" cy="58" r="4.5" fill="#f6cf52"/>` },
+    headphones: { name: "耳机", draw: () => `<path d="M44 104 Q40 24 100 22 Q160 24 156 104" stroke="#5c4b8a" stroke-width="7" fill="none" stroke-linecap="round"/><rect x="32" y="92" width="20" height="32" rx="9" fill="#5c4b8a"/><rect x="148" y="92" width="20" height="32" rx="9" fill="#5c4b8a"/><rect x="36" y="98" width="8" height="20" rx="4" fill="#c9a7f2"/><rect x="156" y="98" width="8" height="20" rx="4" fill="#c9a7f2"/>` },
+    halo: { name: "光环", draw: () => `<ellipse cx="100" cy="14" rx="34" ry="8" fill="none" stroke="#f6cf52" stroke-width="5"/><ellipse cx="100" cy="14" rx="34" ry="8" fill="none" stroke="#fff6c8" stroke-width="1.6"/>` },
+    horns: { name: "小恶魔角", draw: () => `<path d="M66 50 Q56 22 70 10 Q68 30 84 40Z M134 50 Q144 22 130 10 Q132 30 116 40Z" fill="#6a4fa0" stroke="#4a3478" stroke-width="1.6"/>` }
   };
   const HELD = {
     none: { name: "空手", draw: () => "" },
-    tea: { name: "奶茶", draw: () => `<path d="M140 196 h18 l-3 30 h-12z" fill="#f2e2c4" stroke="#c9a77a" stroke-width="1.5"/><path d="M150 196 l5 -16" stroke="#e85a5a" stroke-width="3"/>${[144, 149, 154].map((x) => `<circle cx="${x}" cy="220" r="2.2" fill="#3a2a2a"/>`).join("")}` },
-    plush: { name: "猫猫玩偶", draw: () => `<circle cx="154" cy="204" r="15" fill="#f2d17a"/><path d="M142 196 l-2 -12 10 7z M166 196 l2 -12 -10 7z" fill="#f2d17a"/><circle cx="149" cy="203" r="2" fill="${ink}"/><circle cx="159" cy="203" r="2" fill="${ink}"/><path d="M151 209 q3 3 6 0" stroke="${ink}" stroke-width="1.5" fill="none"/>` },
-    bouquet: { name: "花束", draw: () => `${[[146, 190], [158, 186], [152, 178], [164, 196], [140, 200]].map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="7" fill="${["#f4a7b9", "#e85a5a", "#c9a7f2", "#f4a7b9", "#ffffff"][i]}"/>`).join("")}<path d="M140 204 L166 204 L156 232 L150 232Z" fill="#8fc5f2"/>` },
-    balloon: { name: "气球", draw: () => `<path d="M148 216 Q160 180 162 132" stroke="#999" stroke-width="1.5" fill="none"/><ellipse cx="164" cy="112" rx="18" ry="22" fill="#e85a5a"/><path d="M158 102 q4 -6 10 -4" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>` },
-    book: { name: "书", draw: () => `<rect x="138" y="196" width="26" height="32" rx="3" fill="#3b5bdb"/><rect x="142" y="200" width="18" height="4" rx="2" fill="#fff"/>` },
-    mic: { name: "麦克风", draw: () => `<rect x="146" y="200" width="6" height="26" rx="3" fill="#555"/><circle cx="149" cy="196" r="8" fill="#888"/>` }
+    tea: { name: "奶茶", draw: () => `<path d="M124 196 h22 l-3 30 h-16z" fill="#f2e2c4" stroke="#c9a77a" stroke-width="1.5"/><path d="M124 196 h22 v5 h-22z" fill="#fff"/><path d="M137 196 l6 -18" stroke="#ff6b81" stroke-width="3" stroke-linecap="round"/>${[129, 135, 141].map((x) => `<circle cx="${x}" cy="220" r="2.2" fill="#3a2a2a"/>`).join("")}` },
+    plush: { name: "猫猫玩偶", draw: () => `<circle cx="140" cy="204" r="15" fill="#f6d27a" stroke="#c99a3e" stroke-width="1.6"/><path d="M128 196 l-2 -13 11 8z M152 196 l2 -13 -11 8z" fill="#f6d27a" stroke="#c99a3e" stroke-width="1.4"/><circle cx="135" cy="203" r="2" fill="#3a2a2a"/><circle cx="145" cy="203" r="2" fill="#3a2a2a"/><path d="M137 209 q3 3 6 0" stroke="#3a2a2a" stroke-width="1.5" fill="none"/>` },
+    bouquet: { name: "花束", draw: () => `${[[132, 190], [144, 186], [138, 178], [150, 196], [126, 200]].map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="7" fill="${["#ffb3c4", "#ff6b81", "#c9a7f2", "#ffb3c4", "#ffffff"][i]}" stroke="#e88aa0" stroke-width=".8"/>`).join("")}<path d="M126 204 L152 204 L142 232 L136 232Z" fill="#8fc5f2" stroke="#5f9fd6" stroke-width="1.2"/>` },
+    balloon: { name: "气球", draw: () => `<path d="M134 216 Q146 180 150 132" stroke="#999" stroke-width="1.5" fill="none"/><ellipse cx="152" cy="112" rx="18" ry="22" fill="#ff6b81" stroke="#d94a62" stroke-width="1.6"/><path d="M146 102 q4 -6 10 -4" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>` },
+    book: { name: "书", draw: () => `<rect x="124" y="196" width="26" height="32" rx="3" fill="#3b5bdb" stroke="#28409e" stroke-width="1.4"/><rect x="128" y="200" width="18" height="4" rx="2" fill="#fff"/>` },
+    mic: { name: "麦克风", draw: () => `<rect x="132" y="200" width="6" height="26" rx="3" fill="#555"/><circle cx="135" cy="196" r="8" fill="#9a9aa6" stroke="#6a6a76" stroke-width="1.4"/>` }
   };
   const BG = {
-    pink: { name: "粉色房间", draw: () => `<rect width="200" height="300" fill="#ffe8ee"/><rect y="250" width="200" height="50" fill="#f7c9d4"/><circle cx="34" cy="40" r="3" fill="#fff"/><circle cx="170" cy="60" r="4" fill="#fff"/>` },
-    night: { name: "星空", draw: () => `<rect width="200" height="300" fill="#262044"/>${[[20, 30], [60, 60], [170, 30], [150, 90], [30, 140], [180, 170], [100, 18]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.8" fill="#fff"/>`).join("")}<circle cx="168" cy="36" r="14" fill="#f2e6a8"/>` },
-    grass: { name: "草地", draw: () => `<rect width="200" height="300" fill="#d8f0ff"/><rect y="236" width="200" height="64" fill="#9bd77f"/><circle cx="30" cy="40" r="16" fill="#fff4b0"/>` },
-    sea: { name: "海边", draw: () => `<rect width="200" height="300" fill="#bfe6ff"/><rect y="200" width="200" height="40" fill="#5fb4e8"/><rect y="240" width="200" height="60" fill="#f6e2b3"/>` },
-    cafe: { name: "咖啡店", draw: () => `<rect width="200" height="300" fill="#f3e7d8"/><rect x="0" y="60" width="200" height="6" fill="#c9a77a"/><rect y="250" width="200" height="50" fill="#b98b5e"/><rect x="18" y="22" width="40" height="34" rx="4" fill="#fff" opacity=".7"/>` },
+    pink: { name: "粉色房间", draw: () => `<rect width="200" height="300" fill="#ffe8ee"/><rect y="250" width="200" height="50" fill="#f7c9d4"/><rect x="20" y="40" width="44" height="54" rx="6" fill="#fff" opacity=".7"/><path d="M42 40 v54 M20 67 h44" stroke="#f7c9d4" stroke-width="2"/><circle cx="170" cy="60" r="4" fill="#fff"/>` },
+    night: { name: "星空", draw: () => `<rect width="200" height="300" fill="#262044"/>${[[20, 30], [60, 60], [150, 90], [30, 140], [180, 170], [100, 18], [176, 236], [24, 220]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.8" fill="#fff"/>`).join("")}<circle cx="168" cy="36" r="14" fill="#f2e6a8"/><circle cx="174" cy="32" r="12" fill="#262044"/>` },
+    grass: { name: "草地", draw: () => `<rect width="200" height="300" fill="#d8f0ff"/><ellipse cx="60" cy="60" rx="26" ry="10" fill="#fff"/><rect y="236" width="200" height="64" fill="#9bd77f"/><circle cx="170" cy="40" r="16" fill="#fff4b0"/>` },
+    sea: { name: "海边", draw: () => `<rect width="200" height="300" fill="#bfe6ff"/><rect y="196" width="200" height="44" fill="#5fb4e8"/><path d="M0 200 q12 -6 24 0 t24 0 t24 0 t24 0 t24 0 t24 0 t24 0 t24 0 t24 0" stroke="#fff" stroke-width="2" fill="none" opacity=".7"/><rect y="240" width="200" height="60" fill="#f6e2b3"/>` },
+    cafe: { name: "咖啡店", draw: () => `<rect width="200" height="300" fill="#f3e7d8"/><rect x="0" y="62" width="200" height="6" fill="#c9a77a"/><rect y="250" width="200" height="50" fill="#b98b5e"/><rect x="18" y="20" width="40" height="34" rx="4" fill="#fff" opacity=".7"/><rect x="142" y="20" width="40" height="34" rx="4" fill="#fff" opacity=".7"/>` },
     plain: { name: "纯白", draw: () => `<rect width="200" height="300" fill="#ffffff"/>` }
   };
   const CATS = [
@@ -199,23 +262,27 @@
   function doll(o0) {
     const o = valid(o0);
     const sk = SKIN[o.skin];
+    const skO = shade(sk, 0.8);
     const hc = PAL[o.hairC];
     const isDress = TOP[o.top].dress;
+    const id = "dri" + ++gid;
     return `<svg viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
       ${BG[o.bg].draw()}
+      <ellipse cx="100" cy="276" rx="44" ry="7" fill="#000" opacity=".08"/>
       ${HAIR[o.hair].back(hc)}
-      <rect x="80" y="224" width="15" height="50" rx="7" fill="${sk}"/><rect x="105" y="224" width="15" height="50" rx="7" fill="${sk}"/>
+      <rect x="84" y="212" width="13" height="54" rx="6" fill="${sk}" stroke="${skO}" stroke-width="1.4"/><rect x="103" y="212" width="13" height="54" rx="6" fill="${sk}" stroke="${skO}" stroke-width="1.4"/>
       ${SHOES[o.shoes].draw(PAL[o.shoeC])}
-      <rect x="56" y="150" width="15" height="64" rx="7.5" fill="${sk}" transform="rotate(10 63 152)"/><rect x="129" y="150" width="15" height="64" rx="7.5" fill="${sk}" transform="rotate(-10 137 152)"/>
-      <circle cx="52" cy="215" r="8" fill="${sk}"/><circle cx="148" cy="215" r="8" fill="${sk}"/>
-      <rect x="72" y="146" width="56" height="84" rx="18" fill="${sk}"/>
-      <rect x="90" y="134" width="20" height="16" fill="${sk}"/>
+      <path d="M80 164 Q69 188 66 210 M120 164 Q131 188 134 210" stroke="${skO}" stroke-width="14.5" stroke-linecap="round" fill="none"/><path d="M80 164 Q69 188 66 210 M120 164 Q131 188 134 210" stroke="${sk}" stroke-width="12" stroke-linecap="round" fill="none"/>
+      <circle cx="66" cy="213" r="7.5" fill="${sk}" stroke="${skO}" stroke-width="1.4"/><circle cx="134" cy="213" r="7.5" fill="${sk}" stroke="${skO}" stroke-width="1.4"/>
+      <path d="M74 168 Q74 158 88 157 L112 157 Q126 158 126 168 L128 216 Q100 222 72 216Z" fill="${sk}"/>
+      <rect x="93" y="144" width="14" height="18" rx="5" fill="${sk}"/><path d="M93 152 Q100 158 107 152" stroke="${skO}" stroke-width="1.4" fill="none" opacity=".6"/>
       ${isDress ? "" : BOTTOM[o.bottom].draw(PAL[o.botC])}
       ${TOP[o.top].draw(PAL[o.topC])}
-      <circle cx="100" cy="92" r="56" fill="${sk}"/>
-      <circle cx="45" cy="100" r="9" fill="${sk}"/><circle cx="155" cy="100" r="9" fill="${sk}"/>
-      ${EYES[o.eyes].draw(PAL[o.eyeC])}
-      <ellipse cx="66" cy="120" rx="9" ry="5" fill="#f4a7b9" opacity=".55"/><ellipse cx="134" cy="120" rx="9" ry="5" fill="#f4a7b9" opacity=".55"/>
+      <path d="${FACE}" fill="${sk}" stroke="${skO}" stroke-width="1.6"/>
+      ${EYES[o.eyes].draw(PAL[o.eyeC], id, sk)}
+      <ellipse cx="68" cy="128" rx="9" ry="5" fill="#ff8fa6" opacity=".38"/><ellipse cx="132" cy="128" rx="9" ry="5" fill="#ff8fa6" opacity=".38"/>
+      <path d="M64 126 l3 -3 M69 127 l3 -3 M128 126 l3 -3 M133 127 l3 -3" stroke="#ff7f99" stroke-width="1.2" opacity=".6" stroke-linecap="round"/>
+      <circle cx="100" cy="124" r="1.3" fill="${shade(sk, 0.7)}"/>
       ${MOUTH[o.mouth].draw()}
       ${HAIR[o.hair].front(hc)}
       ${ACC[o.acc].draw(hc)}

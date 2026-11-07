@@ -159,18 +159,70 @@
   }
 
   /* ───── 渲染 ───── */
+  /** 「视频」= 几张连续镜头的画面，播放时慢慢推拉 + 交叉淡入 */
+  const framesOf = (p) => (Array.isArray(p.frames) && p.frames.length ? p.frames : p.image ? [p.image] : []);
+  const genBusy = new Set();
+  const SHOTS = ["开场镜头，中景，交代人物和环境", "特写镜头，表情和动作细节", "结尾镜头，换个角度，有点氛围感"];
+  async function genFrames(i, more) {
+    const p = posts[i];
+    if (!p || genBusy.has(p) || !F.hasImageGen()) return;
+    const have = more ? framesOf(p).slice() : [];
+    const todo = more ? SHOTS.slice(have.length, 3) : SHOTS.slice(0, 1);
+    if (!todo.length) {
+      have.length = 0;
+      todo.push(...SHOTS);
+    }
+    genBusy.add(p);
+    updateSlide(i);
+    const c = castByName(p.author);
+    try {
+      for (const shot of todo) {
+        const img = await F.genImage(`竖屏短视频（9:16）里的一帧画面，${shot}。视频内容：${p.scene || p.caption}。文案：${p.caption}`, {
+          chars: c ? [c] : [],
+          style: "vertical 9:16 video frame, cinematic still, candid, natural light, film grain"
+        });
+        have.push(img);
+        p.frames = have.slice();
+        p.image = have[0];
+        save();
+        updateSlide(i);
+      }
+    } catch (err) {
+      toast(err.message || "画面生成失败");
+    } finally {
+      genBusy.delete(p);
+      updateSlide(i);
+    }
+  }
+  /** 刷到这条：还没有画面就自动拍一段（一次只拍一条，别同时烧太多次生图） */
+  let autoQ = Promise.resolve();
+  function autoFrames(i) {
+    const p = posts[i];
+    if (!p || p.mine || framesOf(p).length || genBusy.has(p) || !F.hasImageGen() || p.__autoTried) return;
+    p.__autoTried = true;
+    autoQ = autoQ.then(() => genFrames(i, false)).catch(() => {});
+  }
+
   function slideHtml(p, i) {
     const av = avatarOf(p.author, p.mine);
     return `<article class="sv-slide" data-i="${i}" style="--h:${p.hue}">
-      <div class="sv-bg">${p.image ? `<img src="${esc(p.image)}" alt="" />` : `<span class="sv-emoji">${esc(p.emoji)}</span>`}</div>
-      ${p.scene ? `<div class="sv-scene"><small>画面</small>${esc(p.scene)}</div>` : ""}
+      ${(() => {
+        const fr = framesOf(p);
+        if (fr.length)
+          return `<div class="sv-bg sv-reel n${Math.min(fr.length, 3)}">${fr
+            .slice(0, 3)
+            .map((u, k) => `<img class="kb${k}" style="--k:${k}" src="${esc(u)}" alt="" />`)
+            .join("")}</div>`;
+        return `<div class="sv-bg"><span class="sv-emoji">${esc(p.emoji)}</span>${genBusy.has(p) ? `<span class="sv-genning"><span class="fun-spin"></span>正在拍视频…</span>` : ""}</div>`;
+      })()}
+      ${p.scene && !framesOf(p).length ? `<div class="sv-scene"><small>画面</small>${esc(p.scene)}</div>` : ""}
       <div class="sv-heart-pop"></div>
       <div class="sv-rail">
         <button type="button" class="sv-av-wrap" data-prof>${avHtml({ name: p.author, avatar: av }, "fun-av sv-av")}${!p.mine && !follows.has(p.author) ? `<span class="sv-follow-plus" data-follow>+</span>` : ""}</button>
         <button type="button" class="sv-rbtn${p.liked ? " is-on" : ""}" data-like><i class="ph-fill ph-heart"></i><span>${fmtNum(p.likes + (p.liked ? 1 : 0))}</span></button>
         <button type="button" class="sv-rbtn" data-cmt><i class="ph-fill ph-chat-circle-dots"></i><span>${fmtNum(p.comments.length)}</span></button>
         <button type="button" class="sv-rbtn" data-share><i class="ph-fill ph-share-fat"></i><span>分享</span></button>
-        ${!p.mine && F.hasImageGen() ? `<button type="button" class="sv-rbtn" data-genimg><span class="sv-gi">🎨</span><span>${p.image ? "重画" : "画面"}</span></button>` : ""}
+        ${!p.mine && F.hasImageGen() ? `<button type="button" class="sv-rbtn" data-genimg><span class="sv-gi">🎬</span><span>${framesOf(p).length ? (framesOf(p).length < 3 ? "更多镜头" : "重拍") : "拍视频"}</span></button>` : ""}
         ${p.mine ? `<button type="button" class="sv-rbtn" data-del><i class="ph ph-trash"></i><span>删除</span></button>` : ""}
       </div>
       <div class="sv-info">
@@ -210,7 +262,12 @@
     if (observer) observer.disconnect();
     const feed = root.querySelector("#sv-feed");
     observer = new IntersectionObserver(
-      (entries) => entries.forEach((en) => en.target.classList.toggle("is-active", en.isIntersecting && en.intersectionRatio > 0.6)),
+      (entries) =>
+        entries.forEach((en) => {
+          const on = en.isIntersecting && en.intersectionRatio > 0.6;
+          en.target.classList.toggle("is-active", on);
+          if (on) autoFrames(Number(en.target.dataset.i));
+        }),
       { root: feed, threshold: [0.6] }
     );
     feed.querySelectorAll(".sv-slide").forEach((s) => observer.observe(s));
@@ -440,21 +497,8 @@
     if (e.target.closest("[data-like]")) return toggleLike(i);
     const gi = e.target.closest("[data-genimg]");
     if (gi) {
-      if (gi.dataset.busy) return;
-      gi.dataset.busy = "1";
-      gi.querySelector("span:last-child").textContent = "生成中";
-      const p = posts[i];
-      const c = castByName(p.author);
-      F.genImage(`短视频画面截图（竖屏 9:16）。${p.scene}。文案：${p.caption}`, { chars: c ? [c] : [], style: "vertical video frame, cinematic, candid" })
-        .then((img) => {
-          p.image = img;
-          save();
-          updateSlide(i);
-        })
-        .catch((err) => {
-          toast(err.message);
-          updateSlide(i);
-        });
+      if (genBusy.has(posts[i])) return toast("正在拍，稍等");
+      void genFrames(i, true);
       return;
     }
     if (e.target.closest("[data-cmt]")) return openComments(i);

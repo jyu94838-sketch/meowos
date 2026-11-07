@@ -127,7 +127,7 @@
   <!-- 图标字体放在自己的仓库里：国内（尤其安卓）连不上 jsdelivr 时图标会全白 -->
   <link rel="stylesheet" href="vendor/phosphor/regular/style.css?v=1">
   <link rel="stylesheet" href="vendor/phosphor/fill/style.css?v=1">
-  <link rel="stylesheet" href="fun.css?v=35">
+  <link rel="stylesheet" href="fun.css?v=36">
 </head>
 <body>
   <div class="boot-splash" id="boot-splash" aria-live="polite" aria-busy="true" aria-label="Meow · 开屏画面，请稍后点击进入">
@@ -4323,6 +4323,11 @@
                       <p class="chat-detail-lead chat-detail-lead--compact mx-hint">聊天列表和聊天顶部显示的名字。</p>
                       <p class="chat-detail-readonly" id="chat-detail-display-title">—</p>
                     </div>
+                    <div class="chat-detail-field" id="mx-chat-fs-field">
+                      <span class="chat-detail-field-k">聊天气泡和头像大小 <b id="mx-chat-fs-val">100%</b></span>
+                      <div class="mx-fs-row"><span class="mx-fs-a sm">A</span><input type="range" id="mx-chat-fs" min="80" max="150" step="5" value="100" /><span class="mx-fs-a lg">A</span><button type="button" class="mx-fs-reset" id="mx-chat-fs-reset">还原</button></div>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">拖动调整聊天气泡里的字和头像的大小，所有聊天通用。也可以在「装扮 → 风格包」里调。</p>
+                    </div>
                     <div class="chat-detail-field" id="chat-detail-dm-remark-field" data-chat-detail-dm-only>
                       <div class="chat-detail-scene-head">
                         <label class="chat-detail-field-k chat-detail-field-k--label" for="chat-detail-char-remark-name-input">备注名</label>
@@ -4646,11 +4651,6 @@
                         <span class="visually-hidden">隐藏头像</span>
                       </button>
                       <p class="chat-detail-lead chat-detail-lead--compact mx-hint">聊天里不显示你和 TA 的头像，只留气泡。只对这个聊天生效。</p>
-                    </div>
-                    <div class="chat-detail-field" id="mx-chat-fs-field">
-                      <span class="chat-detail-field-k">聊天字体大小 <b id="mx-chat-fs-val">100%</b></span>
-                      <div class="mx-fs-row"><span class="mx-fs-a sm">A</span><input type="range" id="mx-chat-fs" min="80" max="150" step="5" value="100" /><span class="mx-fs-a lg">A</span><button type="button" class="mx-fs-reset" id="mx-chat-fs-reset">还原</button></div>
-                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">气泡里的字和头像一起放大缩小，所有聊天通用。</p>
                     </div>
                     <div class="chat-detail-field chat-detail-field--switch">
                       <span class="chat-detail-field-k">时间感知</span>
@@ -8680,6 +8680,6 @@
 
   <!-- app.js / ai-api 由 db.js 在 #phone 就绪后注入；图标字体需尽早加载 -->
   <script src="fun-desk.js?v=17"></script>
-  <script src="mx-skins.js?v=7"></script>
+  <script src="mx-skins.js?v=8"></script>
 </body>
 </html>

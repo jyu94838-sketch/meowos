@@ -438,16 +438,16 @@ html body #chat-screen .chat-msg-avatar{width:${Math.round(40 * Math.min(k, 1.25
 html body #chat-screen .chat-input{font-size:calc(${(1 * Math.min(k, 1.3)).toFixed(3)}rem) !important}`).replace(/#chat-screen/g, "#chat-screen#chat-screen#chat-screen");
       if (st.parentNode !== document.body) document.body.appendChild(st);
     }
-    const r = document.getElementById("mx-chat-fs");
-    const lab = document.getElementById("mx-chat-fs-val");
-    if (r) r.value = String(v);
-    if (lab) lab.textContent = v + "%";
+    document.querySelectorAll("#mx-chat-fs, .mx-chat-fs-range").forEach((r) => (r.value = String(v)));
+    document.querySelectorAll("#mx-chat-fs-val, .mx-chat-fs-val").forEach((lab) => (lab.textContent = v + "%"));
   }
-  document.getElementById("mx-chat-fs")?.addEventListener("input", (e) => {
+  document.addEventListener("input", (e) => {
+    if (!e.target.matches?.("#mx-chat-fs, .mx-chat-fs-range")) return;
     localStorage.setItem(FS_KEY, e.target.value);
     applyFs();
   });
-  document.getElementById("mx-chat-fs-reset")?.addEventListener("click", () => {
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest?.("#mx-chat-fs-reset, .mx-fs-reset")) return;
     localStorage.removeItem(FS_KEY);
     applyFs();
   });
@@ -491,6 +491,8 @@ html body #chat-screen .chat-input{font-size:calc(${(1 * Math.min(k, 1.3)).toFix
       <p class="settings-ai-blurb wardrobe-panel-lead">一键换聊天和桌面的样子。每套都附带源码，可以复制下来改颜色。</p></div>
       <p class="mxk-k">聊天风格（气泡 + 聊天列表）</p>
       <div class="mxk-row">${CHAT_SKINS.map(([k, n, d]) => `<button type="button" class="mxk-opt${chat === k ? " is-on" : ""}" data-chat="${k}">${preview.call("chat", k)}<b>${n}</b><small>${d}</small></button>`).join("")}</div>
+      <p class="mxk-k">聊天气泡和头像大小 <b class="mx-chat-fs-val">100%</b></p>
+      <div class="mx-fs-row"><span class="mx-fs-a sm">A</span><input type="range" class="mx-chat-fs-range" min="80" max="150" step="5" value="100" /><span class="mx-fs-a lg">A</span><button type="button" class="mx-fs-reset">还原</button></div>
       <p class="mxk-k">主页风格</p>
       <div class="mxk-row">${HOME_SKINS.map(([k, n, d]) => `<button type="button" class="mxk-opt${home === k ? " is-on" : ""}" data-home="${k}">${preview.call("home", k)}<b>${n}</b><small>${d}</small></button>`).join("")}</div>
       <div class="mxk-src"><span>查看源码：</span><button type="button" class="chip ghost chip-xs" data-src="wechat">微信风</button><button type="button" class="chip ghost chip-xs" data-src="qq">QQ 风</button><button type="button" class="chip ghost chip-xs" data-src="cute">奶油小猫</button></div>`;
@@ -537,6 +539,7 @@ html body #chat-screen .chat-input{font-size:calc(${(1 * Math.min(k, 1.3)).toFix
     box.className = "settings-panel wardrobe-panel mxk";
     host.insertBefore(box, host.firstChild);
     render(box);
+    applyFs();
     box.addEventListener("click", (e) => {
       const c = e.target.closest("[data-chat]");
       const h = e.target.closest("[data-home]");
@@ -551,6 +554,7 @@ html body #chat-screen .chat-input{font-size:calc(${(1 * Math.min(k, 1.3)).toFix
       }
       apply();
       render(box);
+      applyFs();
       toast("已换好，去聊天 / 桌面看看吧");
     });
     return true;

@@ -53012,6 +53012,83 @@ async function postOpenAiImageGenerationsRequest(cfg, prompt, bodyExtra, timeout
   return openAiGenerationsResponseToDataUrl(rawText);
 }
 
+/** 从聊天接口的回复里找图片（nano-banana / gemini-image 这类中转常这样返回） */
+function extractImageFromChatCompletionJson(j) {
+  const msg = j && j.choices && j.choices[0] && j.choices[0].message;
+  if (!msg) return "";
+  const imgs = Array.isArray(msg.images) ? msg.images : [];
+  for (const im of imgs) {
+    const u = (im && (im.image_url?.url || im.url || im.b64_json)) || "";
+    if (u) return /^data:|^https?:/i.test(u) ? u : `data:image/png;base64,${u}`;
+  }
+  const parts = Array.isArray(msg.content) ? msg.content : [msg.content];
+  for (const c of parts) {
+    if (!c) continue;
+    if (typeof c === "object") {
+      const u = c.image_url?.url || c.url || (c.inline_data?.data ? `data:${c.inline_data.mime_type || "image/png"};base64,${c.inline_data.data}` : "");
+      if (u) return u;
+      if (typeof c.text !== "string") continue;
+    }
+    const t = typeof c === "string" ? c : c.text;
+    const m = t.match(/data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+/) || t.match(/!\[[^\]]*\]\((https?:[^)\s]+)\)/) || t.match(/(https?:\/\/\S+\.(?:png|jpe?g|webp)(?:\?\S*)?)/i);
+    if (m) return m[1] || m[0];
+  }
+  return "";
+}
+/**
+ * 参考图的另外两种送法（很多中转不支持 /images/edits）：
+ *   1) /images/generations 里带 image 字段（豆包 seedream、flux-kontext 等）
+ *   2) /chat/completions 多模态（nano-banana / gemini-image 等）
+ */
+async function postImageGenWithRefAlternatives(cfg, prompt, refDataUrl, timeoutMs) {
+  const ref = await prepareOpenAiEditsRefDataUrl(refDataUrl);
+  if (!ref) return { ok: false, error: "参考图无效或无法读取" };
+  const errs = [];
+  try {
+    const g = await postOpenAiImageGenerationsRequest(cfg, prompt, { image: [ref] }, timeoutMs);
+    if (g.ok && g.dataUrl) return g;
+    errs.push("generations+image：" + String(g.error || "").slice(0, 80));
+  } catch (e) {
+    errs.push("generations+image：" + String(e?.message || e).slice(0, 80));
+  }
+  try {
+    const url = buildImageGenOpenAiEditsUrl(cfg).replace(/\/images\/edits$/i, "/chat/completions");
+    const body = {
+      model: cfg.model,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: `Generate an image. Keep the character's face, hairstyle and features exactly the same as in the reference image.\n${prompt}` },
+            { type: "image_url", image_url: { url: ref } }
+          ]
+        }
+      ],
+      modalities: ["image", "text"]
+    };
+    const resp = await fetchImageGenWithTimeout(
+      url,
+      { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}` }, body: JSON.stringify(body), mode: "cors", credentials: "omit" },
+      Number(timeoutMs) > 0 ? Number(timeoutMs) : IMAGE_GEN_FETCH_TIMEOUT_OPENAI_HEAVY_MS
+    );
+    const raw = await resp.text();
+    if (resp.ok) {
+      let j = null;
+      try {
+        j = JSON.parse(raw);
+      } catch (_) {
+        j = null;
+      }
+      const u = extractImageFromChatCompletionJson(j);
+      if (u) return { ok: true, dataUrl: u };
+      errs.push("chat：回复里没有图片");
+    } else errs.push(`chat：HTTP ${resp.status} ${raw.slice(0, 60)}`);
+  } catch (e) {
+    errs.push("chat：" + String(e?.message || e).slice(0, 80));
+  }
+  return { ok: false, error: errs.join("；") };
+}
+
 /**
  * OpenAI 兼容 /images/edits：上传立绘作参考（input_fidelity 锁脸，仅 gpt-image-1/1.5）。
  * 先 multipart，失败再 JSON（部分中转只支持其一）。
@@ -53200,15 +53277,24 @@ async function executeImageGenRequestToDataUrl(cfg, prompt, extras) {
     const fl = extras && typeof extras === "object" ? String(extras.faceLock || "") : "";
     // 强 / 强制锁脸：不认识的模型也先试一次带参考图（失败会自动退回普通生图）
     const useOpenAiEdits =
-      Boolean(refDataUrl) && (openAiImageModelSupportsReferenceEdits(cfg.model) || fl === "strong" || fl === "force");
+      Boolean(refDataUrl) && (openAiImageModelSupportsReferenceEdits(cfg.model) || fl === "strong" || fl === "force" || fl === "normal");
     // 锁脸程度：轻 → 低保真，其余 → 高保真
     if (useOpenAiEdits && extras && extras.faceLock) cfg = { ...cfg, openaiInputFidelity: extras.faceLock === "light" ? "low" : "high" };
     let parsed = useOpenAiEdits
       ? await postOpenAiImageEditsRequest(cfg, p, refDataUrl, timeoutMs)
       : await postOpenAiImageGenerationsRequest(cfg, p, {}, timeoutMs);
-    if (!parsed.ok && useOpenAiEdits) {
+    let refDropped = "";
+    if (!parsed.ok && refDataUrl) {
+      // /images/edits 不行：换别的方式把立绘带上
+      const editErr = String(parsed.error || "").slice(0, 80);
+      const alt = await postImageGenWithRefAlternatives(cfg, p, refDataUrl, timeoutMs);
+      if (alt.ok && alt.dataUrl) return { ok: true, dataUrl: alt.dataUrl };
+      refDropped = `edits：${editErr}；${alt.error || ""}`;
+      parsed = await postOpenAiImageGenerationsRequest(cfg, p, {}, timeoutMs);
+    } else if (!parsed.ok && useOpenAiEdits) {
       parsed = await postOpenAiImageGenerationsRequest(cfg, p, {}, timeoutMs);
     }
+    if (parsed.ok && parsed.dataUrl && refDropped) return { ok: true, dataUrl: parsed.dataUrl, refDropped };
     if (!parsed.ok) {
       const err = String(parsed.error || "");
       const isGpt = isGptImageModelId(cfg.model);
@@ -54045,6 +54131,10 @@ async function runDeferredSessionImageGenForLogIndex(msgIdx, msgAtSnapshot, thre
       preferLongTimeout:
         m.role === "assistant" || plan.subject === "both" || plan.includeCharStrong
     });
+    if (r && r.ok && r.refDropped) {
+      showToast("锁脸没生效：你的生图接口不接受参考图，这张是不带立绘画的（" + String(r.refDropped).slice(0, 90) + "）", 6000);
+      console.warn("[face-lock] ref dropped:", r.refDropped);
+    }
     if (!guardMsgStable()) {
       showToast("消息已变化，配图未能保存");
       return;
@@ -56021,6 +56111,32 @@ chatMessagesEl?.addEventListener(
     }
     e.preventDefault();
     e.stopPropagation();
+    openChatCharInnerVoicePanel(avatar, { browseAssistantLogIdx: msgIdx });
+  },
+  true
+);
+/* 线上聊天：点角色头像（每条气泡旁边的都行）看这条消息时的心声 */
+chatMessagesEl?.addEventListener(
+  "click",
+  (e) => {
+    const t = e.target;
+    if (!(t instanceof Element)) return;
+    if (getActiveChatDmSurfaceForContext() === "offline") return;
+    if (typeof chatMsgMultiSelectMode !== "undefined" && chatMsgMultiSelectMode) return;
+    const avatar = t.closest(".chat-msg--assistant .chat-msg-avatar");
+    if (!(avatar instanceof HTMLElement)) return;
+    const wrap = avatar.closest(".chat-msg");
+    if (!(wrap instanceof HTMLElement) || wrap.dataset.chatMsgIdx == null) return;
+    const msgIdx = Number(wrap.dataset.chatMsgIdx);
+    if (!Number.isFinite(msgIdx)) return;
+    const th = readActiveThread();
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isThreadHeartVoiceEnabled(th)) {
+      if (th?.kind !== "group") showToast("这个聊天关掉了心声（在聊天设置 · 卷宗里可以打开）");
+      return;
+    }
+    if (!isThreadMemoPanelAvailable(th)) return;
     openChatCharInnerVoicePanel(avatar, { browseAssistantLogIdx: msgIdx });
   },
   true

@@ -1752,7 +1752,7 @@
 
 /** 开屏 + 注入 app.js（原 boot.js，合并进 db.js 以减少请求） */
 (function () {
-  const ASSET_V = "370";
+  const ASSET_V = "371";
   const MAIN_APP = "app.js?v=" + ASSET_V;
   const INLINE_HTML_MODULE = "inline-html.js?v=" + ASSET_V;
   const GROUP_MODULE = "group.js?v=" + ASSET_V;
@@ -1766,11 +1766,11 @@
   const ROLEPLAY_MODULE = "roleplay.js?v=16";
   /** 娱乐：音乐 / UNO / 狼人杀 / 短视频 */
   const FUN_MODULES = [
-    "fun.js?v=14",
+    "fun.js?v=15",
     "fun-uno.js?v=2",
     "fun-wolf.js?v=2",
-    "fun-video.js?v=3",
-    "fun-games.js?v=6",
+    "fun-video.js?v=31",
+    "fun-games.js?v=7",
     "fun-mines.js?v=2",
     "fun-bubble.js?v=2b",
     "fun-town.js?v=1",
@@ -1780,8 +1780,8 @@
     "fun-weibo.js?v=2",
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
-    "fun-widgets.js?v=6", "fun-icons.js?v=5", "mx-chatsearch.js?v=1", "fun-mimi.js?v=6", "mx-choose.js?v=3", "fun-yuzu.js?v=1", "fun-names.js?v=1", "fun-net.js?v=2", "fun-arcade.js?v=2", "fun-dress.js?v=1",
-    "changelog.js?v=34",
+    "fun-widgets.js?v=6", "fun-icons.js?v=5", "mx-chatsearch.js?v=2", "fun-mimi.js?v=7", "mx-choose.js?v=3", "fun-yuzu.js?v=1", "fun-names.js?v=1", "fun-net.js?v=2", "fun-arcade.js?v=3", "fun-dress.js?v=2",
+    "changelog.js?v=35",
     "share-config.js?v=3", "st-gate.js?v=1",
     "fun-share.js?v=8"
   ];

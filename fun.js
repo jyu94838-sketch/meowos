@@ -121,7 +121,9 @@
           .join("\n")
           .slice(0, 700),
         avatar: await resolveImg(x.avatar),
-        look: String(x.charImageGenPrompt || "").slice(0, 600)
+        look: String(x.charImageGenPrompt || "").slice(0, 600),
+        // 生图锁脸用：角色档案里的参考立绘（没有就用头像）
+        ref: String(x.charImageRefDataUrl || "").trim() || (/^data:image\//.test(String(x.avatar || "")) ? String(x.avatar) : "")
       }))
     );
   }
@@ -256,7 +258,8 @@
         prompt = scene;
       }
     }
-    const r = await executeImageGenRequestToDataUrl(cfg, String(prompt).slice(0, 1500), {});
+    const ref = opt.refDataUrl || (opt.chars || []).map((c) => c && c.ref).find(Boolean) || "";
+    const r = await executeImageGenRequestToDataUrl(cfg, String(prompt).slice(0, 1500), ref ? { refDataUrl: ref, faceLock: opt.faceLock || "normal" } : {});
     if (!r || !r.ok || !r.dataUrl) throw new Error(r?.error || "生图失败");
     return shrinkDataUrl(r.dataUrl, 900);
   }
@@ -1006,6 +1009,14 @@
       try {
         await loadQrLib();
         const k = await neCall("qr_key");
+        if (!k || !k.qr || !k.key) {
+          sh.body.querySelector("#ne-qr").innerHTML = `<span style="font-size:2rem">☁</span>`;
+          st.innerHTML =
+            k && k.hello
+              ? "Supabase 上的网易云函数还是<b>旧版</b>：去 Supabase → Edge Functions → netease，把代码换成仓库里新的 index.ts，再点 Deploy（见 NETEASE-SETUP.md）。也可以先用下面「手动粘贴 MUSIC_U」。"
+              : esc((k && k.error) || "拿不到登录二维码，稍后再试，或者用下面的手动粘贴");
+          return;
+        }
         sh.body.querySelector("#ne-qr").innerHTML = window.MxQR.svg(k.qr);
         st.textContent = "等你用网易云 App 扫码…";
         const t0 = Date.now();
