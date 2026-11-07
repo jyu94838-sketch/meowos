@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * 桌面图标：调图标大小、给每个应用换自己的图标
+ * 桌面图标：给每个应用换自己的图标
  * 入口：我的 → 装扮 →「桌面图标」；桌面编辑模式顶栏的「图标」
  * 数据由 fun-desk.js 保存（localStorage），这里只是管理界面
  */
@@ -9,19 +9,10 @@
   const F = window.XXJ_FUN;
   if (!F) return;
   const { esc, toast } = F;
-  const DEF = 16;
   let fromWardrobe = false;
   let root = null;
 
   const D = () => window.XXJ_DESK;
-  function curSize() {
-    try {
-      return Number(localStorage.getItem("meowos_icon_size")) || DEF;
-    } catch (_) {
-      return DEF;
-    }
-  }
-
   /** 选图 → 居中裁成正方形，缩到 128px */
   function pickImage() {
     return new Promise((resolve) => {
@@ -70,31 +61,12 @@
     }
     const icons = desk.getIcons();
     const apps = desk.apps();
-    const size = curSize();
     root.innerHTML = `<div class="ico-m">
-      <p class="fun-kicker">ICON SIZE · 图标大小</p>
-      <div class="ico-size">
-        <input type="range" min="12" max="44" step="1" value="${size}" id="ico-range" />
-        <span id="ico-val">${size}px</span>
-        <button type="button" class="chip ghost chip-xs" id="ico-reset-size">默认</button>
-      </div>
-      <p class="fun-note">第一页、第二页的图标一起变大变小。</p>
-      <div class="desk-apps-grid ico-preview">${apps.slice(0, 3).map((a) => tile(a, icons[a.key])).join("")}</div>
-
-      <p class="fun-kicker" style="margin-top:22px">APP ICONS · 换图标</p>
+      <p class="fun-kicker">APP ICONS · 换图标</p>
       <p class="fun-note">点一个应用，从相册选一张图当它的图标（会自动裁成正方形）。聊天、查岗、关系、角色人设、漫游、我的会和第一页一起换。</p>
       <div class="desk-apps-grid ico-grid">${apps.map((a) => tile(a, icons[a.key], `data-k="${a.key}"`)).join("")}</div>
       ${Object.keys(icons).length ? `<button type="button" class="fun-btn ghost ico-reset-all" id="ico-reset-all">全部恢复默认图标</button>` : ""}
     </div>`;
-    const range = root.querySelector("#ico-range");
-    range.addEventListener("input", () => {
-      root.querySelector("#ico-val").textContent = range.value + "px";
-      desk.setIconSize(Number(range.value) === DEF ? 0 : Number(range.value));
-    });
-    root.querySelector("#ico-reset-size").addEventListener("click", () => {
-      desk.setIconSize(0);
-      render();
-    });
   }
 
   async function onClick(e) {
@@ -165,7 +137,7 @@
     const panel = document.createElement("div");
     panel.className = "settings-panel wardrobe-panel wg-ward";
     panel.innerHTML = `<div><p class="widget-label"><i class="ph ph-app-window" aria-hidden="true"></i> 桌面图标</p>
-      <p class="settings-ai-blurb wardrobe-panel-lead">调整桌面图标大小，给每个应用换成你自己的图片。</p></div>
+      <p class="settings-ai-blurb wardrobe-panel-lead">给桌面上每个应用换成你自己的图片当图标。</p></div>
       <button type="button" class="chip solid" id="ward-icons-open">设置图标</button>`;
     host.insertBefore(panel, host.children[1] || null);
     panel.querySelector("#ward-icons-open").addEventListener("click", () => open(true));

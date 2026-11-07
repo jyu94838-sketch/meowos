@@ -18,6 +18,8 @@ create table if not exists public.mx_shares (
   owner_hash  text not null
 );
 alter table public.mx_shares add column if not exists thumb_path text not null default '';
+-- 分类（如 古风、甜宠、简约…）
+alter table public.mx_shares add column if not exists category text not null default '';
 -- 资源类型（重复运行会更新成最新的类型列表）
 alter table public.mx_shares drop constraint if exists mx_shares_kind_check;
 alter table public.mx_shares add constraint mx_shares_kind_check check (kind in ('look', 'worldbook', 'char', 'preset', 'font'));
@@ -41,7 +43,7 @@ create policy "mx insert" on public.mx_shares
 revoke update, delete on public.mx_shares from anon, authenticated;
 -- 不把上传者的删除凭证哈希暴露给别人
 revoke select on public.mx_shares from anon, authenticated;
-grant select (id, created_at, kind, title, description, author, file_path, thumb_path, size, downloads, likes, reports)
+grant select (id, created_at, kind, title, description, author, file_path, thumb_path, size, downloads, likes, reports, category)
   on public.mx_shares to anon, authenticated;
 
 -- 2. 计数 / 举报 / 删除函数

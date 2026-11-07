@@ -6530,3 +6530,100 @@ html .app-nora-mini {
 html .app-nora-main {
   min-height: max(86px, calc(var(--mx-ico, 16px) + 60px));
 }
+
+/* 资源站：分类 + 批量上传 */
+.sh-cats {
+  margin-top: -2px;
+}
+.sh-cats .fun-chip-btn {
+  font-size: 0.72rem;
+  padding: 4px 10px;
+}
+.sh-batch {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sh-blist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sh-brow {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-card);
+}
+.sh-brow.is-bad {
+  opacity: 0.7;
+}
+.sh-brow img {
+  width: 56px;
+  height: 75px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.sh-brow-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 22px;
+}
+.sh-brow-main small {
+  font-size: 0.7rem;
+  color: var(--text-sub);
+}
+.sh-btitle,
+.sh-bcat {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.85rem;
+}
+.sh-brow-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sh-bcat {
+  width: auto;
+  flex-shrink: 0;
+}
+.sh-bstat {
+  font-size: 0.72rem;
+  color: var(--text-sub);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sh-bstat.done {
+  color: #1f9d55;
+}
+.sh-bstat.err {
+  color: #e5484d;
+}
+.sh-brm {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 99px;
+  background: none;
+  color: var(--text-sub);
+  cursor: pointer;
+}

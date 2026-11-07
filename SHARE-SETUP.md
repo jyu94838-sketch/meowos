@@ -78,3 +78,8 @@ Supabase 免费项目 **连续 7 天没人访问会自动暂停**。登录 Supab
    - 5 = 生成几个码，3 = 每个码能激活几台设备，最后的引号里可以写备注（比如发给谁）。
 3. 查看所有码和使用情况：`select code, used, max_uses, note, disabled from mx_codes order by created_at desc;`
 4. 停用某个码：`update mx_codes set disabled = true where code = 'MEOW-XXXX-XXXX';`
+
+## 资源站分类
+
+Supabase 后台 → SQL Editor → New query，把 `share-category.sql` 全部内容粘进去 → Run（只需要一次）。
+没运行之前资源站照常能用，只是没有分类。

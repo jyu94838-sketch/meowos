@@ -27,17 +27,12 @@
     }
   }
   let icons = readIcons();
-  function applyIconSize() {
-    let px = 0;
-    try {
-      px = Number(localStorage.getItem(SIZE_KEY)) || 0;
-    } catch (_) {
-      px = 0;
-    }
-    if (px >= 12 && px <= 64) document.documentElement.style.setProperty("--mx-ico", px + "px");
-    else document.documentElement.style.removeProperty("--mx-ico");
+  // 图标大小功能已取消：清掉之前存过的设置，恢复默认大小
+  try {
+    localStorage.removeItem(SIZE_KEY);
+  } catch (_) {
+    /* ignore */
   }
-  applyIconSize();
   const fun = (k) => () => {
     if (typeof window.openFunApp === "function") window.openFunApp(k);
     else if (typeof showToast === "function") showToast("还在加载，稍等一下");
@@ -396,20 +391,10 @@
     render();
     return true;
   }
-  function setIconSize(px) {
-    try {
-      if (px) localStorage.setItem(SIZE_KEY, String(px));
-      else localStorage.removeItem(SIZE_KEY);
-    } catch (_) {
-      /* ignore */
-    }
-    applyIconSize();
-  }
   window.XXJ_DESK = {
     render,
     setEditing,
     setIcon,
-    setIconSize,
     getIcons: () => ({ ...icons }),
     apps: () => Object.keys(APPS).map((k) => ({ key: k, name: APPS[k][0], icon: APPS[k][1], kicker: APPS[k][3] }))
   };

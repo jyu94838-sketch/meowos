@@ -549,7 +549,16 @@
 
   /* ═════════ 云端（Supabase REST） ═════════ */
   const BUCKET = "mx-shares";
-  const COLS = "id,created_at,kind,title,description,author,file_path,thumb_path,size,downloads,likes";
+  const COLS0 = "id,created_at,kind,title,description,author,file_path,thumb_path,size,downloads,likes";
+  /** 分类：云端还没运行 share-category.sql 时自动退回不带分类 */
+  const CATEGORIES = ["现代", "古风", "校园", "奇幻", "科幻", "末世", "悬疑", "甜宠", "虐心", "搞笑", "简约", "可爱", "暗黑", "其他"];
+  let hasCat = true;
+  const cols = () => (hasCat ? COLS0 + ",category" : COLS0);
+  const isCatErr = (err) => /category/i.test(String(err && err.message));
+  function catChips(cur, attr, withAll) {
+    const list = (withAll ? [["", "全部分类"]] : []).concat(CATEGORIES.map((c) => [c, c]));
+    return `<div class="sh-chips sh-cats">${list.map(([v, n]) => `<button type="button" class="fun-chip-btn${cur === v ? " is-on" : ""}" ${attr}="${esc(v)}">${esc(n)}</button>`).join("")}</div>`;
+  }
   function cfg() {
     let local = {};
     try {
@@ -619,7 +628,7 @@
     return new Promise((res) => c.toBlob((b) => res(b), "image/jpeg", 0.78));
   }
 
-  async function uploadShare(blob, payload) {
+  async function uploadShare(blob, payload, category) {
     const token = uid() + uid() + uid();
     const base = `${payload.kind}/${Date.now()}-${uid()}`;
     const path = base + ".png";
@@ -634,20 +643,27 @@
     } catch (_) {
       /* 缩略图失败不影响上传 */
     }
-    const rows = await api("/rest/v1/mx_shares?select=id", {
-      method: "POST",
-      json: {
-        kind: payload.kind,
-        title: payload.title.slice(0, 60),
-        description: String(payload.desc || "").slice(0, 300),
-        author: String(payload.author || "匿名").slice(0, 30),
-        file_path: path,
-        thumb_path: thumbPath,
-        size: blob.size,
-        owner_hash: await sha256Hex(token)
-      },
-      headers: { Prefer: "return=representation" }
-    });
+    const rowData = {
+      kind: payload.kind,
+      title: String(payload.title || "未命名").slice(0, 60),
+      description: String(payload.desc || "").slice(0, 300),
+      author: String(payload.author || "匿名").slice(0, 30),
+      file_path: path,
+      thumb_path: thumbPath,
+      size: blob.size,
+      owner_hash: await sha256Hex(token)
+    };
+    const insert = (data) => api("/rest/v1/mx_shares?select=id", { method: "POST", json: data, headers: { Prefer: "return=representation" } });
+    let rows;
+    if (hasCat && category) {
+      try {
+        rows = await insert({ ...rowData, category: String(category).slice(0, 20) });
+      } catch (err) {
+        if (!isCatErr(err)) throw err;
+        hasCat = false; // 云端还没加分类字段
+        rows = await insert(rowData);
+      }
+    } else rows = await insert(rowData);
     const row = Array.isArray(rows) ? rows[0] : rows;
     if (row?.id) saveToken(row.id, token);
     return row;
@@ -656,7 +672,7 @@
   /* ═════════ 界面 ═════════ */
   let root = null;
   let tab = "square";
-  let filter = { kind: "", q: "", sort: "new" };
+  let filter = { kind: "", cat: "", q: "", sort: "new" };
   let liked = new Set();
   try {
     liked = new Set(JSON.parse(localStorage.getItem("mx_share_liked") || "[]"));
@@ -670,6 +686,7 @@
         <div class="sh-tabs">
           <button type="button" data-tab="square">广场</button>
           <button type="button" data-tab="make">制作卡片</button>
+          <button type="button" data-tab="upload">批量上传</button>
           <button type="button" data-tab="import">导入</button>
           <button type="button" data-tab="mine">我的上传</button>
         </div>
@@ -685,6 +702,7 @@
     const p = root.querySelector("#sh-panel");
     if (t === "square") renderSquare(p);
     if (t === "make") renderMake(p);
+    if (t === "upload") renderBatch(p);
     if (t === "import") renderImport(p);
     if (t === "mine") renderMine(p);
   }
@@ -705,11 +723,12 @@
       p.innerHTML = noCloudHtml();
       return;
     }
-    p.innerHTML = `${kindChips()}
+    p.innerHTML = `${kindChips()}${hasCat ? catChips(filter.cat, "data-fcat", true) : ""}
       <div class="sh-search"><input type="search" placeholder="搜索标题 / 作者" value="${esc(filter.q)}" /><select><option value="new">最新</option><option value="hot">最多下载</option><option value="like">最多点赞</option></select></div>
       <div class="sh-grid" id="sh-grid"><div class="sh-empty"><span class="fun-spin"></span></div></div>`;
     p.querySelector("select").value = filter.sort;
     p.querySelectorAll("[data-kind]").forEach((b) => (b.onclick = () => ((filter.kind = b.dataset.kind), renderSquare(p))));
+    p.querySelectorAll("[data-fcat]").forEach((b) => (b.onclick = () => ((filter.cat = b.dataset.fcat), renderSquare(p))));
     p.querySelector("select").onchange = (e) => ((filter.sort = e.target.value), renderSquare(p));
     let t;
     p.querySelector("input").oninput = (e) => {
@@ -724,17 +743,25 @@
 
   async function loadGrid(grid, onlyIds) {
     const order = { new: "created_at.desc", hot: "downloads.desc,created_at.desc", like: "likes.desc,created_at.desc" }[filter.sort];
-    let q = `/rest/v1/mx_shares?select=${COLS}&order=${order}&limit=60`;
+    let q = `/rest/v1/mx_shares?select=${cols()}&order=${order}&limit=60`;
     if (onlyIds) q += `&id=in.(${onlyIds.join(",")})`;
     else {
       if (filter.kind) q += `&kind=eq.${filter.kind}`;
+      if (filter.cat && hasCat) q += `&category=eq.${encodeURIComponent(filter.cat)}`;
       if (filter.q) {
         const s = encodeURIComponent(`*${filter.q.replace(/[,()*]/g, " ")}*`);
         q += `&or=(title.ilike.${s},author.ilike.${s})`;
       }
     }
     try {
-      const rows = await api(q);
+      let rows;
+      try {
+        rows = await api(q);
+      } catch (err) {
+        if (!hasCat || !isCatErr(err)) throw err;
+        hasCat = false; // 云端还没运行 share-category.sql
+        return loadGrid(grid, onlyIds);
+      }
       if (!grid.isConnected) return;
       if (!rows.length) {
         grid.innerHTML = `<div class="sh-empty"><div class="sh-empty-ico">🪹</div><p>${onlyIds ? "你还没有上传过" : "这里还空空的"}</p><small>去「制作卡片」上传第一个吧</small></div>`;
@@ -744,7 +771,7 @@
         .map(
           (r) => `<button type="button" class="sh-item" data-id="${esc(r.id)}">
             <img src="${esc(publicUrl(r.thumb_path || r.file_path))}" alt="" loading="lazy" />
-            <span class="sh-item-meta"><strong>${esc(r.title)}</strong><small>${KIND_META[r.kind]?.icon || ""} ${esc(r.author)} · ⬇${r.downloads || 0} · ♥${r.likes || 0}</small></span>
+            <span class="sh-item-meta"><strong>${esc(r.title)}</strong><small>${KIND_META[r.kind]?.icon || ""}${r.category ? " " + esc(r.category) + " ·" : ""} ${esc(r.author)} · ⬇${r.downloads || 0} · ♥${r.likes || 0}</small></span>
           </button>`
         )
         .join("");
@@ -760,7 +787,7 @@
     const sh = F.openSheet(
       `<div class="sh-detail">
         <img src="${esc(publicUrl(r.file_path))}" alt="" />
-        <p class="fun-note">${KIND_META[r.kind]?.icon} ${KIND_META[r.kind]?.name} · by ${esc(r.author)} · ${new Date(r.created_at).toLocaleDateString()} · ${(r.size / 1024).toFixed(0)}KB</p>
+        <p class="fun-note">${KIND_META[r.kind]?.icon} ${KIND_META[r.kind]?.name}${r.category ? " · " + esc(r.category) : ""} · by ${esc(r.author)} · ${new Date(r.created_at).toLocaleDateString()} · ${(r.size / 1024).toFixed(0)}KB</p>
         ${r.description ? `<p class="sh-desc">${esc(r.description)}</p>` : ""}
         <div class="fun-sheet-actions">
           <button type="button" class="fun-btn ghost" data-a="like">${liked.has(r.id) ? "♥ 已赞" : "♡ 点赞"} ${r.likes || 0}</button>
@@ -866,7 +893,7 @@
     });
   }
 
-  let makeState = { kind: "char", ids: [], withBooks: true, sub: "theater" };
+  let makeState = { kind: "char", ids: [], withBooks: true, sub: "theater", cat: "" };
   async function renderMake(p) {
     await hydrateStores();
     const user = await F.loadUser();
@@ -913,6 +940,8 @@
         <label class="fun-field"><span>标题</span><input id="sh-title" maxlength="40" value="${esc(defTitle)}" /></label>
         <label class="fun-field"><span>简介（选填）</span><textarea id="sh-desc" rows="2" maxlength="200" placeholder="风格、适用场景、注意事项…"></textarea></label>
         <label class="fun-field"><span>作者署名</span><input id="sh-author" maxlength="20" value="${esc(localStorage.getItem("mx_share_author") || user.name)}" /></label>
+        <p class="fun-kicker">4 · 选择分类</p>
+        ${catChips(makeState.cat, "data-mcat", false)}
         <div class="sh-preview" id="sh-preview"></div>
         <div class="fun-setup-btns"><button type="button" class="fun-btn ghost" id="sh-dl">生成并下载 PNG</button><button type="button" class="fun-btn solid" id="sh-up" ${cfg() ? "" : "disabled"}>上传到广场</button></div>
         ${cfg() ? "" : `<p class="fun-note">广场未开通，暂时只能下载 PNG。</p>`}
@@ -932,6 +961,13 @@
         })
     );
     p.querySelector("#sh-withbooks")?.addEventListener("change", (e) => (makeState.withBooks = e.target.checked));
+    p.querySelectorAll("[data-mcat]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          makeState.cat = b.dataset.mcat;
+          p.querySelectorAll("[data-mcat]").forEach((x) => x.classList.toggle("is-on", x === b));
+        })
+    );
     const go = async (upload) => {
       const meta = {
         title: p.querySelector("#sh-title").value.trim(),
@@ -942,6 +978,7 @@
       };
       if (!meta.title) return toast("填个标题吧");
       if (k !== "look" && !makeState.ids.length) return toast("先选内容");
+      if (upload && !makeState.cat) return toast("选一个分类再上传");
       localStorage.setItem("mx_share_author", meta.author);
       const btns = p.querySelectorAll(".fun-setup-btns .fun-btn");
       btns.forEach((b) => (b.disabled = true));
@@ -952,7 +989,7 @@
         if (blob.size > 9.5 * 1024 * 1024) throw new Error(`卡片 ${(blob.size / 1048576).toFixed(1)}MB，超过 10MB 上限（多半是图片太大）`);
         if (upload) {
           toast("上传中…");
-          await uploadShare(blob, payload);
+          await uploadShare(blob, payload, makeState.cat);
           toast("上传成功！");
           switchTab("mine");
         } else {
@@ -967,6 +1004,127 @@
     };
     p.querySelector("#sh-dl").onclick = () => go(false);
     p.querySelector("#sh-up").onclick = () => go(true);
+  }
+
+  /* ───── 批量上传：一次选好几张做好的资源卡 ───── */
+  let batch = { items: [], cat: "" };
+  function renderBatch(p) {
+    if (!cfg()) {
+      p.innerHTML = noCloudHtml();
+      return;
+    }
+    const ok = batch.items.filter((x) => x.payload);
+    const pending = ok.filter((x) => x.status !== "done");
+    p.innerHTML = `<div class="sh-batch">
+      <div class="sh-drop" id="sh-bdrop"><div class="sh-empty-ico">📤</div><p>${batch.items.length ? "继续添加资源卡" : "选择要上传的资源卡（可以一次选好几张）"}</p><small>只能上传 Meow OS 资源卡 PNG；在「制作卡片」里生成并下载的都可以</small></div>
+      <input type="file" accept="image/png" multiple hidden />
+      ${
+        batch.items.length
+          ? `<p class="fun-kicker">选择分类（全部套用，也可以单独改）</p>
+        ${catChips(batch.cat, "data-bcat", false)}
+        <div class="sh-blist">${batch.items
+          .map((x, i) =>
+            x.payload
+              ? `<div class="sh-brow" data-i="${i}">
+              <img src="${x.url}" alt="" />
+              <div class="sh-brow-main">
+                <small>${KIND_META[x.payload.kind]?.icon || ""} ${KIND_META[x.payload.kind]?.name || ""} · ${(x.file.size / 1024).toFixed(0)}KB</small>
+                <input class="sh-btitle" maxlength="40" value="${esc(x.title)}" ${x.status === "done" ? "disabled" : ""} />
+                <div class="sh-brow-foot">
+                  <select class="sh-bcat" ${x.status === "done" ? "disabled" : ""}><option value="">选分类</option>${CATEGORIES.map((c) => `<option${x.cat === c ? " selected" : ""}>${c}</option>`).join("")}</select>
+                  <span class="sh-bstat ${x.status || ""}">${x.status === "done" ? "✓ 已上传" : x.status === "up" ? "上传中…" : x.status === "err" ? "失败：" + esc(x.err || "") : ""}</span>
+                </div>
+              </div>
+              ${x.status === "done" || x.status === "up" ? "" : `<button type="button" class="sh-brm" data-rm="${i}" aria-label="移除">✕</button>`}
+            </div>`
+              : `<div class="sh-brow is-bad"><div class="sh-brow-main"><strong>${esc(x.file.name)}</strong><small>不是 Meow OS 资源卡（或被压缩过），不能上传</small></div><button type="button" class="sh-brm" data-rm="${i}" aria-label="移除">✕</button></div>`
+          )
+          .join("")}</div>
+        <div class="fun-setup-btns">
+          <button type="button" class="fun-btn ghost" id="sh-bclear">清空列表</button>
+          <button type="button" class="fun-btn solid" id="sh-bgo" ${pending.length ? "" : "disabled"}>上传全部（${pending.length}）</button>
+        </div>`
+          : ""
+      }
+    </div>`;
+    const inp = p.querySelector("input[type=file]");
+    const drop = p.querySelector("#sh-bdrop");
+    drop.onclick = () => inp.click();
+    drop.ondragover = (e) => e.preventDefault();
+    drop.ondrop = (e) => {
+      e.preventDefault();
+      void addFiles([...e.dataTransfer.files]);
+    };
+    inp.onchange = () => {
+      const fs = [...inp.files];
+      inp.value = "";
+      void addFiles(fs);
+    };
+    async function addFiles(files) {
+      for (const f of files) {
+        let payload = null;
+        try {
+          payload = await extractPayload(f);
+        } catch (_) {
+          payload = null;
+        }
+        batch.items.push({ file: f, payload, url: URL.createObjectURL(f), title: payload ? String(payload.title || f.name.replace(/\.(mxj\.)?png$/i, "")) : "", cat: batch.cat, status: "" });
+      }
+      renderBatch(p);
+    }
+    const syncInputs = () => {
+      p.querySelectorAll(".sh-brow[data-i]").forEach((row) => {
+        const x = batch.items[Number(row.dataset.i)];
+        if (!x || x.status === "done") return;
+        x.title = row.querySelector(".sh-btitle").value.trim();
+        x.cat = row.querySelector(".sh-bcat").value;
+      });
+    };
+    p.querySelectorAll("[data-bcat]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          syncInputs();
+          batch.cat = b.dataset.bcat;
+          batch.items.forEach((x) => x.status !== "done" && (x.cat = batch.cat));
+          renderBatch(p);
+        })
+    );
+    p.querySelectorAll("[data-rm]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          syncInputs();
+          batch.items.splice(Number(b.dataset.rm), 1);
+          renderBatch(p);
+        })
+    );
+    p.querySelector("#sh-bclear")?.addEventListener("click", () => {
+      batch = { items: [], cat: batch.cat };
+      renderBatch(p);
+    });
+    p.querySelector("#sh-bgo")?.addEventListener("click", async () => {
+      syncInputs();
+      const todo = batch.items.filter((x) => x.payload && x.status !== "done");
+      const noCat = todo.filter((x) => !x.cat);
+      if (noCat.length) return toast(`还有 ${noCat.length} 张没选分类`);
+      const noTitle = todo.filter((x) => !x.title);
+      if (noTitle.length) return toast(`还有 ${noTitle.length} 张没填标题`);
+      let okN = 0;
+      for (const x of todo) {
+        x.status = "up";
+        renderBatch(p);
+        try {
+          if (x.file.size > 9.5 * 1024 * 1024) throw new Error("超过 10MB");
+          await uploadShare(x.file, { ...x.payload, title: x.title }, x.cat);
+          x.status = "done";
+          okN++;
+        } catch (err) {
+          x.status = "err";
+          x.err = err.message;
+        }
+      }
+      renderBatch(p);
+      toast(okN === todo.length ? `全部上传成功（${okN} 个）` : `上传了 ${okN} 个，${todo.length - okN} 个失败`);
+    });
   }
 
   function renderImport(p) {

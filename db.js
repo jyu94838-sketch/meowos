@@ -1780,10 +1780,10 @@
     "fun-weibo.js?v=1",
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
-    "fun-widgets.js?v=3", "fun-icons.js?v=1",
-    "changelog.js?v=16",
+    "fun-widgets.js?v=3", "fun-icons.js?v=2",
+    "changelog.js?v=17",
     "share-config.js?v=3", "st-gate.js?v=1",
-    "fun-share.js?v=4"
+    "fun-share.js?v=5"
   ];
   const PRECHAIN = [
     "media-blob.js?v=" + ASSET_V,
