@@ -719,7 +719,7 @@
     const t = curTrack();
     if (!t || !("mediaSession" in navigator)) return;
     try {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist || "未知歌手", album: "没心机 · 音乐" });
+      navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist || "未知歌手", album: "Meow OS · 音乐" });
       navigator.mediaSession.setActionHandler("play", () => audio.play());
       navigator.mediaSession.setActionHandler("pause", () => audio.pause());
       navigator.mediaSession.setActionHandler("previoustrack", () => step(-1));

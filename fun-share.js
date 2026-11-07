@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * 资源站：没心机专属资源卡（.png）+ 共享广场（Supabase）
+ * 资源站：Meow OS 专属资源卡（.png）+ 共享广场（Supabase）
  *
  * 专属 PNG 格式（MXJ 卡）：
  *   - 外观是一张普通 PNG 卡片图（可预览、可发群）
@@ -231,7 +231,7 @@
     ctx.fillText(`by ${author || "匿名"}`, cx, H - 108);
     ctx.font = `18px ${font}`;
     ctx.fillStyle = "#9aa0a8";
-    ctx.fillText("没心机 · 专属资源卡 · 仅限本站「资源站」导入", cx, H - 76);
+    ctx.fillText("Meow OS · 专属资源卡 · 仅限本站「资源站」导入", cx, H - 76);
     // 印章
     ctx.save();
     ctx.translate(W - 150, H - 100);
@@ -690,7 +690,7 @@
           btn.disabled = true;
           btn.textContent = "导入中…";
           const payload = await extractPayload(await fetchBlob());
-          if (!payload) throw new Error("这不是没心机资源卡");
+          if (!payload) throw new Error("这不是 Meow OS 资源卡");
           if (payload.kind === "look" && !(await confirmSheet("导入美化会覆盖你现在的装扮（壁纸、图标、字体、聊天样式等），继续吗？"))) {
             btn.disabled = false;
             btn.textContent = "导入";
@@ -836,7 +836,7 @@
 
   function renderImport(p) {
     p.innerHTML = `<div class="sh-import">
-      <div class="sh-drop" id="sh-drop"><div class="sh-empty-ico">🖼️</div><p>选择一张没心机资源卡（.png）</p><small>美化 / 世界书 / 角色卡都可以</small></div>
+      <div class="sh-drop" id="sh-drop"><div class="sh-empty-ico">🖼️</div><p>选择一张 Meow OS 资源卡（.png）</p><small>美化 / 世界书 / 角色卡都可以</small></div>
       <input type="file" accept="image/png" hidden />
       <div id="sh-import-info"></div></div>`;
     const inp = p.querySelector("input");
@@ -856,7 +856,7 @@
       try {
         const payload = await extractPayload(file);
         if (!payload) {
-          info.innerHTML = `<p class="fun-note warn">这张图里没有没心机资源数据。可能不是资源卡，或者被聊天软件压缩过（请让对方发原图）。</p>`;
+          info.innerHTML = `<p class="fun-note warn">这张图里没有 Meow OS 资源数据。可能不是资源卡，或者被聊天软件压缩过（请让对方发原图）。</p>`;
           return;
         }
         const m = KIND_META[payload.kind];

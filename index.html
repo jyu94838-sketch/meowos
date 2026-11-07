@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#3a5c89">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="没心机">
+  <meta name="apple-mobile-web-app-title" content="Meow OS">
   <!-- app.js 由 db.js 在点「进入」后注入，勿 preload（避免 iOS 提前拉 1.6MB） -->
   <link rel="preload" href="auth.js?v=305" as="script">
   <link rel="preload" href="ai-api.js" as="script">
@@ -100,7 +100,7 @@
   </script>
   <link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <title>没心机 · 小心机2.0</title>
+  <title>Meow OS</title>
   <!-- 首帧与浅色开屏同色，避免 style.css 加载前闪色 -->
   <style>
     html, body { margin: 0; min-height: 100%; background: #f0f1f3; color: #17191c; }
@@ -123,7 +123,7 @@
   <link rel="stylesheet" href="fun.css?v=3">
 </head>
 <body>
-  <div class="boot-splash" id="boot-splash" aria-live="polite" aria-busy="true" aria-label="小心机 · 开屏画面，请稍后点击进入">
+  <div class="boot-splash" id="boot-splash" aria-live="polite" aria-busy="true" aria-label="Meow OS · 开屏画面，请稍后点击进入">
     <div class="boot-splash-bg" aria-hidden="true">
       <div class="boot-splash-orbit"></div>
       <div class="boot-splash-aurora-mount" aria-hidden="true">
@@ -191,7 +191,7 @@
     <div class="boot-splash-stage">
       <div class="boot-splash-title-shell">
         <span class="boot-splash-title-glare" aria-hidden="true"></span>
-        <h1 class="boot-splash-title">小心机</h1>
+        <h1 class="boot-splash-title">Meow OS</h1>
       </div>
       <p class="boot-splash-eyebrow">Desktop narrative</p>
       <div class="boot-splash-meta-row">
@@ -235,7 +235,7 @@
         window.__xxjBootSplashArmed = true;
         root.classList.add("boot-splash--ready");
         root.setAttribute("aria-busy", "false");
-        root.setAttribute("aria-label", "小心机 · 点击按钮或画面任意处进入");
+        root.setAttribute("aria-label", "Meow OS · 点击按钮或画面任意处进入");
         var load = document.getElementById("boot-splash-load");
         if (load) {
           load.hidden = true;
@@ -806,7 +806,7 @@
               <div class="settings-panel settings-panel--soft">
                 <div class="settings-row settings-row-static">
                   <span class="settings-row-l">版本</span>
-                  <span class="settings-row-r">没心机 · UI</span>
+                  <span class="settings-row-r">Meow OS · UI</span>
                 </div>
               </div>
             </section>
@@ -976,7 +976,7 @@
               <button type="button" class="chip ghost" id="notify-settings-bg-test">切后台延时测试</button>
             </div>
             <p class="settings-ai-key-note notify-settings-bg-test-hint">
-              点「切后台延时测试」后<strong>立刻</strong>切走（约 5 秒）。须从<strong>主屏幕图标</strong>打开（http/本地服务器），并开「后台保活」。若只有通知栏：系统设置 → 没心机 → 横幅/浮动。
+              点「切后台延时测试」后<strong>立刻</strong>切走（约 5 秒）。须从<strong>主屏幕图标</strong>打开（http/本地服务器），并开「后台保活」。若只有通知栏：系统设置 → Meow OS → 横幅/浮动。
             </p>
             <div class="chat-detail-field chat-detail-field--switch notify-settings-row">
               <span class="chat-detail-field-k">后台保活</span>
