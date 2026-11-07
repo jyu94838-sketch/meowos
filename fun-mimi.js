@@ -106,6 +106,72 @@ ${GUIDE.map(([k, v]) => `· ${k.split(" ")[0]}：${v}`).join("\n")}`;
 
   let root = null;
   let hist = [];
+  let avatar = ""; // 自定义头像（dataURL），空 = 默认小猫
+  const AV_KEY = "mimi_avatar_v1";
+  const avHtml = () => (avatar ? `<span class="mimi-av has-img"><img src="${avatar}" alt="" /></span>` : `<span class="mimi-av">🐱</span>`);
+  /** 选图 → 居中裁成正方形 200px */
+  function pickAvatar() {
+    return new Promise((resolve) => {
+      const inp = document.createElement("input");
+      inp.type = "file";
+      inp.accept = "image/*";
+      inp.onchange = () => {
+        const f = inp.files && inp.files[0];
+        if (!f) return resolve(null);
+        const url = URL.createObjectURL(f);
+        const img = new Image();
+        img.onload = () => {
+          const S = 200;
+          const c = document.createElement("canvas");
+          c.width = c.height = S;
+          const m = Math.min(img.naturalWidth, img.naturalHeight);
+          c.getContext("2d").drawImage(img, (img.naturalWidth - m) / 2, (img.naturalHeight - m) / 2, m, m, 0, 0, S, S);
+          URL.revokeObjectURL(url);
+          resolve(c.toDataURL("image/jpeg", 0.88));
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          toast("这张图片打不开");
+          resolve(null);
+        };
+        img.src = url;
+      };
+      inp.click();
+    });
+  }
+  function avatarMenu() {
+    const sh = F.openSheet(
+      `<div class="fun-sheet-actions mimi-av-acts">
+        <div class="mimi-av-big">${avHtml()}</div>
+        <button type="button" class="fun-btn solid" data-av="pick">从相册选一张当头像</button>
+        ${avatar ? `<button type="button" class="fun-btn ghost" data-av="reset">换回默认小猫</button>` : ""}
+      </div>`,
+      { title: "给弥弥换头像" }
+    );
+    sh.body.addEventListener("click", async (e) => {
+      const d = e.target.closest("[data-av]")?.dataset.av;
+      if (!d) return;
+      sh.close();
+      if (d === "reset") avatar = "";
+      else {
+        const src = await pickAvatar();
+        if (!src) return;
+        avatar = src;
+      }
+      try {
+        await F.FunDB.set(AV_KEY, avatar);
+      } catch (_) {
+        /* ignore */
+      }
+      drawHead();
+      draw();
+      toast(avatar ? "弥弥换好新头像啦" : "换回默认小猫了");
+    });
+  }
+  function drawHead() {
+    const h = root?.querySelector(".mimi-head");
+    if (h) h.innerHTML = `${avHtml()}<span><b>弥弥</b><small>手机小管家 · 点头像可以换</small></span><button type="button" class="chip ghost chip-xs" data-avmenu>换头像</button>`;
+  }
   async function save() {
     try {
       await F.FunDB.set(KV, hist.slice(-60));
@@ -119,14 +185,14 @@ ${GUIDE.map(([k, v]) => `· ${k.split(" ")[0]}：${v}`).join("\n")}`;
       if (OPEN[n] && !acts.includes(n)) acts.push(n);
       return "";
     });
-    return `<div class="mimi-msg${m.me ? " is-me" : ""}">${m.me ? "" : `<span class="mimi-av">🐱</span>`}<div class="mimi-b"><p>${esc(text.trim()).replace(/\n/g, "<br>")}</p>${acts
+    return `<div class="mimi-msg${m.me ? " is-me" : ""}">${m.me ? "" : avHtml()}<div class="mimi-b"><p>${esc(text.trim()).replace(/\n/g, "<br>")}</p>${acts
       .map((n) => `<button type="button" class="mimi-open" data-open="${esc(n)}">打开「${esc(n)}」 →</button>`)
       .join("")}</div></div>`;
   }
   function draw() {
     if (!root) return;
     const list = root.querySelector(".mimi-list");
-    list.innerHTML = hist.map(bubble).join("") + (busy ? `<div class="mimi-msg"><span class="mimi-av">🐱</span><div class="mimi-b"><p class="mimi-typing">弥弥在想…</p></div></div>` : "");
+    list.innerHTML = hist.map(bubble).join("") + (busy ? `<div class="mimi-msg">${avHtml()}<div class="mimi-b"><p class="mimi-typing">弥弥在想…</p></div></div>` : "");
     list.scrollTop = list.scrollHeight;
   }
   let busy = false;
@@ -162,15 +228,17 @@ ${GUIDE.map(([k, v]) => `· ${k.split(" ")[0]}：${v}`).join("\n")}`;
     async mount(body) {
       root = document.createElement("div");
       root.className = "mimi";
-      root.innerHTML = `<div class="mimi-list"></div>
+      root.innerHTML = `<div class="mimi-head"></div><div class="mimi-list"></div>
         <div class="mimi-quick">${QUICK.map((q) => `<button type="button" class="fun-chip-btn" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>
         <form class="mimi-bar"><input type="text" placeholder="问问弥弥，比如：怎么换字体" enterkeyhint="send" /><button type="submit" class="fun-btn solid">发送</button></form>`;
       body.appendChild(root);
       try {
         hist = (await F.FunDB.get(KV)) || [];
+        avatar = (await F.FunDB.get(AV_KEY)) || "";
       } catch (_) {
         hist = [];
       }
+      drawHead();
       if (!root) return;
       if (!hist.length) {
         const user = await F.loadUser();
@@ -186,6 +254,7 @@ ${GUIDE.map(([k, v]) => `· ${k.split(" ")[0]}：${v}`).join("\n")}`;
         void ask(v);
       });
       root.addEventListener("click", (e) => {
+        if (e.target.closest("[data-avmenu]") || e.target.closest(".mimi-head .mimi-av, .mimi-msg .mimi-av")) return void avatarMenu();
         const q = e.target.closest("[data-q]");
         if (q) return void ask(q.dataset.q);
         const o = e.target.closest("[data-open]");

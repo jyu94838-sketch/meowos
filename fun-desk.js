@@ -61,24 +61,38 @@
     news: ["更新公告", "ph-megaphone", 40, "News", call("openChangelog")]
   };
   const DEFAULT = [Object.keys(APPS)];
+  const LAYOUT_KEY2 = "meowos_desk_layout_v2"; // 每页是「格子数组」，空格子为 null，可以留空位
 
   /* ───── 布局 ───── */
   function loadLayout() {
     let pages = null;
     try {
-      pages = JSON.parse(localStorage.getItem(LAYOUT_KEY) || "null");
+      pages = JSON.parse(localStorage.getItem(LAYOUT_KEY2) || "null");
+      if (!Array.isArray(pages)) pages = JSON.parse(localStorage.getItem(LAYOUT_KEY) || "null"); // 旧版：紧凑数组
     } catch (_) {
       pages = null;
     }
     if (!Array.isArray(pages) || !pages.length) pages = DEFAULT.map((p) => p.slice());
     const seen = new Set();
-    pages = pages.map((pg) => (Array.isArray(pg) ? pg : []).filter((k) => APPS[k] && !seen.has(k) && seen.add(k)));
-    for (const k of Object.keys(APPS)) if (!seen.has(k)) pages[pages.length - 1].push(k); // 新增的应用放最后
+    pages = pages.map((pg) => (Array.isArray(pg) ? pg : []).map((k) => (k && APPS[k] && !seen.has(k) && seen.add(k) ? k : null)));
+    const last = pages[pages.length - 1];
+    for (const k of Object.keys(APPS))
+      if (!seen.has(k)) {
+        // 新增的应用：放进最后一页第一个空位
+        const e = last.indexOf(null);
+        if (e >= 0) last[e] = k;
+        else last.push(k);
+      }
     return pages;
   }
   function saveLayout() {
     try {
-      localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
+      const out = layout.map((pg) => {
+        const a = pg.slice();
+        while (a.length && !a[a.length - 1]) a.pop();
+        return a;
+      });
+      localStorage.setItem(LAYOUT_KEY2, JSON.stringify(out));
     } catch (_) {
       /* ignore */
     }
@@ -101,7 +115,7 @@
 
   const editBar = document.createElement("div");
   editBar.className = "desk-editbar";
-  editBar.innerHTML = `<span>拖动图标调整位置 · 拖到边缘可以翻页</span><button type="button" class="desk-icons-btn">图标</button><button type="button" class="desk-done">完成</button>`;
+  editBar.innerHTML = `<span>拖到任意格子 · 拖到边缘可以翻页</span><button type="button" class="desk-icons-btn">图标</button><button type="button" class="desk-done">完成</button>`;
   phone.appendChild(editBar);
 
   const dots = document.createElement("div");
@@ -115,6 +129,14 @@
     return `<button type="button" class="desk-app" data-k="${k}"><span class="desk-app-ico${img ? " has-img" : ""}">${img ? `<img src="${img}" alt="" />` : `<i class="ph ${icon}"></i>`}</span><span class="desk-app-name">${name}</span></button>`;
   };
 
+  const ROW_H = 92; // 一行格子的高度（图标 + 名字 + 行距）
+  /** 这一页一屏放得下几个格子 */
+  function slotsFor(pgEl, grid) {
+    const h = pager.clientHeight || 600;
+    const top = grid.getBoundingClientRect().top - pgEl.getBoundingClientRect().top;
+    const rows = Math.max(3, Math.floor((h - top - 26 + 10) / ROW_H));
+    return rows * 4;
+  }
   function render() {
     const keepLeft = pager.scrollLeft;
     pager.querySelectorAll(".desk-apps, .desk-newpage").forEach((n) => n.remove());
@@ -122,11 +144,25 @@
       const pg = document.createElement("section");
       pg.className = "desk-page desk-apps";
       pg.dataset.pg = String(i);
-      pg.innerHTML = `${editing && i > 0 ? `<button type="button" class="desk-delpage" data-delpage="${i}">删除这一页</button>` : ""}<div class="desk-apps-grid" data-grid="${i}">${keys.map(iconHtml).join("")}</div>${
-        !keys.length ? `<p class="desk-empty">${editing ? "把图标拖到这里" : "这一页还空着，长按进入编辑，把图标拖过来"}</p>` : ""
-      }`;
+      pg.innerHTML = `${editing && i > 0 ? `<button type="button" class="desk-delpage" data-delpage="${i}">删除这一页</button>` : ""}<div class="desk-apps-grid" data-grid="${i}"></div>`;
       if (i === 0) pg.insertBefore(widgetSlot, pg.firstChild);
       pager.appendChild(pg);
+      const grid = pg.querySelector(".desk-apps-grid");
+      let n = slotsFor(pg, grid);
+      // 屏幕变小、放不下的图标挪进前面的空位
+      for (let j = n; j < keys.length; j++) {
+        if (!keys[j]) continue;
+        const e = keys.indexOf(null);
+        if (e >= 0 && e < n) {
+          keys[e] = keys[j];
+          keys[j] = null;
+        }
+      }
+      while (keys.length && keys.length > n && !keys[keys.length - 1]) keys.pop();
+      n = Math.max(n, Math.ceil(keys.length / 4) * 4);
+      while (keys.length < n) keys.push(null);
+      grid.innerHTML = keys.map((k, j) => `<div class="desk-slot" data-pg="${i}" data-s="${j}">${k ? iconHtml(k) : ""}</div>`).join("");
+      if (!editing && !keys.some(Boolean)) grid.insertAdjacentHTML("beforebegin", `<p class="desk-empty">这一页还空着，长按别的图标进入编辑，把图标拖过来</p>`);
     });
     if (editing) {
       const np = document.createElement("section");
@@ -139,6 +175,17 @@
     pager.scrollLeft = keepLeft;
     renderDots();
   }
+  // 小组件高度变了（加了 / 删了小组件）→ 重新算格子
+  let lastWgH = -1;
+  if (window.ResizeObserver)
+    new ResizeObserver(() => {
+      const h = widgetSlot.offsetHeight;
+      if (Math.abs(h - lastWgH) < 4 || drag) return;
+      lastWgH = h;
+      clearTimeout(roT);
+      roT = setTimeout(() => !drag && render(), 120);
+    }).observe(widgetSlot);
+  let roT = 0;
 
   function pageCount() {
     return pager.querySelectorAll(".desk-page").length;
@@ -185,7 +232,7 @@
     editing = on;
     if (!on) {
       // 去掉末尾的空页
-      while (layout.length > 1 && !layout[layout.length - 1].length) layout.pop();
+      while (layout.length > 1 && !layout[layout.length - 1].some(Boolean)) layout.pop();
       saveLayout();
     }
     render();
@@ -202,11 +249,6 @@
     setEditing(false);
     if (typeof window.openDeskIcons === "function") window.openDeskIcons(false);
   });
-
-  /** 从 DOM 顺序读回布局 */
-  function readLayoutFromDom() {
-    layout = [...pager.querySelectorAll(".desk-apps-grid")].map((g) => [...g.querySelectorAll(".desk-app")].map((b) => b.dataset.k));
-  }
 
   /* 长按进入编辑 */
   let pressTimer = 0;
@@ -258,7 +300,12 @@
       const del = e.target.closest("[data-delpage]");
       if (del) {
         const i = Number(del.dataset.delpage);
-        layout[i - 1].push(...layout[i]);
+        for (const k of layout[i]) {
+          if (!k) continue;
+          const e = layout[i - 1].indexOf(null);
+          if (e >= 0) layout[i - 1][e] = k;
+          else layout[i - 1].push(k);
+        }
         layout.splice(i, 1);
         saveLayout();
         render();
@@ -271,16 +318,23 @@
     true
   );
 
-  /* 拖动排序 */
+  /* 拖动：放进手指下面的任意格子（空格子直接放，有图标就互换） */
   let drag = null;
   pager.addEventListener("pointerdown", (e) => {
     if (!editing) return;
     const app = e.target.closest(".desk-app");
-    if (!app) return;
+    const slot = app?.closest(".desk-slot");
+    if (!slot) return;
     e.preventDefault();
-    drag = { el: app, sx: e.clientX, sy: e.clientY, started: false, ghost: null, edgeTimer: 0, edgeDir: 0 };
+    drag = { el: app, from: { pg: Number(slot.dataset.pg), s: Number(slot.dataset.s) }, k: app.dataset.k, sx: e.clientX, sy: e.clientY, started: false, ghost: null, edgeTimer: 0, edgeDir: 0, target: null };
     app.setPointerCapture?.(e.pointerId);
   });
+  function setTarget(slot) {
+    if (drag.target === slot) return;
+    drag.target?.classList.remove("is-target");
+    drag.target = slot;
+    slot?.classList.add("is-target");
+  }
   document.addEventListener(
     "pointermove",
     (e) => {
@@ -312,54 +366,36 @@
           drag.edgeTimer = setTimeout(function flip() {
             if (!drag) return;
             const next = curPage() + dir;
-            const lastAppPage = layout.length; // 不能拖到第 1 页（原桌面），也不进「新建一页」
-            if (next >= 1 && next <= lastAppPage) {
-              goPage(next);
-              setTimeout(() => {
-                const grid = pager.querySelector(`[data-grid="${next - 1}"]`);
-                if (grid && drag) grid.appendChild(drag.el);
-              }, 320);
-            }
+            if (next >= 1 && next <= layout.length) goPage(next); // 第 1 页是原桌面，不能放
             drag.edgeTimer = setTimeout(flip, 900);
           }, 600);
         }
       }
-      // 放到手指所在位置最近的格子（空白处、行尾、图标之间都可以放）
-      const grid = pager.querySelector(`[data-grid="${curPage() - 1}"]`);
-      if (grid) placeAt(grid, e.clientX, e.clientY);
+      // 找手指下面的格子（找不到就取这一页离手指最近的格子）
+      drag.ghost.style.visibility = "hidden";
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      drag.ghost.style.visibility = "";
+      let slot = under?.closest?.(".desk-slot");
+      if (!slot || !pager.contains(slot)) {
+        const grid = pager.querySelector(`[data-grid="${curPage() - 1}"]`);
+        slot = null;
+        if (grid) {
+          let best = Infinity;
+          for (const c of grid.children) {
+            const r = c.getBoundingClientRect();
+            const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+            if (d < best) {
+              best = d;
+              slot = c;
+            }
+          }
+          if (best > 140) slot = null;
+        }
+      }
+      setTarget(slot);
     },
     { passive: false }
   );
-  /** 按手指坐标把正在拖的图标插到最近的位置 */
-  function placeAt(grid, x, y) {
-    const icons = [...grid.querySelectorAll(".desk-app")].filter((a) => a !== drag.el);
-    if (!icons.length) {
-      if (drag.el.parentNode !== grid) grid.appendChild(drag.el);
-      return;
-    }
-    const first = icons[0].getBoundingClientRect();
-    const last = icons[icons.length - 1].getBoundingClientRect();
-    let ref = null; // 插在 ref 前面；null = 放最后
-    if (y < first.top) ref = icons[0];
-    else if (y > last.bottom || (y >= last.top && x > last.right)) ref = null;
-    else {
-      let best = null;
-      let bestD = Infinity;
-      for (const a of icons) {
-        const r = a.getBoundingClientRect();
-        const cx = r.left + r.width / 2;
-        const cy = r.top + r.height / 2;
-        const d = Math.abs(x - cx) + Math.abs(y - cy) * 1.6; // 同一行优先
-        if (d < bestD) {
-          bestD = d;
-          best = { a, cx };
-        }
-      }
-      ref = x > best.cx ? best.a.nextElementSibling : best.a;
-      if (ref === drag.el) ref = ref.nextElementSibling;
-    }
-    if (ref ? drag.el.nextElementSibling !== ref || drag.el.parentNode !== grid : drag.el !== grid.lastElementChild) grid.insertBefore(drag.el, ref);
-  }
   const endDrag = () => {
     if (!drag) return;
     clearTimeout(drag.edgeTimer);
@@ -367,8 +403,19 @@
       drag.ghost.remove();
       drag.el.classList.remove("is-dragging");
       pager.classList.remove("is-dragging");
-      readLayoutFromDom();
-      saveLayout();
+      const t = drag.target;
+      if (t) {
+        const tp = Number(t.dataset.pg);
+        const ts = Number(t.dataset.s);
+        const { pg: fp, s: fs } = drag.from;
+        if (tp !== fp || ts !== fs) {
+          const other = layout[tp][ts] || null;
+          layout[tp][ts] = drag.k;
+          layout[fp][fs] = other; // 有图标就互换，空格子就直接放
+          saveLayout();
+        }
+      }
+      drag.target?.classList.remove("is-target");
       render();
     }
     drag = null;
@@ -377,7 +424,11 @@
   document.addEventListener("pointercancel", endDrag);
 
   render();
-  window.addEventListener("resize", renderDots);
+  window.addEventListener("resize", () => {
+    renderDots();
+    clearTimeout(roT);
+    roT = setTimeout(() => !drag && render(), 200);
+  });
   /** 换图标：src 为 dataURL，传空则恢复默认 */
   function setIcon(k, src) {
     if (!APPS[k]) return;

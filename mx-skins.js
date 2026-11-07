@@ -1,0 +1,332 @@
+"use strict";
+
+/**
+ * 风格包：聊天风格（默认 / 微信 / QQ）+ 主页风格（默认 / 奶油小猫）
+ * - 每套风格就是一段 CSS 源码：可以一键套用，也可以「查看源码」复制去改
+ * - 入口：我的 → 装扮 → 最上面「风格包」
+ * - 微信 / QQ 风格下，聊天列表会额外显示头像
+ */
+(function () {
+  // 这个文件在页面一开始就加载（避免先闪一下默认样式），娱乐模块晚点才有，所以用到时再取
+  const FUN = () => window.XXJ_FUN;
+  const toast = (m) => (FUN() ? FUN().toast(m) : typeof showToast === "function" && showToast(m));
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const KEY_CHAT = "meowos_skin_chat";
+  const KEY_HOME = "meowos_skin_home";
+
+  /* ═════════ 源码 ═════════ */
+  const CSS = {
+    wechat: `/* ===== Meow OS · 微信风格聊天（可以复制去改颜色） ===== */
+/* 聊天背景 */
+#chat-screen .chat-scroll,
+#chat-screen .chat-messages { background: #ededed !important; }
+body.dark #chat-screen .chat-scroll,
+body.dark #chat-screen .chat-messages { background: #111 !important; }
+
+/* 气泡：直角小圆角、无边框、带小尖角 */
+#chat-screen .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing) {
+  border: none !important;
+  border-radius: 5px !important;
+  box-shadow: none !important;
+  background: #fff !important;
+  color: #191919 !important;
+  font-size: 0.95rem !important;
+  line-height: 1.55 !important;
+  padding: 9px 12px !important;
+}
+#chat-screen .chat-msg--assistant .chat-msg-bubble { border-left: none !important; }
+#chat-screen .chat-msg--user .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing) {
+  background: #95ec69 !important;
+}
+#chat-screen .chat-msg-bubble-stack > .chat-msg-bubble:first-child:not(.chat-msg-bubble--sticker)::before {
+  content: ""; position: absolute; top: 13px; width: 0; height: 0;
+  border: 6px solid transparent;
+}
+#chat-screen .chat-msg--assistant .chat-msg-bubble-stack > .chat-msg-bubble:first-child:not(.chat-msg-bubble--sticker)::before {
+  left: -11px; border-right-color: #fff;
+}
+#chat-screen .chat-msg--user .chat-msg-bubble-stack > .chat-msg-bubble:first-child:not(.chat-msg-bubble--sticker)::before {
+  right: -11px; border-left-color: #95ec69;
+}
+body.dark #chat-screen .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing) { background: #2c2c2c !important; color: #e6e6e6 !important; }
+body.dark #chat-screen .chat-msg--user .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing) { background: #3eb575 !important; color: #111 !important; }
+body.dark #chat-screen .chat-msg--assistant .chat-msg-bubble-stack > .chat-msg-bubble:first-child::before { border-right-color: #2c2c2c; }
+body.dark #chat-screen .chat-msg--user .chat-msg-bubble-stack > .chat-msg-bubble:first-child::before { border-left-color: #3eb575; }
+
+/* 头像：方形小圆角（聊天设置里开了「隐藏头像」就不显示） */
+#chat-screen .chat-msg-avatar { display: grid !important; width: 40px !important; height: 40px !important; border-radius: 5px !important; border: none !important; box-shadow: none !important; background: #c9d6e8; color: #fff; }
+#chat-screen img.chat-msg-avatar { display: block !important; object-fit: cover; }
+#chat-screen .chat-msg-inner { gap: 10px; align-items: flex-start; }
+#chat-screen .chat-msg--user .chat-msg-inner { flex-direction: row !important; justify-content: flex-end; }
+
+/* 聊天列表：白色通栏 + 方形头像 */
+#chat-list-screen .chat-thread-li { transform: none !important; margin: 0 !important; }
+#chat-list-screen .chat-thread-card { display: flex !important; align-items: center; gap: 12px; padding: 12px 14px !important; background: #fff !important; border-bottom: 1px solid #ececec !important; border-radius: 0 !important; }
+#chat-list-screen .chat-thread-card .chat-slab-spine,
+#chat-list-screen .chat-thread-card .chat-thread-top,
+#chat-list-screen .chat-thread-card .chat-slab-tape,
+#chat-list-screen .chat-thread-card .chat-corner-stamp,
+#chat-list-screen .chat-thread-card .chat-thread-card-k { display: none !important; }
+#chat-list-screen .chat-thread-card .chat-thread-shell,
+#chat-list-screen .chat-thread-card .chat-thread-slab,
+#chat-list-screen .chat-thread-card .chat-slab-stack,
+#chat-list-screen .chat-thread-card .chat-slab-mat,
+#chat-list-screen .chat-thread-card .chat-thread-panel { all: unset; display: block; flex: 1; min-width: 0; }
+#chat-list-screen .chat-thread-card .mx-list-av { display: grid !important; width: 48px; height: 48px; border-radius: 6px; }
+#chat-list-screen .chat-thread-card-name { font-size: 1rem !important; font-weight: 500 !important; font-style: normal !important; color: #191919 !important; margin: 0 0 4px !important; }
+#chat-list-screen .chat-thread-card-snippet { font-size: 0.8rem !important; color: #999 !important; margin: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#chat-list-screen .chat-thread-card-meta { position: absolute; top: 14px; right: 14px; font-size: 0.68rem !important; color: #b2b2b2 !important; }
+#chat-list-screen .chat-thread-card { position: relative; }
+body.dark #chat-list-screen .chat-thread-card { background: #191919 !important; border-bottom-color: #2a2a2a !important; }
+body.dark #chat-list-screen .chat-thread-card-name { color: #e6e6e6 !important; }
+`,
+    qq: `/* ===== Meow OS · QQ 风格聊天（可以复制去改颜色） ===== */
+/* 聊天背景：淡淡的蓝灰 */
+#chat-screen .chat-scroll,
+#chat-screen .chat-messages { background: linear-gradient(180deg, #f3f6fb, #eef1f7) !important; }
+body.dark #chat-screen .chat-scroll,
+body.dark #chat-screen .chat-messages { background: #17181c !important; }
+
+/* 气泡：大圆角，对方白色，自己蓝色 */
+#chat-screen .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing) {
+  border: none !important;
+  border-radius: 18px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  background: #fff !important;
+  color: #1f1f1f !important;
+  font-size: 0.95rem !important;
+  line-height: 1.55 !important;
+  padding: 10px 14px !important;
+}
+#chat-screen .chat-msg--assistant .chat-msg-bubble { border-left: none !important; }
+#chat-screen .chat-msg--assistant .chat-msg-bubble-stack > .chat-msg-bubble:first-child:not(.chat-msg-bubble--sticker) { border-top-left-radius: 4px !important; }
+#chat-screen .chat-msg--user .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing) {
+  background: linear-gradient(135deg, #3fb2ff, #1888ff) !important;
+  color: #fff !important;
+}
+#chat-screen .chat-msg--user .chat-msg-bubble-stack > .chat-msg-bubble:first-child:not(.chat-msg-bubble--sticker) { border-top-right-radius: 4px !important; }
+#chat-screen .chat-msg--user .chat-msg-bubble * { color: inherit; }
+body.dark #chat-screen .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing) { background: #26272c !important; color: #e8e8e8 !important; }
+body.dark #chat-screen .chat-msg--user .chat-msg-bubble:not(.chat-msg-bubble--sticker):not(.chat-msg-bubble--typing) { background: linear-gradient(135deg, #2c8fe0, #1670d6) !important; color: #fff !important; }
+
+/* 头像：圆形（聊天设置里开了「隐藏头像」就不显示） */
+#chat-screen .chat-msg-avatar { display: grid !important; width: 40px !important; height: 40px !important; border-radius: 50% !important; border: 2px solid #fff !important; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important; background: #b9d7f5; color: #fff; }
+#chat-screen img.chat-msg-avatar { display: block !important; object-fit: cover; }
+#chat-screen .chat-msg-inner { gap: 10px; align-items: flex-start; }
+#chat-screen .chat-msg--user .chat-msg-inner { flex-direction: row !important; justify-content: flex-end; }
+
+/* 聊天列表：圆头像 + 浅蓝选中 */
+#chat-list-screen .chat-thread-li { transform: none !important; margin: 0 !important; }
+#chat-list-screen .chat-thread-card { display: flex !important; align-items: center; gap: 12px; padding: 12px 16px !important; background: #fff !important; border-radius: 0 !important; position: relative; }
+#chat-list-screen .chat-thread-card:active { background: #eaf4ff !important; }
+#chat-list-screen .chat-thread-card .chat-slab-spine,
+#chat-list-screen .chat-thread-card .chat-thread-top,
+#chat-list-screen .chat-thread-card .chat-slab-tape,
+#chat-list-screen .chat-thread-card .chat-corner-stamp,
+#chat-list-screen .chat-thread-card .chat-thread-card-k { display: none !important; }
+#chat-list-screen .chat-thread-card .chat-thread-shell,
+#chat-list-screen .chat-thread-card .chat-thread-slab,
+#chat-list-screen .chat-thread-card .chat-slab-stack,
+#chat-list-screen .chat-thread-card .chat-slab-mat,
+#chat-list-screen .chat-thread-card .chat-thread-panel { all: unset; display: block; flex: 1; min-width: 0; }
+#chat-list-screen .chat-thread-card .mx-list-av { display: grid !important; width: 50px; height: 50px; border-radius: 50%; }
+#chat-list-screen .chat-thread-card-name { font-size: 1rem !important; font-weight: 500 !important; font-style: normal !important; color: #1f1f1f !important; margin: 0 0 4px !important; }
+#chat-list-screen .chat-thread-card-snippet { font-size: 0.8rem !important; color: #8c8c8c !important; margin: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#chat-list-screen .chat-thread-card-meta { position: absolute; top: 14px; right: 16px; font-size: 0.68rem !important; color: #a8a8a8 !important; }
+body.dark #chat-list-screen .chat-thread-card { background: #1c1d21 !important; }
+body.dark #chat-list-screen .chat-thread-card-name { color: #e8e8e8 !important; }
+`,
+    cute: `/* ===== Meow OS · 奶油小猫主页（可以复制去改颜色） ===== */
+/* 桌面底色：奶油粉 + 小爪印 */
+#phone .wallpaper:not([style*="url"]) {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.9) 0 6px, transparent 7px),
+    radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.9) 0 5px, transparent 6px),
+    linear-gradient(160deg, #fff4f0 0%, #ffe3ec 55%, #f6e7ff 100%) !important;
+}
+/* 顶部时间卡片 */
+#phone .hero-card {
+  border-radius: 28px !important;
+  border: 2px solid #ffd3e1 !important;
+  background: rgba(255, 252, 250, 0.92) !important;
+  box-shadow: 0 8px 24px -10px rgba(255, 140, 170, 0.45) !important;
+}
+#phone .hero-card h1 { color: #e0789b !important; }
+/* 第一页应用卡片 */
+#phone .app-tower {
+  border-radius: 28px !important;
+  border: 2px dashed #ffc8d9 !important;
+  background: rgba(255, 250, 252, 0.85) !important;
+}
+#phone .app-nora {
+  border-radius: 20px !important;
+  border: 1.5px solid #ffd6e3 !important;
+  background: #fffafb !important;
+}
+#phone .app-nora i { color: #e889a8 !important; }
+/* 第二页方形图标 */
+#phone .desk-app-ico:not(.has-img) {
+  border-radius: 20px !important;
+  border: 1.5px solid #ffd3e1 !important;
+  background: linear-gradient(160deg, #fffdfb, #ffeef4) !important;
+  color: #e0789b !important;
+  box-shadow: 0 4px 12px -6px rgba(255, 130, 165, 0.5) !important;
+}
+#phone .desk-app-name { color: #8a5a6a !important; font-weight: 600; }
+/* 底部 Dock 栏 */
+#phone .dock-plate {
+  border-radius: 999px !important;
+  border: 2px solid #ffd3e1 !important;
+  background: rgba(255, 250, 252, 0.92) !important;
+}
+`
+  };
+  const CHAT_SKINS = [
+    ["default", "默认", "Meow OS 原来的样子"],
+    ["wechat", "微信风", "绿色气泡、方形头像"],
+    ["qq", "QQ 风", "蓝色气泡、圆形头像"]
+  ];
+  const HOME_SKINS = [
+    ["default", "默认", "原来的桌面"],
+    ["cute", "奶油小猫", "粉粉的奶油色桌面"]
+  ];
+
+  const get = (k, d) => {
+    try {
+      return localStorage.getItem(k) || d;
+    } catch (_) {
+      return d;
+    }
+  };
+  let styleEl = null;
+  function apply() {
+    const chat = get(KEY_CHAT, "default");
+    const home = get(KEY_HOME, "default");
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "mx-skin-css";
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = (CSS[chat] || "") + "\n" + (CSS[home] || "");
+    document.documentElement.dataset.mxChatSkin = chat;
+    if (chat !== "default") decorateList();
+  }
+
+  /* 微信 / QQ 风格：聊天列表加头像 */
+  function decorateList() {
+    if (get(KEY_CHAT, "default") === "default") return;
+    document.querySelectorAll("#chat-list-screen .chat-thread-card").forEach((btn) => {
+      if (btn.querySelector(".mx-list-av")) return;
+      const av = document.createElement("span");
+      av.className = "mx-list-av";
+      const name = btn.querySelector(".chat-thread-card-name")?.textContent?.trim() || "?";
+      let url = "";
+      try {
+        const it = btn.dataset.charId && typeof getCharPersonaItemById === "function" ? getCharPersonaItemById(btn.dataset.charId) : null;
+        url = it && it.avatar ? String(it.avatar) : "";
+      } catch (_) {
+        url = "";
+      }
+      if (url && typeof applyChatAvatarUrlToImg === "function") {
+        const im = document.createElement("img");
+        im.alt = "";
+        av.appendChild(im);
+        try {
+          applyChatAvatarUrlToImg(im, url);
+        } catch (_) {
+          im.remove();
+          av.textContent = name.slice(0, 1);
+        }
+      } else av.textContent = name.slice(0, 1);
+      btn.insertBefore(av, btn.firstChild);
+    });
+  }
+  const listRoot = document.getElementById("chat-thread-list-root");
+  if (listRoot && window.MutationObserver) new MutationObserver(() => decorateList()).observe(listRoot, { childList: true, subtree: true });
+
+  /* ═════════ 装扮页「风格包」 ═════════ */
+  function preview(kind) {
+    if (kind === "cute") return `<span class="mxk-pv mxk-pv--cute"><i></i><i></i><i></i><i></i></span>`;
+    if (kind === "default" && this === "home") return `<span class="mxk-pv mxk-pv--home"><i></i><i></i><i></i><i></i></span>`;
+    return `<span class="mxk-pv mxk-pv--${kind}"><b></b><em></em><b></b></span>`;
+  }
+  function render(box) {
+    const chat = get(KEY_CHAT, "default");
+    const home = get(KEY_HOME, "default");
+    box.innerHTML = `<div><p class="widget-label"><i class="ph ph-paint-bucket" aria-hidden="true"></i> 风格包</p>
+      <p class="settings-ai-blurb wardrobe-panel-lead">一键换聊天和桌面的样子。每套都附带源码，可以复制下来改颜色。</p></div>
+      <p class="mxk-k">聊天风格（气泡 + 聊天列表）</p>
+      <div class="mxk-row">${CHAT_SKINS.map(([k, n, d]) => `<button type="button" class="mxk-opt${chat === k ? " is-on" : ""}" data-chat="${k}">${preview.call("chat", k)}<b>${n}</b><small>${d}</small></button>`).join("")}</div>
+      <p class="mxk-k">主页风格</p>
+      <div class="mxk-row">${HOME_SKINS.map(([k, n, d]) => `<button type="button" class="mxk-opt${home === k ? " is-on" : ""}" data-home="${k}">${preview.call("home", k)}<b>${n}</b><small>${d}</small></button>`).join("")}</div>
+      <div class="mxk-src"><span>查看源码：</span><button type="button" class="chip ghost chip-xs" data-src="wechat">微信风</button><button type="button" class="chip ghost chip-xs" data-src="qq">QQ 风</button><button type="button" class="chip ghost chip-xs" data-src="cute">奶油小猫</button></div>`;
+  }
+  function showSource(k) {
+    const name = { wechat: "微信风", qq: "QQ 风", cute: "奶油小猫" }[k];
+    const F = FUN();
+    if (!F) return toast("还在加载，稍等一下");
+    const sh = F.openSheet(
+      `<div class="mxk-code"><p class="fun-note">这就是「${name}」的全部 CSS 源码。可以复制下来改颜色，改好后粘进「装扮 → 聊天界面样式 · CSS」的代码框，再点「保存并应用」。</p>
+        <textarea readonly spellcheck="false">${esc(CSS[k])}</textarea>
+        <div class="fun-setup-btns"><button type="button" class="fun-btn ghost" data-do="fill">放进 CSS 框里改</button><button type="button" class="fun-btn solid" data-do="copy">复制源码</button></div></div>`,
+      { title: `${name} · 源码` }
+    );
+    sh.body.addEventListener("click", async (e) => {
+      const d = e.target.closest("[data-do]")?.dataset.do;
+      if (d === "copy") {
+        try {
+          await navigator.clipboard.writeText(CSS[k]);
+          toast("已复制");
+        } catch (_) {
+          const ta = sh.body.querySelector("textarea");
+          ta.select();
+          document.execCommand?.("copy");
+          toast("已复制");
+        }
+      } else if (d === "fill") {
+        const ta = document.getElementById("ward-chat-css-input");
+        if (!ta) return toast("先打开「我的 → 装扮」再试");
+        ta.value = CSS[k];
+        ta.dispatchEvent(new Event("input", { bubbles: true }));
+        sh.close();
+        ta.scrollIntoView({ behavior: "smooth", block: "center" });
+        toast("已放进代码框，改好后点「保存并应用」");
+      }
+    });
+  }
+  function inject() {
+    const host = document.getElementById("ward-widgets-entry");
+    if (!host) return false;
+    if (document.getElementById("mx-skin-panel")) return true;
+    const box = document.createElement("div");
+    box.id = "mx-skin-panel";
+    box.className = "settings-panel wardrobe-panel mxk";
+    host.insertBefore(box, host.firstChild);
+    render(box);
+    box.addEventListener("click", (e) => {
+      const c = e.target.closest("[data-chat]");
+      const h = e.target.closest("[data-home]");
+      const s = e.target.closest("[data-src]");
+      if (s) return showSource(s.dataset.src);
+      if (!c && !h) return;
+      try {
+        if (c) localStorage.setItem(KEY_CHAT, c.dataset.chat);
+        if (h) localStorage.setItem(KEY_HOME, h.dataset.home);
+      } catch (_) {
+        /* ignore */
+      }
+      apply();
+      render(box);
+      toast("已换好，去聊天 / 桌面看看吧");
+    });
+    return true;
+  }
+  apply();
+  if (!inject()) {
+    let n = 0;
+    const t = setInterval(() => {
+      if (inject() || ++n > 120) clearInterval(t);
+    }, 500);
+  }
+  window.XXJ_SKINS = { apply, css: CSS };
+})();

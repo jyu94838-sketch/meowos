@@ -17143,6 +17143,12 @@ function charDisplayNameFromStore(charId) {
 function syncChatDetailFaceLockSelect(th) {
   const sel = document.getElementById("chat-detail-face-lock");
   if (sel instanceof HTMLSelectElement) sel.value = threadFaceLockLevel(th);
+  const av = document.getElementById("chat-detail-hide-avatars-toggle");
+  if (av) av.setAttribute("aria-pressed", th && th.hideAvatars ? "true" : "false");
+}
+/** 聊天设置「隐藏头像」：给聊天界面加 class */
+function applyChatHideAvatarsClass(th) {
+  document.getElementById("chat-screen")?.classList.toggle("mx-hide-av", !!(th && th.hideAvatars));
 }
 
 function syncChatDetailLinkedGroupSelect(th) {
@@ -38710,6 +38716,11 @@ function finishChatMessagesRenderShell(stickerReusePool, photoReusePool, msgRowR
 }
 
 function renderChatMessages() {
+  try {
+    applyChatHideAvatarsClass(readActiveThread());
+  } catch (_) {
+    /* ignore */
+  }
   const root = document.getElementById("chat-messages");
   const allowLatestAssistAnim = chatAnimateLatestAssistantReply;
   chatAnimateLatestAssistantReply = false;
@@ -65146,6 +65157,19 @@ document.getElementById("chat-ui-theme-switch")?.addEventListener("click", (e) =
   if (!kind || kind === getActiveThreadUiThemeKind()) return;
   applyChatUiThemeKindToActiveThread(kind);
 });
+document.getElementById("chat-detail-hide-avatars-toggle")?.addEventListener("click", (e) => {
+  const btn = e.currentTarget;
+  if (!readActiveThread()) return;
+  const on = btn.getAttribute("aria-pressed") !== "true";
+  patchActiveThread((t) => {
+    if (on) t.hideAvatars = true;
+    else delete t.hideAvatars;
+  });
+  btn.setAttribute("aria-pressed", on ? "true" : "false");
+  applyChatHideAvatarsClass(readActiveThread());
+  showToast(on ? "这个聊天已隐藏头像" : "已显示头像");
+});
+
 document.getElementById("chat-detail-face-lock")?.addEventListener("change", (e) => {
   const v = String(e.target.value || "normal");
   if (!readActiveThread()) return;

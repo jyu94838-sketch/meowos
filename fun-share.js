@@ -218,8 +218,215 @@
     ctx.closePath();
   }
 
+  /* ───── 可爱小猫系列卡面 ───── */
+  const CAT_STYLE = {
+    look: { fur: "#ffd9e6", dark: "#f3a6c0", bg1: "#fff0f5", bg2: "#ffd6e5", ink: "#c45d86", acc: "bow" },
+    worldbook: { fur: "#dbe9ff", dark: "#9dbcf0", bg1: "#f1f6ff", bg2: "#d5e5ff", ink: "#4a6fa8", acc: "glasses" },
+    char: { fur: "#e9e0ff", dark: "#b9a5f0", bg1: "#f6f2ff", bg2: "#e3d9ff", ink: "#7457c4", acc: "star" },
+    preset: { fur: "#d8f5e6", dark: "#93d9b5", bg1: "#effcf5", bg2: "#d2f2e2", ink: "#2f8a63", acc: "leaf" },
+    font: { fur: "#fff1c9", dark: "#f0cf6e", bg1: "#fffaea", bg2: "#ffedb8", ink: "#a37f12", acc: "pencil" }
+  };
+  function paw(ctx, x, y, r, color) {
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(x, y + r * 0.35, r * 0.62, r * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    [[-0.62, -0.32], [-0.22, -0.68], [0.22, -0.68], [0.62, -0.32]].forEach(([dx, dy]) => {
+      ctx.beginPath();
+      ctx.ellipse(x + dx * r, y + dy * r, r * 0.22, r * 0.27, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+  /** 一只圆滚滚的小猫头（cx, cy 为脸中心，r 为半径） */
+  function drawCat(ctx, cx, cy, r, st) {
+    ctx.save();
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    const line = "#5b4a52";
+    // 耳朵
+    [-1, 1].forEach((sd) => {
+      ctx.beginPath();
+      ctx.moveTo(cx + sd * r * 0.92, cy - r * 0.18);
+      ctx.quadraticCurveTo(cx + sd * r * 0.98, cy - r * 1.18, cx + sd * r * 0.42, cy - r * 0.82);
+      ctx.closePath();
+      ctx.fillStyle = st.fur;
+      ctx.fill();
+      ctx.lineWidth = r * 0.06;
+      ctx.strokeStyle = line;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx + sd * r * 0.8, cy - r * 0.32);
+      ctx.quadraticCurveTo(cx + sd * r * 0.86, cy - r * 0.95, cx + sd * r * 0.52, cy - r * 0.72);
+      ctx.closePath();
+      ctx.fillStyle = "#ffc2d4";
+      ctx.fill();
+    });
+    // 脸
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * 1.05, r * 0.86, 0, 0, Math.PI * 2);
+    ctx.fillStyle = st.fur;
+    ctx.fill();
+    ctx.lineWidth = r * 0.06;
+    ctx.strokeStyle = line;
+    ctx.stroke();
+    // 额头花纹
+    ctx.strokeStyle = st.dark;
+    ctx.lineWidth = r * 0.07;
+    [-0.18, 0, 0.18].forEach((dx) => {
+      ctx.beginPath();
+      ctx.moveTo(cx + dx * r, cy - r * 0.78);
+      ctx.lineTo(cx + dx * r, cy - r * 0.58);
+      ctx.stroke();
+    });
+    // 腮红
+    ctx.fillStyle = "rgba(255,140,170,0.45)";
+    [-1, 1].forEach((sd) => {
+      ctx.beginPath();
+      ctx.ellipse(cx + sd * r * 0.6, cy + r * 0.22, r * 0.17, r * 0.1, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    // 眼睛（亮晶晶）
+    [-1, 1].forEach((sd) => {
+      const ex = cx + sd * r * 0.38;
+      const ey = cy - r * 0.02;
+      ctx.fillStyle = line;
+      ctx.beginPath();
+      ctx.ellipse(ex, ey, r * 0.12, r * 0.15, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.arc(ex - r * 0.04, ey - r * 0.06, r * 0.045, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(ex + r * 0.04, ey + r * 0.05, r * 0.022, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    // 鼻子 + ω 嘴
+    ctx.fillStyle = "#ff8fab";
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 0.07, cy + r * 0.13);
+    ctx.lineTo(cx + r * 0.07, cy + r * 0.13);
+    ctx.lineTo(cx, cy + r * 0.21);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = line;
+    ctx.lineWidth = r * 0.045;
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.09, cy + r * 0.24, r * 0.09, 0.15 * Math.PI, 0.95 * Math.PI);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx + r * 0.09, cy + r * 0.24, r * 0.09, 0.05 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+    // 胡须
+    ctx.lineWidth = r * 0.03;
+    [-1, 1].forEach((sd) => {
+      [-0.06, 0.08].forEach((dy) => {
+        ctx.beginPath();
+        ctx.moveTo(cx + sd * r * 0.72, cy + r * (0.14 + dy));
+        ctx.lineTo(cx + sd * r * 1.18, cy + r * (0.08 + dy * 1.6));
+        ctx.stroke();
+      });
+    });
+    // 小配饰：每种资源一只不同的猫
+    ctx.lineWidth = r * 0.05;
+    if (st.acc === "bow") {
+      const bx = cx + r * 0.62;
+      const by = cy - r * 0.62;
+      ctx.fillStyle = "#ff7aa2";
+      [-1, 1].forEach((sd) => {
+        ctx.beginPath();
+        ctx.moveTo(bx, by);
+        ctx.lineTo(bx + sd * r * 0.32, by - r * 0.16);
+        ctx.lineTo(bx + sd * r * 0.32, by + r * 0.16);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      });
+      ctx.beginPath();
+      ctx.arc(bx, by, r * 0.08, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else if (st.acc === "glasses") {
+      ctx.strokeStyle = line;
+      [-1, 1].forEach((sd) => {
+        ctx.beginPath();
+        ctx.arc(cx + sd * r * 0.38, cy - r * 0.02, r * 0.22, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+      ctx.beginPath();
+      ctx.moveTo(cx - r * 0.16, cy - r * 0.04);
+      ctx.lineTo(cx + r * 0.16, cy - r * 0.04);
+      ctx.stroke();
+    } else if (st.acc === "star") {
+      const sx = cx + r * 0.66;
+      const sy = cy - r * 0.66;
+      ctx.fillStyle = "#ffd34d";
+      ctx.beginPath();
+      for (let k = 0; k < 10; k++) {
+        const a = -Math.PI / 2 + (k * Math.PI) / 5;
+        const rr = k % 2 ? r * 0.11 : r * 0.26;
+        ctx.lineTo(sx + Math.cos(a) * rr, sy + Math.sin(a) * rr);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else if (st.acc === "leaf") {
+      ctx.fillStyle = "#6fcf97";
+      ctx.beginPath();
+      ctx.ellipse(cx + r * 0.1, cy - r * 1.0, r * 0.26, r * 0.12, -0.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r * 0.86);
+      ctx.lineTo(cx + r * 0.05, cy - r * 0.96);
+      ctx.stroke();
+    } else if (st.acc === "pencil") {
+      ctx.save();
+      ctx.translate(cx + r * 0.78, cy - r * 0.62);
+      ctx.rotate(0.6);
+      ctx.fillStyle = "#ffcf5a";
+      ctx.fillRect(-r * 0.07, -r * 0.34, r * 0.14, r * 0.5);
+      ctx.strokeRect(-r * 0.07, -r * 0.34, r * 0.14, r * 0.5);
+      ctx.fillStyle = "#f6c7a0";
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.07, r * 0.16);
+      ctx.lineTo(r * 0.07, r * 0.16);
+      ctx.lineTo(0, r * 0.3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+  /** 小猫趴在框上：两只小爪子 */
+  function catPaws(ctx, cx, y, r, st) {
+    ctx.save();
+    ctx.fillStyle = st.fur;
+    ctx.strokeStyle = "#5b4a52";
+    ctx.lineWidth = r * 0.06;
+    [-1, 1].forEach((sd) => {
+      ctx.beginPath();
+      ctx.ellipse(cx + sd * r * 0.55, y, r * 0.24, r * 0.17, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.lineWidth = r * 0.035;
+      [-0.08, 0.08].forEach((dx) => {
+        ctx.beginPath();
+        ctx.moveTo(cx + sd * r * 0.55 + dx * r, y + r * 0.02);
+        ctx.lineTo(cx + sd * r * 0.55 + dx * r, y + r * 0.13);
+        ctx.stroke();
+      });
+      ctx.lineWidth = r * 0.06;
+    });
+    ctx.restore();
+  }
+
   async function drawCard({ kind, title, author, desc, cover, sub }) {
     const m = KIND_META[kind];
+    const st = CAT_STYLE[kind] || CAT_STYLE.look;
     const W = 720;
     const H = 960;
     const c = document.createElement("canvas");
@@ -227,90 +434,121 @@
     c.height = H;
     const ctx = c.getContext("2d");
     const font = '"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif';
+    // 底色 + 散落的小爪印
     const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, m.c1);
-    g.addColorStop(1, "#ffffff");
+    g.addColorStop(0, st.bg1);
+    g.addColorStop(1, st.bg2);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
-    // 胶带 + 卡片
+    [[60, 40, 14], [660, 120, 18], [30, 520, 16], [690, 640, 14], [120, 930, 18], [600, 920, 12], [360, 22, 10]].forEach(([x, y, r]) => paw(ctx, x, y, r, "rgba(255,255,255,0.75)"));
+    // 白色卡片
     ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.12)";
-    ctx.shadowBlur = 30;
-    ctx.shadowOffsetY = 10;
-    roundRect(ctx, 48, 60, W - 96, H - 120, 36);
-    ctx.fillStyle = "#fff";
+    ctx.shadowColor = "rgba(120,80,100,0.16)";
+    ctx.shadowBlur = 34;
+    ctx.shadowOffsetY = 12;
+    roundRect(ctx, 48, 70, W - 96, H - 130, 44);
+    ctx.fillStyle = "#fffdfb";
     ctx.fill();
     ctx.restore();
     ctx.save();
-    ctx.translate(W / 2, 60);
-    ctx.rotate(-0.04);
-    ctx.fillStyle = "rgba(255,255,255,0.75)";
-    ctx.fillRect(-90, -18, 180, 36);
+    ctx.setLineDash([10, 9]);
+    ctx.strokeStyle = st.dark;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 2.5;
+    roundRect(ctx, 64, 86, W - 128, H - 162, 34);
+    ctx.stroke();
     ctx.restore();
-    // 封面
+    // 封面窗
+    const cx = 92;
+    const cy = 214;
+    const cw = W - 184;
+    const ch = 300;
     const img = await loadImg(cover);
-    const cx = 84;
-    const cy = 104;
-    const cw = W - 168;
-    const ch = 400;
     ctx.save();
-    roundRect(ctx, cx, cy, cw, ch, 24);
+    roundRect(ctx, cx, cy, cw, ch, 30);
     ctx.clip();
     if (img) {
       const s = Math.max(cw / img.width, ch / img.height);
       ctx.drawImage(img, cx + (cw - img.width * s) / 2, cy + (ch - img.height * s) / 2, img.width * s, img.height * s);
     } else {
       const g2 = ctx.createLinearGradient(cx, cy, cx + cw, cy + ch);
-      g2.addColorStop(0, m.c1);
-      g2.addColorStop(1, m.c2);
+      g2.addColorStop(0, st.bg2);
+      g2.addColorStop(1, st.fur);
       ctx.fillStyle = g2;
       ctx.fillRect(cx, cy, cw, ch);
-      ctx.font = `160px ${font}`;
+      for (let yy = cy + 30; yy < cy + ch; yy += 70)
+        for (let xx = cx + ((yy / 70) % 2 ? 30 : 65); xx < cx + cw; xx += 90) paw(ctx, xx, yy, 13, "rgba(255,255,255,0.6)");
+      ctx.fillStyle = st.ink;
+      ctx.globalAlpha = 0.85;
+      ctx.font = `bold 46px ${font}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(m.icon, W / 2, cy + ch / 2);
+      ctx.fillText(`${m.icon} ${m.name}`, W / 2, cy + ch / 2 + 46);
+      ctx.globalAlpha = 1;
     }
     ctx.restore();
-    // 标签
-    ctx.textAlign = "left";
-    ctx.textBaseline = "alphabetic";
-    ctx.font = `600 22px ui-monospace, Menlo, monospace`;
-    ctx.fillStyle = m.c2;
-    ctx.fillText(`${m.icon} MXJ CARD · ${m.name}`, cx, cy + ch + 52);
-    // 标题
-    ctx.fillStyle = "#17191c";
-    ctx.font = `bold italic 44px "Times New Roman","Songti SC",${font}`;
-    wrapText(ctx, title || "未命名", cw, 2).forEach((l, i) => ctx.fillText(l, cx, cy + ch + 112 + i * 54));
-    // 描述
-    ctx.font = `24px ${font}`;
-    ctx.fillStyle = "#6d727b";
-    const dy = cy + ch + 112 + Math.min(2, wrapText(ctx, title || "", cw, 2).length) * 54 + 6;
-    wrapText(ctx, desc || sub || "", cw, 3).forEach((l, i) => ctx.fillText(l, cx, dy + i * 34));
-    // 底栏
-    ctx.strokeStyle = "#e7e8ea";
-    ctx.beginPath();
-    ctx.moveTo(cx, H - 150);
-    ctx.lineTo(cx + cw, H - 150);
-    ctx.stroke();
-    ctx.font = `24px ${font}`;
-    ctx.fillStyle = "#17191c";
-    ctx.fillText(`by ${author || "匿名"}`, cx, H - 108);
-    ctx.font = `18px ${font}`;
-    ctx.fillStyle = "#9aa0a8";
-    ctx.fillText("Meow OS · 专属资源卡 · 仅限本站「资源站」导入", cx, H - 76);
-    // 印章
     ctx.save();
-    ctx.translate(W - 150, H - 100);
-    ctx.rotate(-0.2);
-    ctx.strokeStyle = m.c2;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(0, 0, 44, 0, Math.PI * 2);
+    roundRect(ctx, cx, cy, cw, ch, 30);
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = "#5b4a52";
     ctx.stroke();
-    ctx.fillStyle = m.c2;
-    ctx.font = `bold 22px ui-monospace, Menlo, monospace`;
-    ctx.textAlign = "center";
-    ctx.fillText("MXJ", 0, 8);
+    ctx.restore();
+    // 趴在封面上的小猫
+    drawCat(ctx, W / 2, cy - 22, 82, st);
+    catPaws(ctx, W / 2, cy + 4, 82, st);
+    // 类型小标签
+    ctx.textBaseline = "middle";
+    ctx.font = `bold 22px ${font}`;
+    const tag = `🐾 MEOW CARD · ${m.name}`;
+    const tw = ctx.measureText(tag).width + 36;
+    roundRect(ctx, cx, cy + ch + 30, tw, 42, 21);
+    ctx.fillStyle = st.bg2;
+    ctx.fill();
+    ctx.fillStyle = st.ink;
+    ctx.textAlign = "left";
+    ctx.fillText(tag, cx + 18, cy + ch + 52);
+    // 标题（先量好行数，再排副标题，避免重叠）
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#3d3036";
+    ctx.font = `bold 40px ${font}`;
+    const tLines = wrapText(ctx, title || "未命名", cw, 2);
+    const ty = cy + ch + 124;
+    tLines.forEach((l, i) => ctx.fillText(l, cx, ty + i * 52));
+    ctx.font = `24px ${font}`;
+    ctx.fillStyle = "#8a7c83";
+    const dy = ty + (tLines.length - 1) * 52 + 44;
+    wrapText(ctx, desc || sub || "", cw, 2).forEach((l, i) => ctx.fillText(l, cx, dy + i * 34));
+    // 底栏
+    ctx.save();
+    ctx.setLineDash([6, 8]);
+    ctx.strokeStyle = st.dark;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, H - 184);
+    ctx.lineTo(cx + cw, H - 184);
+    ctx.stroke();
+    ctx.restore();
+    paw(ctx, cx + 12, H - 142, 13, st.dark);
+    ctx.font = `bold 24px ${font}`;
+    ctx.fillStyle = "#3d3036";
+    ctx.fillText(`by ${author || "匿名"}`, cx + 34, H - 134);
+    ctx.font = `18px ${font}`;
+    ctx.fillStyle = "#a99ba2";
+    ctx.fillText("Meow OS 专属资源卡 · 只能在 Meow OS 里导入", cx, H - 104);
+    // 右下角小猫印章
+    ctx.save();
+    ctx.translate(W - 150, H - 140);
+    ctx.rotate(-0.15);
+    ctx.beginPath();
+    ctx.arc(0, 0, 50, 0, Math.PI * 2);
+    ctx.fillStyle = st.bg1;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = st.ink;
+    ctx.setLineDash([5, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    drawCat(ctx, 0, 6, 26, st);
     ctx.restore();
     return new Promise((res) => c.toBlob((b) => res(b), "image/png"));
   }

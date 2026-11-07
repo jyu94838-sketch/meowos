@@ -123,7 +123,7 @@
   <link rel="stylesheet" href="roam.css?v=31">
   <link rel="stylesheet" href="forum.css?v=44">
   <link rel="stylesheet" href="relation.css?v=18">
-  <link rel="stylesheet" href="fun.css?v=25">
+  <link rel="stylesheet" href="fun.css?v=26">
 </head>
 <body>
   <div class="boot-splash" id="boot-splash" aria-live="polite" aria-busy="true" aria-label="Meow OS · 开屏画面，请稍后点击进入">
@@ -4615,6 +4615,13 @@
                       <p class="chat-detail-lead chat-detail-lead--compact mx-hint">不显示每条消息的发送时间。</p>
                     </div>
                     <div class="chat-detail-field chat-detail-field--switch">
+                      <span class="chat-detail-field-k">隐藏头像</span>
+                      <button type="button" class="chat-detail-switch" id="chat-detail-hide-avatars-toggle" aria-pressed="false">
+                        <span class="visually-hidden">隐藏头像</span>
+                      </button>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">聊天里不显示你和 TA 的头像，只留气泡。只对这个聊天生效。</p>
+                    </div>
+                    <div class="chat-detail-field chat-detail-field--switch">
                       <span class="chat-detail-field-k">时间感知</span>
                       <button type="button" class="chat-detail-switch" id="chat-detail-time-aware-toggle" aria-pressed="false">
                         <span class="visually-hidden">时间感知</span>
@@ -8641,7 +8648,8 @@
       </div>
 
   <!-- app.js / ai-api 由 db.js 在 #phone 就绪后注入；图标字体需尽早加载 -->
-  <script src="fun-desk.js?v=10"></script>
+  <script src="fun-desk.js?v=11"></script>
+  <script src="mx-skins.js?v=3"></script>
   <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web"></script>
 </body>
 </html>
