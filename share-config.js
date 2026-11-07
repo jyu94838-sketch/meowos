@@ -6,6 +6,6 @@
  * 留空则资源站只能本地导出/导入 PNG，广场不可用。
  */
 window.MX_SHARE_CONFIG = {
-  url: "",
-  anonKey: ""
+  url: "https://hmnfcbkrzfwsofhhpmxu.supabase.co",
+  anonKey: "sb_publishable_yb4qdsanq82oMImqhCHseg_UrJ4PouS"
 };
