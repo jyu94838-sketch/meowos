@@ -8081,3 +8081,9 @@ img.cp-pet-img.is-sleepy { filter: brightness(0.85) saturate(0.8); }
 .mx-fs-pop.is-bottom { top: auto; left: 12px; right: 12px; width: auto; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
 .wb-rename { margin-left: 6px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); background: none; color: var(--text-sub); font: inherit; font-size: 0.66rem; font-weight: 400; vertical-align: 2px; cursor: pointer; }
 .dr-item.is-m::after { content: "♂"; margin-left: 4px; font-size: 0.7rem; color: #5b8def; }
+
+/* 导入文件按钮（预设 / 提示词） */
+.mx-imp-bar { display: flex; justify-content: flex-end; margin: 4px 0 2px; }
+.mx-imp-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 999px; border: 1px dashed var(--line, #ccc); background: none; color: var(--text-sub, #888); font: inherit; font-size: 0.72rem; cursor: pointer; }
+.mx-imp-btn small { opacity: 0.65; font-size: 0.62rem; }
+.mx-imp-btn:active { opacity: 0.6; }
