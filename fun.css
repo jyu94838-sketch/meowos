@@ -6447,3 +6447,86 @@ body.dark .desk-apps-grid .desk-app.app-nora {
   min-height: 70px;
   box-sizing: border-box;
 }
+
+/* ═════════ 桌面图标大小（--mx-ico，由「桌面图标」设置） ═════════ */
+html .app-nora > i,
+html .app-nora-mini > i,
+html .desk-apps-grid .desk-app.app-nora > i {
+  font-size: var(--mx-ico, 1rem);
+}
+html .app-nora > img.home-app-icon,
+html .app-nora-mini > img.home-app-icon,
+html .desk-apps-grid .desk-app.app-nora > img.home-app-icon {
+  width: var(--mx-ico, 1.05rem);
+  height: var(--mx-ico, 1.05rem);
+  border-radius: calc(var(--mx-ico, 16px) * 0.28);
+  object-fit: cover;
+}
+.desk-apps-grid .desk-app.app-nora > i,
+.desk-apps-grid .desk-app.app-nora > img.home-app-icon {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  opacity: 0.88;
+}
+.desk-apps-grid .desk-app.app-nora > img.home-app-icon {
+  opacity: 1;
+}
+.desk-apps-grid .desk-app.app-nora {
+  position: relative;
+  min-height: max(70px, calc(var(--mx-ico, 16px) + 50px));
+}
+.desk-apps-grid .desk-app.app-nora .app-nora-k {
+  max-width: calc(100% - var(--mx-ico, 16px) - 6px);
+}
+html .app-nora {
+  min-height: max(70px, calc(var(--mx-ico, 16px) + 50px));
+}
+html .app-nora-mini {
+  min-height: max(64px, calc(var(--mx-ico, 16px) + 44px));
+}
+
+/* 「桌面图标」设置页 */
+.ico-m {
+  padding: 18px 16px 40px;
+}
+.ico-size {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 6px;
+}
+.ico-size input[type="range"] {
+  flex: 1;
+  accent-color: var(--text-main);
+}
+.ico-size span {
+  min-width: 44px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+}
+.ico-preview,
+.ico-grid {
+  margin-top: 12px;
+}
+.ico-reset-all {
+  display: block;
+  margin: 18px auto 0;
+}
+.ico-acts {
+  flex-direction: column;
+}
+.desk-icons-btn {
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 0.74rem;
+  background: none;
+  color: var(--text-main);
+  cursor: pointer;
+  margin-left: auto;
+}
+html .app-nora-main {
+  min-height: max(86px, calc(var(--mx-ico, 16px) + 60px));
+}

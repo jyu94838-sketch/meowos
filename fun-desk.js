@@ -13,6 +13,31 @@
   if (!phone || !shell || document.getElementById("desk-pager")) return;
 
   const LAYOUT_KEY = "meowos_desk_layout_v1";
+  const ICONS_KEY = "meowos_desk_icons_v1";
+  const SIZE_KEY = "meowos_icon_size";
+  /** 第二页里和第一页同一个应用的格子：换图标时两边一起换（第一页用原版装扮里的图标设置） */
+  const HOME_SLOT = { chat: "聊天", checkup: "查岗", relation: "关系", char: "人设", roam: "漫游", my: "我的" };
+
+  function readIcons() {
+    try {
+      const o = JSON.parse(localStorage.getItem(ICONS_KEY) || "{}");
+      return o && typeof o === "object" ? o : {};
+    } catch (_) {
+      return {};
+    }
+  }
+  let icons = readIcons();
+  function applyIconSize() {
+    let px = 0;
+    try {
+      px = Number(localStorage.getItem(SIZE_KEY)) || 0;
+    } catch (_) {
+      px = 0;
+    }
+    if (px >= 12 && px <= 64) document.documentElement.style.setProperty("--mx-ico", px + "px");
+    else document.documentElement.style.removeProperty("--mx-ico");
+  }
+  applyIconSize();
   const fun = (k) => () => {
     if (typeof window.openFunApp === "function") window.openFunApp(k);
     else if (typeof showToast === "function") showToast("还在加载，稍等一下");
@@ -86,7 +111,7 @@
 
   const editBar = document.createElement("div");
   editBar.className = "desk-editbar";
-  editBar.innerHTML = `<span>拖动图标调整位置 · 拖到边缘可以翻页</span><button type="button" class="desk-done">完成</button>`;
+  editBar.innerHTML = `<span>拖动图标调整位置 · 拖到边缘可以翻页</span><button type="button" class="desk-icons-btn">图标</button><button type="button" class="desk-done">完成</button>`;
   phone.appendChild(editBar);
 
   const dots = document.createElement("div");
@@ -96,7 +121,9 @@
   // 和第一页一样的卡片样式：英文小标 + 斜体名字 + 右上角线条图标
   const iconHtml = (k) => {
     const [name, icon, , kicker] = APPS[k];
-    return `<button type="button" class="desk-app app-nora" data-k="${k}"><span class="app-nora-k">${kicker}</span><strong>${name}</strong><i class="ph ${icon}"></i></button>`;
+    const img = icons[k];
+    const ico = img ? `<img class="home-app-icon" src="${img}" alt="" />` : `<i class="ph ${icon}"></i>`;
+    return `<button type="button" class="desk-app app-nora${img ? " has-home-app-icon" : ""}" data-k="${k}"><span class="app-nora-k">${kicker}</span><strong>${name}</strong>${ico}</button>`;
   };
 
   function render() {
@@ -182,6 +209,10 @@
     }
   }
   editBar.querySelector(".desk-done").addEventListener("click", () => setEditing(false));
+  editBar.querySelector(".desk-icons-btn").addEventListener("click", () => {
+    setEditing(false);
+    if (typeof window.openDeskIcons === "function") window.openDeskIcons(false);
+  });
 
   /** 从 DOM 顺序读回布局 */
   function readLayoutFromDom() {
@@ -338,5 +369,48 @@
 
   render();
   window.addEventListener("resize", renderDots);
-  window.XXJ_DESK = { render, setEditing };
+  /** 换图标：src 为 dataURL，传空则恢复默认 */
+  function setIcon(k, src) {
+    if (!APPS[k]) return;
+    if (src) icons[k] = src;
+    else delete icons[k];
+    try {
+      localStorage.setItem(ICONS_KEY, JSON.stringify(icons));
+    } catch (_) {
+      if (typeof showToast === "function") showToast("存不下了，图片太大或图标太多");
+      icons = readIcons();
+      return false;
+    }
+    // 第一页同名格子也一起换
+    const slot = HOME_SLOT[k];
+    if (slot && typeof window.mutateDesktopAppIconsKv === "function") {
+      try {
+        window.mutateDesktopAppIconsKv("home", (pack) => {
+          if (src) pack.byApp[slot] = src;
+          else delete pack.byApp[slot];
+        });
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    render();
+    return true;
+  }
+  function setIconSize(px) {
+    try {
+      if (px) localStorage.setItem(SIZE_KEY, String(px));
+      else localStorage.removeItem(SIZE_KEY);
+    } catch (_) {
+      /* ignore */
+    }
+    applyIconSize();
+  }
+  window.XXJ_DESK = {
+    render,
+    setEditing,
+    setIcon,
+    setIconSize,
+    getIcons: () => ({ ...icons }),
+    apps: () => Object.keys(APPS).map((k) => ({ key: k, name: APPS[k][0], icon: APPS[k][1], kicker: APPS[k][3] }))
+  };
 })();
