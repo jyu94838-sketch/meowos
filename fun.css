@@ -5799,8 +5799,30 @@ body.dark .wg-t-couple {
 .wg-ward {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   justify-content: space-between;
+  padding: 16px 16px 16px 18px;
+}
+.wg-ward > div:first-child {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wardrobe-screen .wg-ward .widget-label {
+  font-size: 0.62rem;
+  color: var(--text-main);
+}
+.wg-ward .wardrobe-panel-lead,
+.wardrobe-panel.wg-ward > div > .settings-ai-blurb.wardrobe-panel-lead {
+  padding: 0;
+  margin: 0;
+}
+#ward-widgets-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 .wg-ward .chip {
   flex-shrink: 0;
