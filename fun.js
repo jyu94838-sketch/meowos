@@ -547,7 +547,7 @@
     const sh = openSheet(
       `<p class="fm-ne-tip">${failed ? `《${esc(t.title)}》是 VIP 或版权受限歌曲，网页里放不了。<br/>` : ""}可以在网易云里用你自己的会员听完整版。</p>
        <a class="fun-btn solid wide fm-ne-btn" href="https://music.163.com/song?id=${id}" target="_blank" rel="noopener">在网易云里打开</a>
-       <p class="fun-note">手机上装了网易云 App 会直接跳过去；没装的话会打开网页版。听完切回 Meow OS 就行。</p>`,
+       <p class="fun-note">手机上装了网易云 App 会直接跳过去；没装的话会打开网页版。听完切回 Meow 就行。</p>`,
       { title: "🎵 去网易云听" }
     );
     sh.body.querySelector("a").addEventListener("click", () => setTimeout(() => sh.close(), 300));
@@ -1326,7 +1326,7 @@
     const t = curTrack();
     if (!t || !("mediaSession" in navigator)) return;
     try {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist || "未知歌手", album: "Meow OS · 音乐" });
+      navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist || "未知歌手", album: "Meow · 音乐" });
       navigator.mediaSession.setActionHandler("play", () => audio.play());
       navigator.mediaSession.setActionHandler("pause", () => audio.pause());
       navigator.mediaSession.setActionHandler("previoustrack", () => step(-1));

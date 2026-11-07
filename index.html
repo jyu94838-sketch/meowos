@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#0b0b0e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Meow OS">
+  <meta name="apple-mobile-web-app-title" content="Meow">
   <!-- app.js 由 db.js 在点「进入」后注入，勿 preload（避免 iOS 提前拉 1.6MB） -->
   <link rel="preload" href="auth.js?v=305" as="script">
   <link rel="preload" href="ai-api.js" as="script">
@@ -103,7 +103,7 @@
   </script>
   <link rel="icon" href="icons/icon-192.png?v=3" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=3">
-  <title>Meow OS</title>
+  <title>Meow</title>
   <!-- 首帧与浅色开屏同色，避免 style.css 加载前闪色 -->
   <style>
     html, body { margin: 0; min-height: 100%; background: #f0f1f3; color: #17191c; }
@@ -127,10 +127,10 @@
   <!-- 图标字体放在自己的仓库里：国内（尤其安卓）连不上 jsdelivr 时图标会全白 -->
   <link rel="stylesheet" href="vendor/phosphor/regular/style.css?v=1">
   <link rel="stylesheet" href="vendor/phosphor/fill/style.css?v=1">
-  <link rel="stylesheet" href="fun.css?v=32">
+  <link rel="stylesheet" href="fun.css?v=33">
 </head>
 <body>
-  <div class="boot-splash" id="boot-splash" aria-live="polite" aria-busy="true" aria-label="Meow OS · 开屏画面，请稍后点击进入">
+  <div class="boot-splash" id="boot-splash" aria-live="polite" aria-busy="true" aria-label="Meow · 开屏画面，请稍后点击进入">
     <div class="boot-splash-bg" aria-hidden="true">
       <div class="boot-splash-orbit"></div>
       <div class="boot-splash-aurora-mount" aria-hidden="true">
@@ -198,7 +198,7 @@
     <div class="boot-splash-stage">
       <div class="boot-splash-title-shell">
         <span class="boot-splash-title-glare" aria-hidden="true"></span>
-        <h1 class="boot-splash-title">Meow OS</h1>
+        <h1 class="boot-splash-title">Meow</h1>
       </div>
       <p class="boot-splash-eyebrow">Desktop narrative</p>
       <div class="boot-splash-meta-row">
@@ -223,7 +223,7 @@
       <p class="boot-splash-hint" id="boot-splash-hint">正在准备桌面与数据…</p>
     </div>
   </div>
-  <script src="boot-cat.js?v=9"></script>
+  <script src="boot-cat.js?v=10"></script>
   <script>
     /* 开屏时序（不等 app.js）；点击关闭由 db.js 内加载器接管 */
     (function () {
@@ -243,7 +243,7 @@
         window.__xxjBootSplashArmed = true;
         root.classList.add("boot-splash--ready");
         root.setAttribute("aria-busy", "false");
-        root.setAttribute("aria-label", "Meow OS · 点击按钮或画面任意处进入");
+        root.setAttribute("aria-label", "Meow · 点击按钮或画面任意处进入");
         var load = document.getElementById("boot-splash-load");
         if (load) {
           load.hidden = true;
@@ -819,7 +819,7 @@
               <div class="settings-panel settings-panel--soft">
                 <div class="settings-row settings-row-static">
                   <span class="settings-row-l">版本</span>
-                  <span class="settings-row-r">Meow OS · UI</span>
+                  <span class="settings-row-r">Meow · UI</span>
                 </div>
               </div>
             </section>
@@ -989,7 +989,7 @@
               <button type="button" class="chip ghost" id="notify-settings-bg-test">切后台延时测试</button>
             </div>
             <p class="settings-ai-key-note notify-settings-bg-test-hint">
-              点「切后台延时测试」后<strong>立刻</strong>切走（约 5 秒）。须从<strong>主屏幕图标</strong>打开（http/本地服务器），并开「后台保活」。若只有通知栏：系统设置 → Meow OS → 横幅/浮动。
+              点「切后台延时测试」后<strong>立刻</strong>切走（约 5 秒）。须从<strong>主屏幕图标</strong>打开（http/本地服务器），并开「后台保活」。若只有通知栏：系统设置 → Meow → 横幅/浮动。
             </p>
             <div class="chat-detail-field chat-detail-field--switch notify-settings-row">
               <span class="chat-detail-field-k">后台保活</span>
@@ -3780,10 +3780,10 @@
                     >
                       <i class="ph ph-file-zip" aria-hidden="true"></i> 导入 ZIP
                     </label>
-                    <button type="button" class="chip ghost chip-xs mx-png-import" data-mxpng="worldbook" aria-label="导入 Meow OS 世界书卡">
+                    <button type="button" class="chip ghost chip-xs mx-png-import" data-mxpng="worldbook" aria-label="导入 Meow 世界书卡">
                       <i class="ph ph-cat" aria-hidden="true"></i> 导入 PNG
                     </button>
-                    <button type="button" class="chip ghost chip-xs mx-png-import" data-mxpng-export="worldbook" aria-label="导出为 Meow OS PNG">
+                    <button type="button" class="chip ghost chip-xs mx-png-import" data-mxpng-export="worldbook" aria-label="导出为 Meow PNG">
                       <i class="ph ph-export" aria-hidden="true"></i> 导出 PNG
                     </button>
                     <button type="button" class="chip solid chip-xs world-book-add-btn" id="world-book-add">＋ 新书</button>
@@ -8679,7 +8679,7 @@
       </div>
 
   <!-- app.js / ai-api 由 db.js 在 #phone 就绪后注入；图标字体需尽早加载 -->
-  <script src="fun-desk.js?v=16"></script>
-  <script src="mx-skins.js?v=6"></script>
+  <script src="fun-desk.js?v=17"></script>
+  <script src="mx-skins.js?v=7"></script>
 </body>
 </html>

@@ -11,6 +11,16 @@
   // { v: 1, date: "2026-11-08", title: "标题", items: ["改了什么"] },
   const CHANGELOG = [
     {
+      v: 9,
+      date: "2026-11-08",
+      title: "改名 Meow · 两个新小游戏",
+      items: [
+        "名字改成 Meow 啦：开屏、标题、桌面图标名字、各处文字都换了（网址不变）",
+        "游戏厅新增「喵了个喵」：叠层消除，点没被压住的牌放进槽里，凑齐 3 张就消掉；一共 3 关，每关能用一次移出、撤回、洗牌",
+        "游戏厅新增「钢琴块」：只点黑块，越弹越快，弹对会放出小星星、欢乐颂、卡农、致爱丽丝的旋律"
+      ]
+    },
+    {
       v: 8,
       date: "2026-11-08",
       title: "联机 · 网易云会员 · 聊天页细节",
@@ -34,7 +44,7 @@
         "音乐搜歌直接搜网易云曲库，免费歌曲在小手机里就能听完整版；标了 VIP 的点「去听」跳网易云 App",
         "小组件可以随便放了：长按桌面进入编辑，小组件和图标一样拖到任意位置，被挤开的图标会自动让位",
         "聊天页整体跟着风格走：微信风 / QQ 风下，顶栏、输入框也换成对应样式，去掉了原来的角色大卡片（点顶栏名字还能看心声）",
-        "下载的图片、导出的文件名改成 MeowOS，通知标题也改成 Meow OS"
+        "下载的图片、导出的文件名改成 Meow，通知标题也改成 Meow"
       ]
     },
     {
@@ -123,7 +133,7 @@
     box.innerHTML = `<div class="mx-cl-mask"></div>
       <div class="mx-cl-card" role="dialog" aria-label="更新公告">
         <p class="mx-cl-k">${isUpdate ? "WHAT'S NEW" : "CHANGELOG"}</p>
-        <h3>${isUpdate ? "Meow OS 更新啦" : "更新公告"}</h3>
+        <h3>${isUpdate ? "Meow 更新啦" : "更新公告"}</h3>
         <div class="mx-cl-list">${entries.length ? "" : `<p class="mx-cl-empty">暂时还没有更新公告</p>`}${entries
           .map(
             (e) => `<section><p class="mx-cl-ver"><b>${esc(e.title)}</b><small>v${e.v} · ${esc(e.date)}</small></p><ul>${e.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></section>`

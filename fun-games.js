@@ -18,7 +18,9 @@
     { key: "情侣扫雷", icon: "💣", name: "情侣扫雷", desc: "各一块雷盘，输的人受罚" },
     { key: "谁是卧底", icon: "🕵️", name: "谁是卧底", desc: "描述词语，揪出卧底" },
     { key: "真心话大冒险", icon: "🍾", name: "真心话大冒险", desc: "转瓶子，敢不敢" },
-    { key: "你画我猜", icon: "🎨", name: "你画我猜", desc: "画给 TA 猜 / 猜 TA 的词" }
+    { key: "你画我猜", icon: "🎨", name: "你画我猜", desc: "画给 TA 猜 / 猜 TA 的词" },
+    { key: "喵了个喵", icon: "🐱", name: "喵了个喵", desc: "叠叠乐消除，凑 3 张就消" },
+    { key: "钢琴块", icon: "🎹", name: "钢琴块", desc: "只点黑块，越弹越快" }
   ];
 
   const needKey = () => {

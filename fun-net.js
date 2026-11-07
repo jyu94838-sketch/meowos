@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * 联机 · 和别的 Meow OS 用户一起玩
+ * 联机 · 和别的 Meow 用户一起玩
  * - 房间：6 位房间号，或者进「公共大厅」随便聊
  * - 每个人可以把自己的一个角色（char）带进房间：TA 用主人手机上的 AI 说话、一起玩游戏
  * - 小游戏：掷骰子比大小（输的人接惩罚）、数字炸弹、真心话大冒险
@@ -604,7 +604,7 @@
   }
   function drawLobby() {
     root.innerHTML = `<div class="net-lobby">
-      <div class="net-hero"><span>🌐</span><h3>和别的 Meow OS 用户一起玩</h3><p>建个房间把房间号发给朋友，或者去公共大厅随便聊聊。每个人都可以带上自己的一个角色，TA 会一起聊天、一起玩游戏。</p></div>
+      <div class="net-hero"><span>🌐</span><h3>和别的 Meow 用户一起玩</h3><p>建个房间把房间号发给朋友，或者去公共大厅随便聊聊。每个人都可以带上自己的一个角色，TA 会一起聊天、一起玩游戏。</p></div>
       <button type="button" class="fun-btn solid wide" data-a="create">＋ 新建房间</button>
       <div class="net-join"><input type="text" id="net-code" maxlength="6" placeholder="输入 6 位房间号" autocapitalize="characters" /><button type="button" class="fun-btn ghost" data-a="join">加入</button></div>
       <button type="button" class="fun-btn ghost wide" data-a="public">🏛 去公共大厅</button>
@@ -730,7 +730,7 @@
     }
     if (a === "leave") return leaveRoom();
     if (a === "copy") {
-      navigator.clipboard?.writeText(`来 Meow OS 联机找我玩！打开「联机」输入房间号：${R.code}`).then(
+      navigator.clipboard?.writeText(`来 Meow 联机找我玩！打开「联机」输入房间号：${R.code}`).then(
         () => toast("已复制，发给朋友吧"),
         () => toast("房间号：" + R.code)
       );

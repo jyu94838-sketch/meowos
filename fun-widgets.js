@@ -81,7 +81,7 @@
         if (w.size === "s")
           return `<div class="wg-music s${playing ? " is-playing" : ""}"><span class="wg-disc" style="${t?.cover ? `--cover:url('${esc(t.cover)}')` : ""}"></span><strong>${esc(t?.title || "没有在放")}</strong><button type="button" class="wg-btn" data-mu="toggle">${playing ? "❚❚" : "▶"}</button></div>`;
         return `<div class="wg-music m${playing ? " is-playing" : ""}"><span class="wg-disc" style="${t?.cover ? `--cover:url('${esc(t.cover)}')` : ""}"></span>
-          <div class="wg-music-meta"><small>${playing ? "正在播放" : "Meow OS 音乐"}</small><strong>${esc(t?.title || "没有在放的歌")}</strong><span>${esc(t?.artist || "点 ▶ 播放歌单")}</span>
+          <div class="wg-music-meta"><small>${playing ? "正在播放" : "Meow 音乐"}</small><strong>${esc(t?.title || "没有在放的歌")}</strong><span>${esc(t?.artist || "点 ▶ 播放歌单")}</span>
           <i class="wg-prog"><b style="width:${Math.round((M?.progress() || 0) * 100)}%"></b></i>
           <div class="wg-ctrls"><button type="button" class="wg-btn" data-mu="prev">⏮</button><button type="button" class="wg-btn big" data-mu="toggle">${playing ? "❚❚" : "▶"}</button><button type="button" class="wg-btn" data-mu="next">⏭</button></div></div></div>`;
       }

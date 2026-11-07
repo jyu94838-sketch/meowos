@@ -1,4 +1,4 @@
-# Meow OS
+# Meow
 
 基于 [没心机](#没心机)（作者 **Ruiya**，AGPL-3.0）修改的版本，新增：音乐、刷刷（短视频）、游戏厅（UNO / 狼人杀 / 飞行棋 / 谁是卧底 / 真心话大冒险 / 你画我猜）、Bubble、Pocket Town、资源站（专属 PNG 资源卡 + 共享广场，配置见 [SHARE-SETUP.md](./SHARE-SETUP.md)）。
 本修改版同样以 AGPL-3.0 开源。

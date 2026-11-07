@@ -3306,7 +3306,7 @@ const KeepAliveModule = (() => {
     try {
       if (!("mediaSession" in navigator)) return;
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: "Meow OS",
+        title: "Meow",
         artist: "后台保活",
         album: " "
       });
@@ -4203,7 +4203,7 @@ function closeNotifySettingsSheet() {
 function buildTestChatNotifySnap(preview) {
   const mid = String(getActiveMaskIdForInbox() || "").trim() || "test";
   const tid = String(readChatActiveThreadRef().threadId || "").trim();
-  let displayName = "Meow OS";
+  let displayName = "Meow";
   let avatarUrl = "";
   let charId = "";
   let initial = "没";
@@ -5217,7 +5217,7 @@ function enqueueSystemChatNotification(snap) {
 
 /** @param {ChatNotifySnap} snap */
 function buildSystemNotificationPayload(snap) {
-  const title = String(snap.displayName || "").trim() || "Meow OS";
+  const title = String(snap.displayName || "").trim() || "Meow";
   const body = String(snap.preview || "").trim() || "新消息";
   const mid = String(snap.maskId || "").trim();
   const tid = String(snap.threadId || "").trim();
@@ -13689,7 +13689,7 @@ async function runBackupZipExport() {
     const url = URL.createObjectURL(built.blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `MeowOS-backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}.zip`;
+    a.download = `Meow-backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}.zip`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -28077,7 +28077,7 @@ function runMomentsGalleryDownloadClick() {
     showToast("没有可下载的图片");
     return;
   }
-  const stem = chatImageDownloadStem("MeowOS-朋友圈配图");
+  const stem = chatImageDownloadStem("Meow-朋友圈配图");
   const pref = momentsGalleryDownloadPrefetch;
   if (pref && pref.stored === stored && pref.blob) {
     try {
@@ -30480,7 +30480,7 @@ function exportActiveChatThreadRecordJson() {
       .replace(/\s+/g, "_")
       .slice(0, 72) || "chat";
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  downloadJson(`MeowOS-chat-${safe}-${ts}.json`, payload);
+  downloadJson(`Meow-chat-${safe}-${ts}.json`, payload);
   showToast(messages.length ? `已导出 ${messages.length} 条记录` : "已导出（暂无消息）");
 }
 
@@ -34372,7 +34372,7 @@ async function downloadXxjStGateCard() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "MeowOS-ST验证卡.png";
+  a.download = "Meow-ST验证卡.png";
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
@@ -34501,7 +34501,7 @@ async function verifyStExportUnlockBuffer(buffer) {
 let charStUnlockPendingFile = null;
 
 function readStTavernImportUnlocked() {
-  /* Meow OS：用专属激活码解锁（st-gate.js） */
+  /* Meow：用专属激活码解锁（st-gate.js） */
   try {
     return localStorage.getItem("meowos_st_unlock") === "1";
   } catch {
@@ -54330,7 +54330,7 @@ function clearChatPhotoViewerDownloadPrefetch() {
 }
 
 function chatImageDownloadStem(baseName) {
-  return String(baseName || "MeowOS-聊天图片")
+  return String(baseName || "Meow-聊天图片")
     .trim()
     .replace(/[/\\?%*:|"<>]/g, "_")
     .slice(0, 72);
@@ -54483,7 +54483,7 @@ function runChatPhotoViewerDownloadClick() {
     showToast("没有可下载的图片");
     return;
   }
-  const stem = chatImageDownloadStem("MeowOS-聊天图片");
+  const stem = chatImageDownloadStem("Meow-聊天图片");
   const pref = chatPhotoViewerDownloadPrefetch;
   if (pref && pref.stored === stored && pref.blob) {
     try {
@@ -70769,7 +70769,7 @@ function exportWardrobeChatCssSnippetJson() {
   };
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const base = wardrobePromptJsonBasename(
-    `MeowOS-密谈壳-${chatUiCssPresetKindLabel(kind)}-${ts}`
+    `Meow-密谈壳-${chatUiCssPresetKindLabel(kind)}-${ts}`
   );
   if (base == null) return;
   downloadJson(`${base}.json`, payload);
@@ -70877,7 +70877,7 @@ function exportWardrobeLookJson() {
     if (v !== undefined) kv[key] = v;
   }
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const base = wardrobePromptJsonBasename(`MeowOS-装扮-${ts}`);
+  const base = wardrobePromptJsonBasename(`Meow-装扮-${ts}`);
   if (base == null) return;
   downloadJson(`${base}.json`, {
     format: "xxj-wardrobe-look",

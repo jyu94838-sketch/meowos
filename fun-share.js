@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * 资源站：Meow OS 专属资源卡（.png）+ 共享广场（Supabase）
+ * 资源站：Meow 专属资源卡（.png）+ 共享广场（Supabase）
  *
  * 专属 PNG 格式（MXJ 卡）：
  *   - 外观是一张普通 PNG 卡片图（可预览、可发群）
@@ -534,7 +534,7 @@
     ctx.fillText(`by ${author || "匿名"}`, cx + 34, H - 134);
     ctx.font = `18px ${font}`;
     ctx.fillStyle = "#a99ba2";
-    ctx.fillText("Meow OS 专属资源卡 · 只能在 Meow OS 里导入", cx, H - 104);
+    ctx.fillText("Meow 专属资源卡 · 只能在 Meow 里导入", cx, H - 104);
     // 右下角小猫印章
     ctx.save();
     ctx.translate(W - 150, H - 140);
@@ -1085,7 +1085,7 @@
           btn.disabled = true;
           btn.textContent = "导入中…";
           const payload = await extractPayload(await fetchBlob());
-          if (!payload) throw new Error("这不是 Meow OS 资源卡");
+          if (!payload) throw new Error("这不是 Meow 资源卡");
           if (payload.kind === "look" && !(await confirmSheet("导入美化会覆盖你现在的装扮（壁纸、图标、字体、聊天样式等），继续吗？"))) {
             btn.disabled = false;
             btn.textContent = "导入";
@@ -1264,7 +1264,7 @@
     const kinds = [...new Set(ok.map((x) => x.payload.kind))];
     const oneKind = kinds.length === 1 ? kinds[0] : "";
     p.innerHTML = `<div class="sh-batch">
-      <div class="sh-drop" id="sh-bdrop"><div class="sh-empty-ico">📤</div><p>${batch.items.length ? "继续添加资源卡" : "选择要上传的资源卡（可以一次选好几张）"}</p><small>只能上传 Meow OS 资源卡 PNG；在「制作卡片」里生成并下载的都可以</small></div>
+      <div class="sh-drop" id="sh-bdrop"><div class="sh-empty-ico">📤</div><p>${batch.items.length ? "继续添加资源卡" : "选择要上传的资源卡（可以一次选好几张）"}</p><small>只能上传 Meow 资源卡 PNG；在「制作卡片」里生成并下载的都可以</small></div>
       <input type="file" accept="image/png" multiple hidden />
       ${
         batch.items.length
@@ -1288,7 +1288,7 @@
               </div>
               ${x.status === "done" || x.status === "up" ? "" : `<button type="button" class="sh-brm" data-rm="${i}" aria-label="移除">✕</button>`}
             </div>`
-              : `<div class="sh-brow is-bad"><div class="sh-brow-main"><strong>${esc(x.file.name)}</strong><small>不是 Meow OS 资源卡（或被压缩过），不能上传</small></div><button type="button" class="sh-brm" data-rm="${i}" aria-label="移除">✕</button></div>`
+              : `<div class="sh-brow is-bad"><div class="sh-brow-main"><strong>${esc(x.file.name)}</strong><small>不是 Meow 资源卡（或被压缩过），不能上传</small></div><button type="button" class="sh-brm" data-rm="${i}" aria-label="移除">✕</button></div>`
           )
           .join("")}</div>
         <div class="fun-setup-btns">
@@ -1380,7 +1380,7 @@
 
   function renderImport(p) {
     p.innerHTML = `<div class="sh-import">
-      <div class="sh-drop" id="sh-drop"><div class="sh-empty-ico">🖼️</div><p>选择一张 Meow OS 资源卡（.png）</p><small>美化 / 世界书 / 角色卡 / 预设 / 字体都可以</small></div>
+      <div class="sh-drop" id="sh-drop"><div class="sh-empty-ico">🖼️</div><p>选择一张 Meow 资源卡（.png）</p><small>美化 / 世界书 / 角色卡 / 预设 / 字体都可以</small></div>
       <input type="file" accept="image/png" hidden />
       <div id="sh-import-info"></div></div>`;
     const inp = p.querySelector("input");
@@ -1400,7 +1400,7 @@
       try {
         const payload = await extractPayload(file);
         if (!payload) {
-          info.innerHTML = `<p class="fun-note warn">这张图里没有 Meow OS 资源数据。可能不是资源卡，或者被聊天软件压缩过（请让对方发原图）。</p>`;
+          info.innerHTML = `<p class="fun-note warn">这张图里没有 Meow 资源数据。可能不是资源卡，或者被聊天软件压缩过（请让对方发原图）。</p>`;
           return;
         }
         const m = KIND_META[payload.kind];
@@ -1465,7 +1465,7 @@
     }
   });
 
-  /* ───── 世界书 / 角色 / 装扮页里的「导入 Meow OS 卡」按钮 ───── */
+  /* ───── 世界书 / 角色 / 装扮页里的「导入 Meow 卡」按钮 ───── */
   const KIND_WANT_NAME = { char: "角色卡", worldbook: "世界书", look: "美化" };
   let pngPicker = null;
   async function importPngFor(want) {
@@ -1485,7 +1485,7 @@
     try {
       const payload = await extractPayload(file);
       if (!payload) {
-        toast("这张图里没有 Meow OS 资源数据（可能不是资源卡，或被聊天软件压缩过，请要原图）");
+        toast("这张图里没有 Meow 资源数据（可能不是资源卡，或被聊天软件压缩过，请要原图）");
         return;
       }
       const m = KIND_META[payload.kind] || {};
@@ -1523,8 +1523,8 @@
       `<div class="sh-exp">
         ${
           kind === "look"
-            ? `<p class="fun-note">会把你现在的装扮（壁纸、图标、字体、聊天样式等）打包成一张 Meow OS 卡片 PNG。别人在「装扮」里点「导入 PNG」就能一键用上。</p>`
-            : `<p class="fun-note">${multi ? "选要导出的世界书（可以多选）" : "选一个要导出的角色"}，会生成一张只有 Meow OS 能读的 PNG 卡片。</p>
+            ? `<p class="fun-note">会把你现在的装扮（壁纸、图标、字体、聊天样式等）打包成一张 Meow 卡片 PNG。别人在「装扮」里点「导入 PNG」就能一键用上。</p>`
+            : `<p class="fun-note">${multi ? "选要导出的世界书（可以多选）" : "选一个要导出的角色"}，会生成一张只有 Meow 能读的 PNG 卡片。</p>
           <div class="sh-pick">${list.map((x, i) => `<button type="button" class="sh-pick-item${i === 0 ? " is-on" : ""}" data-pid="${esc(x.id)}"><strong>${esc(x.name)}</strong>${x.sub ? `<small>${esc(x.sub)}</small>` : ""}</button>`).join("")}</div>
           ${kind === "char" ? `<label class="fun-switch"><input type="checkbox" class="sh-exp-books" checked /><span>附带角色绑定的世界书</span></label>` : ""}`
         }

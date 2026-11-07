@@ -1,4 +1,4 @@
-const CACHE_NAME = "xxj-pwa-v276";
+const CACHE_NAME = "xxj-pwa-v277";
 const KEEPALIVE_PERIODIC_TAG = "xxj-keepalive";
 const SCHEDULE_IDB = "xxj_sw_schedule";
 const SCHEDULE_STORE = "due";
@@ -154,7 +154,7 @@ function absNotifyAsset(path) {
 }
 
 function showChatNotificationFromPayload(p) {
-  const title = String(p.title || "Meow OS").trim() || "Meow OS";
+  const title = String(p.title || "Meow").trim() || "Meow";
   const body = String(p.body || "新消息").trim() || "新消息";
   const opts = {
     body,
@@ -282,7 +282,7 @@ function flushDueGithubBackupSchedule() {
         const snooze = now + 6 * 60 * 60 * 1000;
         return persistGithubBackupSchedule(snooze).then(() =>
           showChatNotificationFromPayload({
-            title: "Meow OS · GitHub 备份",
+            title: "Meow · GitHub 备份",
             body: "定时备份已到点，请打开应用完成上传",
             tag: "xxj-github-backup-auto",
             data: { notifyKind: "backup" }

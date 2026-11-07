@@ -1,7 +1,7 @@
 {
-  "name": "Meow OS",
-  "short_name": "Meow OS",
-  "description": "Meow OS · 角色聊天与小世界（基于没心机修改）",
+  "name": "Meow",
+  "short_name": "Meow",
+  "description": "Meow · 角色聊天与小世界（基于没心机修改）",
   "id": "./index.html",
   "lang": "zh-CN",
   "dir": "ltr",

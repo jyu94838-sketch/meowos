@@ -1,6 +1,6 @@
 /**
- * Meow OS 开屏：白色噪点小猫
- * 黑底雪花 → 噪点聚成毛茸茸的小猫轮廓 → 下方出现 Meow OS
+ * Meow 开屏：白色噪点小猫
+ * 黑底雪花 → 噪点聚成毛茸茸的小猫轮廓 → 下方出现 Meow
  * 这一屏就是开屏：数据准备好后提示「轻触进入」，点一下调用原开屏的进入逻辑（原开屏被隐藏，只保留功能）。
  * 系统开启「减少动态效果」时直接显示成形的小猫，不播放聚拢动画。
  */
@@ -197,7 +197,7 @@
       ctx.fillRect(x, y, p.r, p.r);
     }
 
-    // 3) Meow OS + 状态
+    // 3) Meow + 状态
     var ta = ease((t - 2.1) / 0.8);
     if (ta > 0) {
       var ready = !!window.__xxjBootSplashArmed;
@@ -208,7 +208,7 @@
       ctx.globalAlpha = ta;
       ctx.fillStyle = "#fff";
       ctx.font = "italic 700 " + Math.round(S * 0.19) + 'px "Times New Roman","Songti SC",serif';
-      ctx.fillText("Meow OS", W / 2, cy + S * 1.2);
+      ctx.fillText("Meow", W / 2, cy + S * 1.2);
       var lab = document.getElementById("boot-splash-load-label");
       var status = ready ? "轻触进入" : wantEnter ? "马上就好，加载完会自动进入…" : (lab && lab.textContent.trim()) || "正在准备…";
       ctx.font = Math.round(S * 0.05) + 'px ui-monospace, Menlo, "PingFang SC", monospace';

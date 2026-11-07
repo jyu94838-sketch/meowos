@@ -16,7 +16,7 @@
 
   /* ═════════ 源码 ═════════ */
   const CSS = {
-    wechat: `/* ===== Meow OS · 微信风格聊天（可以复制去改颜色） ===== */
+    wechat: `/* ===== Meow · 微信风格聊天（可以复制去改颜色） ===== */
 /* 聊天背景 */
 #chat-screen .chat-scroll,
 #chat-screen .chat-messages { background: #ededed !important; }
@@ -80,7 +80,7 @@ body.dark #chat-screen .chat-msg--user .chat-msg-bubble-stack > .chat-msg-bubble
 body.dark #chat-list-screen .chat-thread-card { background: #191919 !important; border-bottom-color: #2a2a2a !important; }
 body.dark #chat-list-screen .chat-thread-card-name { color: #e6e6e6 !important; }
 `,
-    qq: `/* ===== Meow OS · QQ 风格聊天（可以复制去改颜色） ===== */
+    qq: `/* ===== Meow · QQ 风格聊天（可以复制去改颜色） ===== */
 /* 聊天背景：淡淡的蓝灰 */
 #chat-screen .chat-scroll,
 #chat-screen .chat-messages { background: linear-gradient(180deg, #f3f6fb, #eef1f7) !important; }
@@ -136,7 +136,7 @@ body.dark #chat-screen .chat-msg--user .chat-msg-bubble:not(.chat-msg-bubble--st
 body.dark #chat-list-screen .chat-thread-card { background: #1c1d21 !important; }
 body.dark #chat-list-screen .chat-thread-card-name { color: #e8e8e8 !important; }
 `,
-    cute: `/* ===== Meow OS · 奶油小猫主页（可以复制去改颜色） ===== */
+    cute: `/* ===== Meow · 奶油小猫主页（可以复制去改颜色） ===== */
 /* 桌面底色：奶油粉 + 小爪印 */
 #phone .wallpaper:not([style*="url"]) {
   background:
@@ -288,7 +288,7 @@ body.dark #chat-screen .chat-msg--assistant .chat-msg-bubble--composer-quote .ch
   CSS.qq += frame({ bg: "#f1f4f9", top: "#ffffffee", bar: "#f5f7fa", line: "#e3e8f0", input: "#fff", inputRadius: "18px", text: "#1f1f1f", ph: "#a9b2bf", icon: "#4a5568", send: "linear-gradient(135deg, #3fb2ff, #1888ff)", sendRadius: "17px", dbg: "#17181c", dbar: "#1c1d21" });
 
   const CHAT_SKINS = [
-    ["default", "默认", "Meow OS 原来的样子"],
+    ["default", "默认", "Meow 原来的样子"],
     ["wechat", "微信风", "绿色气泡、方形头像"],
     ["qq", "QQ 风", "蓝色气泡、圆形头像"]
   ];

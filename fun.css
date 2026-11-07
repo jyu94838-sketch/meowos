@@ -7917,3 +7917,47 @@ body.dark .net-dice span { background: rgba(0, 0, 0, 0.2); }
 .net-games button span { grid-row: span 2; font-size: 1.8rem; text-align: center; }
 .net-games button small { color: var(--text-sub); font-size: 0.74rem; }
 .net { padding: 0 14px; box-sizing: border-box; }
+
+/* ═════════ 喵了个喵 ═════════ */
+.mlm-root, .pt-root { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+.mlm-menu, .pt-menu { padding: 10px 14px; display: flex; flex-direction: column; gap: 12px; }
+.mlm-logo { display: flex; flex-direction: column; align-items: center; font-size: 3rem; margin-top: 8px; }
+.mlm-logo span { font-size: 1.5rem; font-weight: 800; font-style: italic; letter-spacing: 0.04em; }
+.mlm-levels { display: flex; flex-direction: column; gap: 10px; }
+.mlm-levels button { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-radius: 18px; border: 0; background: linear-gradient(135deg, #ffe9c7, #ffd3dc); color: #4a3020; font: inherit; cursor: pointer; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.08); }
+.mlm-levels button:nth-child(2) { background: linear-gradient(135deg, #d9f2ff, #e3dcff); color: #2a3150; }
+.mlm-levels button:nth-child(3) { background: linear-gradient(135deg, #3a2d4d, #1e1a2b); color: #ffe6f2; }
+.mlm-levels strong { font-size: 1.05rem; }
+.mlm-levels small { font-size: 0.76rem; opacity: 0.8; }
+.mlm { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; padding: 0 4px 6px; background: radial-gradient(circle at 50% 0%, #fff7e8, transparent 70%); }
+body.dark .mlm { background: none; }
+.mlm-top { width: 100%; display: flex; align-items: center; gap: 10px; padding: 2px 6px 8px; }
+.mlm-top strong { flex: 1; text-align: center; }
+.mlm-top small { color: var(--text-sub); font-size: 0.76rem; }
+.mlm-board { position: relative; margin: 4px auto 0; flex-shrink: 0; }
+.mlm-tile { position: absolute; width: var(--c, 44px); height: calc(var(--c, 44px) * 1.08); box-sizing: border-box; border-radius: 9px; border: 1.5px solid #c9b79a; background: linear-gradient(#fffdf6, #f3ead6); box-shadow: 0 4px 0 #b9a27c, 0 5px 6px rgba(0, 0, 0, 0.12); font-size: calc(var(--c, 44px) * 0.56); line-height: 1; display: grid; place-items: center; padding: 0; cursor: pointer; transition: transform 0.08s; color: #000; }
+.mlm-tile:active { transform: translateY(2px); }
+.mlm-tile.is-cov { filter: brightness(0.55) saturate(0.6); cursor: default; }
+.mlm-out { display: flex; gap: 6px; min-height: 0; margin: 8px 0 0; }
+.mlm-out .mlm-tile, .mlm-cell .mlm-tile { position: static; --c: 40px; }
+.mlm-slot { display: flex; gap: 4px; padding: 7px; margin-top: auto; border-radius: 14px; background: #7b5a3a; box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.35); }
+.mlm-cell { width: 42px; height: 46px; border-radius: 8px; background: rgba(0, 0, 0, 0.18); display: grid; place-items: center; }
+.mlm-cell .mlm-tile { box-shadow: 0 2px 0 #b9a27c; cursor: default; }
+.mlm-props { display: flex; gap: 8px; margin-top: 10px; }
+.mlm-props button { padding: 8px 12px; border-radius: 999px; border: 0; background: #ff8fab; color: #fff; font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; box-shadow: 0 3px 0 #d96b88; }
+.mlm-props button:disabled { background: #cfc7cb; box-shadow: 0 3px 0 #aaa; color: #f4f0f2; }
+.mlm-end { text-align: center; font-size: 3rem; padding: 6px 0; }
+.mlm-end h3 { font-size: 1.3rem; margin: 6px 0 4px; }
+.mlm-end p { font-size: 0.9rem; color: var(--text-sub); margin: 0; }
+
+/* ═════════ 钢琴块 ═════════ */
+.pt-songs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pt-songs button { padding: 14px 10px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); font: inherit; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.pt-songs button small { font-weight: 400; font-size: 0.7rem; color: var(--text-sub); }
+.pt-songs button.is-on { background: #16161c; color: #fff; border-color: #16161c; }
+.pt-songs button.is-on small { color: #bbb; }
+.pt-game { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.pt-hud { display: flex; align-items: center; gap: 10px; padding: 0 8px 6px; }
+.pt-hud b { flex: 1; text-align: center; font-size: 1.6rem; color: #e64646; font-variant-numeric: tabular-nums; }
+.pt-hud small { color: var(--text-sub); font-size: 0.72rem; min-width: 60px; text-align: right; }
+#pt-cv { flex: 1; min-height: 300px; width: 100%; display: block; touch-action: none; border-radius: 12px; }

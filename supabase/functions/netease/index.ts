@@ -1,4 +1,4 @@
-// Meow OS · 网易云音乐接口（Supabase Edge Function，名字叫 netease）
+// Meow · 网易云音乐接口（Supabase Edge Function，名字叫 netease）
 //
 // 按「Cove 一起听歌」的思路做的音源适配层：
 //   search   搜歌（cloudsearch）
