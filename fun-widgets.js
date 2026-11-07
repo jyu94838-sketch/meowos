@@ -144,12 +144,15 @@
 
   /* ───── 桌面上的小组件区 ───── */
   async function renderDesk() {
-    const page = document.querySelector(".desk-apps");
-    if (!page) return;
     if (!area) {
-      area = document.createElement("div");
-      area.className = "wg-area";
-      page.insertBefore(area, page.firstChild);
+      area = document.getElementById("desk-widgets-slot");
+      if (!area) {
+        const page = document.querySelector(".desk-apps");
+        if (!page) return;
+        area = document.createElement("div");
+        area.className = "wg-area";
+        page.insertBefore(area, page.firstChild);
+      }
       area.addEventListener("click", onDeskClick);
     }
     if (!widgets.length) {
