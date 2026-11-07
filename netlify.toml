@@ -1,0 +1,5 @@
+# Netlify 部署配置：根目录即站点，无需打包。
+# auth.js / oauth-bootstrap.js 被 .gitignore 忽略，部署时用开源版占位文件自动生成。
+[build]
+  publish = "."
+  command = "test -f auth.js || cp auth.stub.js auth.js; test -f oauth-bootstrap.js || cp oauth-bootstrap.stub.js oauth-bootstrap.js"

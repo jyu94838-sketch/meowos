@@ -54791,6 +54791,12 @@ document.querySelectorAll("#drawer .drawer-item, .dock-btn").forEach((node) => {
       drawer.classList.remove("open");
       return;
     }
+    if (["音乐", "短视频", "UNO", "狼人杀"].includes(node.dataset.app)) {
+      if (typeof window.openFunApp === "function") window.openFunApp(node.dataset.app);
+      else showToast("模块还在加载，稍等一下");
+      drawer.classList.remove("open");
+      return;
+    }
     if (node.dataset.app === "表情包" || node.dataset.app === "表情" || node.dataset.app === "贴纸") {
       openStickerScreen("manage");
       return;

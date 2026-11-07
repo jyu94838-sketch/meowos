@@ -1764,6 +1764,8 @@
   const RELATION_INTERACT_MODULE = "relation-interact.js?v=19";
   const RELATION_AI_MODULE = "relation-ai.js?v=2";
   const ROLEPLAY_MODULE = "roleplay.js?v=16";
+  /** 娱乐：音乐 / UNO / 狼人杀 / 短视频 */
+  const FUN_MODULES = ["fun.js?v=1", "fun-uno.js?v=1", "fun-wolf.js?v=1", "fun-video.js?v=1"];
   const PRECHAIN = [
     "media-blob.js?v=" + ASSET_V,
     "ai-api.js?v=" + ASSET_V,
@@ -2220,6 +2222,7 @@
         await loadScript(ROAM_MODULE);
         await loadScript(FORUM_MODULE);
         await loadScript(ROLEPLAY_MODULE);
+        for (const m of FUN_MODULES) await loadScript(m).catch((e) => console.warn("[xxj-load] fun", e));
       } catch (err) {
         console.warn("[xxj-load] main script chain failed", err);
       }
@@ -2304,6 +2307,7 @@
           await loadScript(ROAM_MODULE);
           await loadScript(FORUM_MODULE);
           await loadScript(ROLEPLAY_MODULE);
+          for (const m of FUN_MODULES) await loadScript(m).catch((e) => console.warn("[xxj-load] fun", e));
           if (isBootSplashVisible()) setBootSplashProgress(90, "正在整理桌面…");
           else if (showUi) setProgress(70);
         } catch (err) {
