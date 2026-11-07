@@ -33,9 +33,27 @@
   } catch (_) {
     /* ignore */
   }
+  // 应用还没加载完时点了：记住，加载好马上自动打开（不再点了没反应）
+  let pendingApp = null;
+  const toastSoon = () => {
+    const msg = "正在打开，马上就好…";
+    if (window.XXJ_FUN && window.XXJ_FUN.toast) window.XXJ_FUN.toast(msg);
+    else if (typeof showToast === "function") showToast(msg);
+  };
+  const flushPending = () => {
+    if (!pendingApp || !window.__xxjFunReady || typeof window.openFunApp !== "function") return;
+    const k = pendingApp;
+    pendingApp = null;
+    window.openFunApp(k);
+  };
+  window.addEventListener("xxj-fun-ready", flushPending);
   const fun = (k) => () => {
-    if (typeof window.openFunApp === "function") window.openFunApp(k);
-    else if (typeof showToast === "function") showToast("还在加载，稍等一下");
+    if (window.__xxjFunReady && typeof window.openFunApp === "function") {
+      window.openFunApp(k);
+      return;
+    }
+    if (!pendingApp) toastSoon();
+    pendingApp = k;
   };
   const call = (fn) => () => {
     const f = window[fn];

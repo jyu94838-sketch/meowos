@@ -1781,7 +1781,7 @@
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
     "fun-widgets.js?v=3", "fun-icons.js?v=5", "mx-chatsearch.js?v=1", "fun-mimi.js?v=3", "mx-choose.js?v=3", "fun-yuzu.js?v=1", "fun-names.js?v=1",
-    "changelog.js?v=28",
+    "changelog.js?v=29",
     "share-config.js?v=3", "st-gate.js?v=1",
     "fun-share.js?v=7"
   ];
@@ -2256,6 +2256,8 @@
         await loadScript(FORUM_MODULE);
         await loadScript(ROLEPLAY_MODULE);
         for (const m of FUN_MODULES) await loadScript(m).catch((e) => console.warn("[xxj-load] fun", e));
+        window.__xxjFunReady = true;
+        try { window.dispatchEvent(new Event("xxj-fun-ready")); } catch (_) {}
       } catch (err) {
         console.warn("[xxj-load] main script chain failed", err);
       }
@@ -2341,6 +2343,8 @@
           await loadScript(FORUM_MODULE);
           await loadScript(ROLEPLAY_MODULE);
           for (const m of FUN_MODULES) await loadScript(m).catch((e) => console.warn("[xxj-load] fun", e));
+        window.__xxjFunReady = true;
+        try { window.dispatchEvent(new Event("xxj-fun-ready")); } catch (_) {}
           if (isBootSplashVisible()) setBootSplashProgress(90, "正在整理桌面…");
           else if (showUi) setProgress(70);
         } catch (err) {
