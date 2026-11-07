@@ -1,4 +1,4 @@
-const CACHE_NAME = "xxj-pwa-v264";
+const CACHE_NAME = "xxj-pwa-v265";
 const KEEPALIVE_PERIODIC_TAG = "xxj-keepalive";
 const SCHEDULE_IDB = "xxj_sw_schedule";
 const SCHEDULE_STORE = "due";
@@ -83,7 +83,7 @@ self.addEventListener("fetch", (event) => {
   /* db / app 等须网络优先，避免旧缓存导致「修了仍丢数据」 */
   if (isBootScript) {
     event.respondWith(
-      fetch(req)
+      fetch(req, { cache: "no-cache" }) /* 绕过 GitHub Pages 的 10 分钟缓存，有更新马上拿到 */
         .then((res) => {
           if (res && res.status === 200 && res.type === "basic") {
             const copy = res.clone();
@@ -98,8 +98,10 @@ self.addEventListener("fetch", (event) => {
 
   if (isDocument) {
     event.respondWith(
-      fetch(req)
+      fetch(req.url, { cache: "no-cache", credentials: "same-origin" })
         .then((res) => {
+          // 地址少了结尾的 / 时服务器会跳转：交给浏览器重新打开，避免 Safari 拒绝
+          if (res.redirected) return Response.redirect(res.url, 302);
           if (res && res.status === 200 && res.type === "basic") {
             const copy = res.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));

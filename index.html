@@ -98,7 +98,7 @@
         location.protocol === "https:" ||
         location.hostname === "localhost" ||
         location.hostname === "127.0.0.1";
-      if (ok) navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(function () {});
+      if (ok) navigator.serviceWorker.register("./sw.js", { scope: "./", updateViaCache: "none" }).catch(function () {});
     })();
   </script>
   <link rel="icon" href="icons/icon-192.png?v=3" type="image/png" sizes="192x192">
