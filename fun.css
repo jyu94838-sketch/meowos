@@ -6717,3 +6717,238 @@ body.dark .desk-app-ico {
   font-size: 0.85rem;
   margin: 18px 0;
 }
+.mx-p2-icons-k {
+  margin: 14px 16px 6px;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: var(--text-sub);
+}
+#mx-p2-icons .ward-desktop-icon-preview {
+  object-fit: cover;
+}
+.mx-look-io-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.mx-look-io-btns .chip {
+  white-space: nowrap;
+}
+.sh-exp {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 聊天设置：白话说明 + 锁脸程度 */
+.chat-detail-field.chat-detail-field--switch > .mx-hint {
+  flex: 1 1 100%;
+  width: 100%;
+  margin-top: 4px;
+}
+.mx-hint {
+  margin-top: 4px;
+}
+.mx-facelock-k {
+  margin-top: 14px;
+}
+.mx-facelock {
+  width: 100%;
+  margin-top: 6px;
+}
+
+/* 查找聊天记录 */
+#chat-screen .chat-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mx-chat-search-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+  color: var(--text-main);
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.mxs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mxs-in {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-card);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.95rem;
+}
+.mxs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.mxs-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-card);
+  color: var(--text-main);
+  font: inherit;
+  cursor: pointer;
+}
+.mxs-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text-sub);
+}
+.mxs-text {
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.mxs-text mark {
+  background: #ffe28a;
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.mxs-ctx {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+  font-size: 0.78rem;
+  color: var(--text-sub);
+}
+.mxs-ctx .is-hit {
+  color: var(--text-main);
+}
+.mxs-ctx small {
+  font-size: 0.66rem;
+  opacity: 0.8;
+}
+@keyframes mxs-flash {
+  0%, 100% { box-shadow: none; }
+  30%, 70% { box-shadow: 0 0 0 3px rgba(255, 200, 60, 0.7); border-radius: 16px; }
+}
+.mxs-flash {
+  animation: mxs-flash 1.8s ease;
+}
+
+/* ═════════ 弥弥 · 手机小管家 ═════════ */
+.mimi {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.mimi-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 14px;
+}
+.mimi-msg {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  max-width: 88%;
+}
+.mimi-msg.is-me {
+  align-self: flex-end;
+}
+.mimi-av {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 1.2rem;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.mimi-b {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 13px;
+  border-radius: 16px 16px 16px 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+.mimi-msg.is-me .mimi-b {
+  border-radius: 16px 16px 6px 16px;
+  background: var(--text-main);
+  color: var(--bg-card, #fff);
+  border-color: transparent;
+}
+.mimi-b p {
+  margin: 0;
+}
+.mimi-typing {
+  color: var(--text-sub);
+}
+.mimi-open {
+  align-self: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 5px 12px;
+  background: none;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mimi-quick {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 14px 8px;
+  scrollbar-width: none;
+}
+.mimi-quick .fun-chip-btn {
+  flex-shrink: 0;
+  font-size: 0.74rem;
+}
+.mimi-bar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+}
+.mimi-bar input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--bg-card);
+  color: var(--text-main);
+  font: inherit;
+}

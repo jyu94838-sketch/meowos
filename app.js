@@ -1575,7 +1575,7 @@ function applyDesktopCustomWallpaper(pal, wi, dark) {
 
 const GLOBAL_UI_TYPO_MIN_PX = 12;
 const GLOBAL_UI_TYPO_MAX_PX = 22;
-const GLOBAL_UI_TYPO_FONT_FILE_MAX = 5 * 1024 * 1024;
+const GLOBAL_UI_TYPO_FONT_FILE_MAX = 30 * 1024 * 1024; // 中文字体常常 10MB 以上
 /** 与 body 默认无衬线栈一致，接在用户 font-family 之后 */
 const GLOBAL_UI_TYPO_FALLBACK_SANS = `"DM Sans", "Noto Sans SC", system-ui, sans-serif`;
 
@@ -6496,6 +6496,27 @@ function resolveThreadCharImageRefDataUrl(thread) {
   return it && typeof it.charImageRefDataUrl === "string" ? String(it.charImageRefDataUrl).trim() : "";
 }
 
+/**
+ * 锁脸程度（每个聊天单独设置）：生图时多像参考立绘
+ * off 不参考 · light 轻 · normal 中（默认）· strong 强 · force 强制（每张有 TA 的图都参考）
+ */
+const FACE_LOCK_LEVELS = ["off", "light", "normal", "strong", "force"];
+function threadFaceLockLevel(thread) {
+  const v = thread && typeof thread === "object" ? String(thread.faceLockLevel || "") : "";
+  return FACE_LOCK_LEVELS.includes(v) ? v : "normal";
+}
+/** NovelAI img2img 的 strength：越小越像参考图 */
+function faceLockNaiStrength(level) {
+  return level === "light" ? 0.68 : level === "strong" || level === "force" ? 0.36 : 0.52;
+}
+/** 按锁脸程度决定这张图要不要带参考立绘 */
+function resolveFaceLockRef(thread, planAllows) {
+  const lv = threadFaceLockLevel(thread);
+  if (lv === "off") return "";
+  if (!planAllows && lv !== "force") return "";
+  return resolveThreadCharImageRefDataUrl(thread);
+}
+
 /** 视频通话立绘：内置情绪 + 可自定义情绪（charCallIllustCustomMoods / chatCallIllustCustomMoods） */
 const CALL_ILLUST_MOODS = [
   { id: "neutral", label: "默认" },
@@ -8019,11 +8040,11 @@ function dataUrlToNovelAiRawBase64(dataUrl) {
   return String(m[1] || "").replace(/\s/g, "");
 }
 
-function buildImageGenNovelAiGenerateJson(cfg, promptText, refDataUrl) {
+function buildImageGenNovelAiGenerateJson(cfg, promptText, refDataUrl, faceLock) {
   const refB64 = dataUrlToNovelAiRawBase64(refDataUrl || "");
   const useImg2img = Boolean(refB64);
-  /** 参考立绘时的 img2img：略偏保守，避免完全洗掉构图 */
-  const img2Strength = Math.min(0.99, Math.max(0.01, 0.52));
+  /** 参考立绘时的 img2img：强度跟随聊天设置里的「锁脸程度」 */
+  const img2Strength = Math.min(0.99, Math.max(0.01, faceLockNaiStrength(faceLock)));
   const img2Noise = Math.min(0.99, Math.max(0, 0.07));
   const [width, height] = parseImageGenSizeToWh(cfg.size);
   const neg =
@@ -17119,6 +17140,11 @@ function charDisplayNameFromStore(charId) {
   return it ? resolvePersonaDisplayName(it, "main") : "";
 }
 
+function syncChatDetailFaceLockSelect(th) {
+  const sel = document.getElementById("chat-detail-face-lock");
+  if (sel instanceof HTMLSelectElement) sel.value = threadFaceLockLevel(th);
+}
+
 function syncChatDetailLinkedGroupSelect(th) {
   const sel = document.getElementById("chat-detail-linked-group-select");
   if (!(sel instanceof HTMLSelectElement)) return;
@@ -21371,11 +21397,11 @@ async function resolveMomentsCharPostImagesInner(imagePlan, candidates, thread, 
     logArr: log
   });
   let refDataUrl = "";
-  if (imageGenPlanAllowsThreadRef(imgPlan) && thread && typeof thread === "object") {
-    refDataUrl = resolveThreadCharImageRefDataUrl(thread);
+  if (thread && typeof thread === "object") {
+    refDataUrl = resolveFaceLockRef(thread, imageGenPlanAllowsThreadRef(imgPlan));
   }
   const r = await executeImageGenRequestToDataUrl(cfg, prompt, {
-    ...(refDataUrl ? { refDataUrl } : {}),
+    ...(refDataUrl ? { refDataUrl, faceLock: threadFaceLockLevel(thread) } : {}),
     preferLongTimeout: true
   });
   if (r.ok && r.dataUrl) {
@@ -36484,6 +36510,7 @@ function syncChatThreadDetailPanelPlaceholders() {
     window.XXJ_GroupChat.syncChatDetailGroupPanelUi(th);
   }
   syncChatDetailLinkedGroupSelect(th);
+  syncChatDetailFaceLockSelect(th);
   syncChatDetailMemoryModeUi(th);
   const personaFoldField = document.getElementById("chat-detail-persona-fold-field");
   const personaFoldBtn = document.getElementById("chat-detail-persona-fold-toggle");
@@ -52897,7 +52924,7 @@ async function executeImageGenRequestToDataUrl(cfg, prompt, extras) {
             "Content-Type": "application/json",
             Authorization: `Bearer ${cfg.apiKey}`
           },
-          body: JSON.stringify(buildImageGenNovelAiGenerateJson(cfg, p, refDataUrl)),
+          body: JSON.stringify(buildImageGenNovelAiGenerateJson(cfg, p, refDataUrl, extras && extras.faceLock)),
           mode: "cors",
           credentials: "omit"
         },
@@ -52929,6 +52956,8 @@ async function executeImageGenRequestToDataUrl(cfg, prompt, extras) {
     }
     const useOpenAiEdits =
       Boolean(refDataUrl) && openAiImageModelSupportsReferenceEdits(cfg.model);
+    // 锁脸程度：轻 → 低保真，其余 → 高保真
+    if (useOpenAiEdits && extras && extras.faceLock) cfg = { ...cfg, openaiInputFidelity: extras.faceLock === "light" ? "low" : "high" };
     let parsed = useOpenAiEdits
       ? await postOpenAiImageEditsRequest(cfg, p, refDataUrl, timeoutMs)
       : await postOpenAiImageGenerationsRequest(cfg, p, {}, timeoutMs);
@@ -53763,16 +53792,11 @@ async function runDeferredSessionImageGenForLogIndex(msgIdx, msgAtSnapshot, thre
       logArr: log
     });
     let refDataUrl = "";
-    if (
-      m.role !== "user" &&
-      imageGenPlanAllowsThreadRef(plan) &&
-      thread &&
-      typeof thread === "object"
-    ) {
-      refDataUrl = resolveThreadCharImageRefDataUrl(thread);
+    if (m.role !== "user" && thread && typeof thread === "object") {
+      refDataUrl = resolveFaceLockRef(thread, imageGenPlanAllowsThreadRef(plan));
     }
     const r = await executeImageGenRequestToDataUrl(cfg, prompt, {
-      ...(refDataUrl ? { refDataUrl } : {}),
+      ...(refDataUrl ? { refDataUrl, faceLock: threadFaceLockLevel(thread) } : {}),
       preferLongTimeout:
         m.role === "assistant" || plan.subject === "both" || plan.includeCharStrong
     });
@@ -63172,14 +63196,15 @@ document.getElementById("ward-font-file-input")?.addEventListener("change", (e) 
   input.value = "";
   if (!f) return;
   if (f.size > GLOBAL_UI_TYPO_FONT_FILE_MAX) {
-    showToast("字体文件过大（≤5MB）");
+    showToast("字体文件太大了（要 30MB 以内）");
     return;
   }
   const faceEl = document.getElementById("ward-font-face-name");
-  const fam = faceEl && faceEl instanceof HTMLInputElement ? faceEl.value.trim() : "";
+  let fam = faceEl && faceEl instanceof HTMLInputElement ? faceEl.value.trim() : "";
   if (!fam) {
-    showToast("请先填写「自定义字体名」再选择文件");
-    return;
+    // 没起名字就用文件名，免得用户卡在这一步
+    fam = String(f.name || "我的字体").replace(/\.(woff2?|ttf|otf)$/i, "").replace(/["'\\]/g, "").trim().slice(0, 40) || "我的字体";
+    if (faceEl && faceEl instanceof HTMLInputElement) faceEl.value = fam;
   }
   const reader = new FileReader();
   reader.onload = () => {
@@ -65121,6 +65146,18 @@ document.getElementById("chat-ui-theme-switch")?.addEventListener("click", (e) =
   if (!kind || kind === getActiveThreadUiThemeKind()) return;
   applyChatUiThemeKindToActiveThread(kind);
 });
+document.getElementById("chat-detail-face-lock")?.addEventListener("change", (e) => {
+  const v = String(e.target.value || "normal");
+  if (!readActiveThread()) return;
+  patchActiveThread((t) => {
+    if (v === "normal") delete t.faceLockLevel;
+    else t.faceLockLevel = v;
+  });
+  showToast(
+    { off: "已关闭锁脸：生图不再参考立绘", light: "锁脸：轻（只参考大概样子）", normal: "锁脸：中", strong: "锁脸：强（尽量画成同一张脸）", force: "已开启强制锁脸：每张有 TA 的图都按立绘画" }[v] || "已保存"
+  );
+});
+
 document.getElementById("chat-detail-linked-group-select")?.addEventListener("change", () => {
   const sel = document.getElementById("chat-detail-linked-group-select");
   const th = readActiveThread();

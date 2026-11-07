@@ -1,4 +1,4 @@
-const CACHE_NAME = "xxj-pwa-v265";
+const CACHE_NAME = "xxj-pwa-v266";
 const KEEPALIVE_PERIODIC_TAG = "xxj-keepalive";
 const SCHEDULE_IDB = "xxj_sw_schedule";
 const SCHEDULE_STORE = "due";

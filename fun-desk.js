@@ -57,6 +57,7 @@
     astro: ["星座", "ph-moon-stars", 265, "Stars", fun("星座")],
     games: ["游戏厅", "ph-game-controller", 300, "Arcade", fun("游戏厅")],
     share: ["资源站", "ph-package", 175, "Share", fun("资源站")],
+    mimi: ["弥弥", "ph-cat", 0, "Butler", fun("弥弥")],
     news: ["更新公告", "ph-megaphone", 40, "News", call("openChangelog")]
   };
   const DEFAULT = [Object.keys(APPS)];
@@ -323,22 +324,42 @@
           }, 600);
         }
       }
-      // 插到指针下的图标前后
-      drag.ghost.style.visibility = "hidden";
-      const under = document.elementFromPoint(e.clientX, e.clientY);
-      drag.ghost.style.visibility = "";
-      const target = under?.closest(".desk-app");
-      if (target && target !== drag.el && pager.contains(target)) {
-        const tr = target.getBoundingClientRect();
-        const after = e.clientX > tr.left + tr.width / 2;
-        target.parentNode.insertBefore(drag.el, after ? target.nextSibling : target);
-      } else {
-        const grid = under?.closest(".desk-apps")?.querySelector(".desk-apps-grid");
-        if (grid && !grid.contains(drag.el) && !grid.querySelector(".desk-app")) grid.appendChild(drag.el);
-      }
+      // 放到手指所在位置最近的格子（空白处、行尾、图标之间都可以放）
+      const grid = pager.querySelector(`[data-grid="${curPage() - 1}"]`);
+      if (grid) placeAt(grid, e.clientX, e.clientY);
     },
     { passive: false }
   );
+  /** 按手指坐标把正在拖的图标插到最近的位置 */
+  function placeAt(grid, x, y) {
+    const icons = [...grid.querySelectorAll(".desk-app")].filter((a) => a !== drag.el);
+    if (!icons.length) {
+      if (drag.el.parentNode !== grid) grid.appendChild(drag.el);
+      return;
+    }
+    const first = icons[0].getBoundingClientRect();
+    const last = icons[icons.length - 1].getBoundingClientRect();
+    let ref = null; // 插在 ref 前面；null = 放最后
+    if (y < first.top) ref = icons[0];
+    else if (y > last.bottom || (y >= last.top && x > last.right)) ref = null;
+    else {
+      let best = null;
+      let bestD = Infinity;
+      for (const a of icons) {
+        const r = a.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        const d = Math.abs(x - cx) + Math.abs(y - cy) * 1.6; // 同一行优先
+        if (d < bestD) {
+          bestD = d;
+          best = { a, cx };
+        }
+      }
+      ref = x > best.cx ? best.a.nextElementSibling : best.a;
+      if (ref === drag.el) ref = ref.nextElementSibling;
+    }
+    if (ref ? drag.el.nextElementSibling !== ref || drag.el.parentNode !== grid : drag.el !== grid.lastElementChild) grid.insertBefore(drag.el, ref);
+  }
   const endDrag = () => {
     if (!drag) return;
     clearTimeout(drag.edgeTimer);

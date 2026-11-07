@@ -123,7 +123,7 @@
   <link rel="stylesheet" href="roam.css?v=31">
   <link rel="stylesheet" href="forum.css?v=44">
   <link rel="stylesheet" href="relation.css?v=18">
-  <link rel="stylesheet" href="fun.css?v=24">
+  <link rel="stylesheet" href="fun.css?v=25">
 </head>
 <body>
   <div class="boot-splash" id="boot-splash" aria-live="polite" aria-busy="true" aria-label="Meow OS · 开屏画面，请稍后点击进入">
@@ -1038,12 +1038,12 @@
                   <span class="settings-sec-idx" aria-hidden="true">01</span>
                   <div class="settings-sec-head-text">
                     <span class="settings-sec-tape" aria-hidden="true"></span>
-                    <p class="widget-label"><i class="ph ph-paint-brush" aria-hidden="true"></i> 密谈壳 · CSS</p>
+                    <p class="widget-label"><i class="ph ph-paint-brush" aria-hidden="true"></i> 聊天界面样式 · CSS</p>
                   </div>
                 </div>
                 <div class="settings-panel settings-panel--shine wardrobe-panel">
                   <p class="settings-ai-blurb wardrobe-panel-lead">
-                    <strong>经典 / 玻璃</strong>各一套 CSS 槽：用下方工具栏「填入 / 复制」进入对应槽，<strong>保存并应用</strong>后全机生效（全机经典/玻璃与单聊卷宗主题可分开）。样式可写宽。可写 <code>#chat-offline-screen</code>（晤面）。
+                    这里可以用 CSS 代码改聊天界面的样子（气泡、颜色、背景等）。<strong>不会写代码也没关系</strong>：点「线下模板」或用别人分享的代码，粘进下面的框里，再点<strong>保存并应用</strong>就生效。「经典」「玻璃」是两种聊天界面风格，各存一份代码。
                   </p>
                   <div class="wardrobe-toolbar" role="group" aria-label="样式快捷操作">
                     <span class="wardrobe-toolbar-label">经典</span>
@@ -1097,8 +1097,8 @@
                   <div class="settings-api-field wardrobe-panel-field wardrobe-panel-field--preview">
                     <span class="settings-api-field-k">实时预览</span>
                     <p class="settings-ai-key-note wardrobe-preview-hint">
-                      预览仅映射 <code>#chat-screen</code>；<code>#chat-offline-screen</code> 与壳外浮层请在实机对照。
-                    </p>
+                    这里只能预览普通聊天界面；「晤面」等其他界面要进去实际看效果。
+                  </p>
                     <div
                       class="chat-detail-thread-ui-css-preview"
                       id="wardrobe-chat-css-preview"
@@ -1144,7 +1144,9 @@
                         <i class="ph ph-plus" aria-hidden="true"></i> 存为线下预设
                       </button>
                     </div>
-                    <p class="settings-ai-key-note ward-offline-preset-note">写入当前样式框；晤面「+」里可切换绑定（不改全局 CSS）。</p>
+                    <p class="settings-ai-key-note ward-offline-preset-note">
+                    点一下就会把模板放进上面的代码框，记得再点「保存并应用」。
+                  </p>
                     <div id="ward-chat-offline-css-presets" class="ward-chat-css-presets"></div>
                   </div>
                 </div>
@@ -1160,10 +1162,10 @@
                 </div>
                 <div class="settings-panel wardrobe-panel">
                   <p class="settings-ai-blurb wardrobe-panel-lead">
-                    可填 Google Fonts 的样式表链接（<code>https</code>）与 <code>font-family</code>；或使用字体文件直链 / 本机上传（需填写自定义字体名）。
+                    换全机字体，有两种办法：① <strong>从手机上传字体文件</strong>（.ttf / .otf / .woff2），给它起个名字再保存；② 填网络字体链接（比如 Google Fonts）。只用其中一种就行。
                   </p>
                   <div class="settings-api-field wardrobe-panel-field">
-                    <label class="settings-api-field-k" for="ward-font-link">字体 CSS 链接（可选）</label>
+                    <label class="settings-api-field-k" for="ward-font-link">网络字体链接（可选，比如 Google Fonts）</label>
                     <input
                       id="ward-font-link"
                       class="settings-api-input"
@@ -1175,7 +1177,7 @@
                     />
                   </div>
                   <div class="settings-api-field wardrobe-panel-field">
-                    <label class="settings-api-field-k" for="ward-font-stack">font-family（可选）</label>
+                    <label class="settings-api-field-k" for="ward-font-stack">字体名称（可选，填链接时用）</label>
                     <input
                       id="ward-font-stack"
                       class="settings-api-input"
@@ -1185,7 +1187,7 @@
                     />
                   </div>
                   <div class="settings-api-field wardrobe-panel-field">
-                    <label class="settings-api-field-k" for="ward-font-face-name">自定义字体名（@font-face）</label>
+                    <label class="settings-api-field-k" for="ward-font-face-name">给上传的字体起个名字</label>
                     <input
                       id="ward-font-face-name"
                       class="settings-api-input"
@@ -1195,7 +1197,7 @@
                     />
                   </div>
                   <div class="settings-api-field wardrobe-panel-field">
-                    <label class="settings-api-field-k" for="ward-font-src-url">字体文件直链（可选）</label>
+                    <label class="settings-api-field-k" for="ward-font-src-url">字体文件网址（可选）</label>
                     <input
                       id="ward-font-src-url"
                       class="settings-api-input"
@@ -1204,10 +1206,12 @@
                       spellcheck="false"
                       placeholder="https://…/font.woff2"
                     />
-                    <p class="settings-ai-key-note">支持 .woff2 / .woff / .ttf</p>
+                    <p class="settings-ai-key-note">
+                    可以填 .woff2 / .woff / .ttf 文件的网址。
+                  </p>
                   </div>
                   <div class="settings-api-field wardrobe-panel-field">
-                    <span class="settings-api-field-k">本地上传（≤5MB）</span>
+                    <span class="settings-api-field-k">从手机上传字体文件（30MB 以内）</span>
                     <div class="wardrobe-file-row">
                       <button type="button" class="chip ghost chip-xs" id="ward-font-file-pick">
                         <i class="ph ph-upload-simple" aria-hidden="true"></i> 选择文件
@@ -1230,8 +1234,7 @@
                 </div>
                 <div class="settings-panel settings-panel--soft wardrobe-panel">
                   <p class="settings-ai-blurb wardrobe-panel-lead">
-                    作用于 <code>html</code> 根字号；聊天区的消息气泡、输入栏等多处使用
-                    <code>rem</code>，会一并缩放。不勾选则使用浏览器默认。
+                    调整整个界面的文字大小，聊天气泡、输入框会一起变大变小。不勾选就用默认大小。
                   </p>
                   <div class="settings-api-field wardrobe-panel-field wardrobe-panel-field--presets">
                     <div class="ward-preset-head">
@@ -1242,8 +1245,8 @@
                     </div>
                     <div id="ward-typo-presets" class="ward-chat-css-presets"></div>
                     <p class="settings-ai-key-note">
-                      保存当前字体链接、font-family、本地上传缓存与根字号；点「套用」立即生效。
-                    </p>
+                    把现在的字体和字号存成一个预设，以后点「套用」就能一键换回来。
+                  </p>
                   </div>
                   <div class="settings-api-field wardrobe-panel-field">
                     <label class="wardrobe-check-row" for="ward-font-use-size">
@@ -1284,7 +1287,10 @@
                   <i class="ph ph-upload-simple" aria-hidden="true"></i> 导入 JSON
                 </button>
                 <button type="button" class="chip ghost chip-xs wardrobe-io-btn mx-png-import" data-mxpng="look">
-                  <i class="ph ph-cat" aria-hidden="true"></i> 导入 Meow OS 卡
+                  <i class="ph ph-cat" aria-hidden="true"></i> 导入 PNG
+                </button>
+                <button type="button" class="chip ghost chip-xs wardrobe-io-btn mx-png-import" data-mxpng-export="look">
+                  <i class="ph ph-export" aria-hidden="true"></i> 导出为 PNG
                 </button>
                 <input id="ward-look-import-file" type="file" accept=".json,application/json" hidden />
               </div>
@@ -1299,12 +1305,11 @@
                 </div>
                 <div class="settings-panel wardrobe-panel" id="ward-desktop-home-icons-panel">
                   <p class="settings-ai-blurb wardrobe-panel-lead">
-                    <strong>主屏应用格</strong>（<code>#app-grid</code>）图标，与底栏 Dock<strong>分开保存</strong>；支持本地上传（存本机）或
-                    <code>https</code> 图片链接。
+                    给桌面上的应用换图标：点「上传」从相册选图就行（也可以在下面填图片网址）。第一页和第二页的应用都在这里，底部圆形 Dock 栏的图标在下一块单独设置。
                   </p>
                   <div id="ward-desktop-home-icons-mount" class="ward-desktop-icons" role="list"></div>
                   <div class="settings-api-field wardrobe-panel-field ward-desktop-icon-url-field">
-                    <label class="settings-api-field-k" for="ward-desktop-home-icon-url-app">主屏 · 用链接设置（可选）</label>
+                    <label class="settings-api-field-k" for="ward-desktop-home-icon-url-app">也可以用图片网址设置（可选）</label>
                     <div class="ward-desktop-icon-url-row">
                       <select id="ward-desktop-home-icon-url-app" class="settings-ai-select ward-desktop-icon-url-select">
                         <option value="">选择应用…</option>
@@ -1320,7 +1325,9 @@
                       />
                       <button type="button" class="chip solid chip-xs" id="ward-desktop-home-icon-url-apply">应用链接</button>
                     </div>
-                    <p class="settings-ai-key-note">外链若遇防盗链可能无法显示；可改上传图片。</p>
+                    <p class="settings-ai-key-note">
+                    有些网站的图片不让别处显示，打不开的话就改用上传。
+                  </p>
                   </div>
                   <div class="wardrobe-panel-footer ward-desktop-icons-footer">
                     <button type="button" class="chip ghost chip-xs" id="ward-desktop-home-icons-clear-all">清除全部主屏自定义图标</button>
@@ -1328,11 +1335,11 @@
                 </div>
                 <div class="settings-panel wardrobe-panel ward-dock-icons-panel" id="ward-dock-icons-panel">
                   <p class="settings-ai-blurb wardrobe-panel-lead">
-                    <strong>Dock 底栏</strong>圆形按钮图标单独设置；某一应用<strong>未设 Dock 图</strong>时，会自动沿用<strong>主屏同名片</strong>图标（升级前只有一份数据的也会照常显示）。
+                    屏幕最底下那排圆形按钮（Dock 栏）的图标。没单独设置的，会自动用上面同名应用的图标。
                   </p>
                   <div id="ward-dock-icons-mount" class="ward-desktop-icons" role="list"></div>
                   <div class="settings-api-field wardrobe-panel-field ward-desktop-icon-url-field">
-                    <label class="settings-api-field-k" for="ward-dock-icon-url-app">Dock · 用链接设置（可选）</label>
+                    <label class="settings-api-field-k" for="ward-dock-icon-url-app">Dock 栏 · 用图片网址设置（可选）</label>
                     <div class="ward-desktop-icon-url-row">
                       <select id="ward-dock-icon-url-app" class="settings-ai-select ward-desktop-icon-url-select">
                         <option value="">选择应用…</option>
@@ -1348,7 +1355,9 @@
                       />
                       <button type="button" class="chip solid chip-xs" id="ward-dock-icon-url-apply">应用链接</button>
                     </div>
-                    <p class="settings-ai-key-note">「我的」在主屏与 Dock 可各用一张图。</p>
+                    <p class="settings-ai-key-note">
+                    同一个应用在桌面和 Dock 栏可以用不同的图。
+                  </p>
                   </div>
                   <div class="wardrobe-panel-footer ward-desktop-icons-footer">
                     <button type="button" class="chip ghost chip-xs" id="ward-dock-icons-clear-all">清除全部 Dock 自定义图标</button>
@@ -1361,17 +1370,19 @@
                   <span class="settings-sec-idx" aria-hidden="true">05</span>
                   <div class="settings-sec-head-text">
                     <span class="settings-sec-tape" aria-hidden="true"></span>
-                    <p class="widget-label"><i class="ph ph-squares-four" aria-hidden="true"></i> 应用格底图 · 应用塔背景</p>
+                    <p class="widget-label"><i class="ph ph-squares-four" aria-hidden="true"></i> 应用卡片背景</p>
                   </div>
                 </div>
                 <div class="settings-panel wardrobe-panel" id="ward-desktop-tile-bgs-panel">
                   <p class="settings-ai-blurb wardrobe-panel-lead">
-                    <strong>逐格底图</strong>只作用在<strong>主屏下方应用块</strong>（聊天 / 查岗 / 关系 … 各按钮），每条格子单独一张图；<strong>Dock 圆形图标</strong>不变。<strong>应用塔整体背景</strong>铺在整块应用区域底下（仍保留圆角卡片轮廓）。
+                    给第一页每个应用卡片单独加一张背景图（图标在上面，背景在下面）；也可以给整块应用区域加一张大背景。
                   </p>
-                  <p class="settings-ai-key-note wardrobe-preview-hint">与「桌面图标」相同的应用列表；图标在上层，底图在其下方。</p>
+                  <p class="settings-ai-key-note wardrobe-preview-hint">
+                    点「上传」给对应的应用卡片加背景图。
+                  </p>
                   <div id="ward-desktop-tile-bgs-mount" class="ward-desktop-icons" role="list"></div>
                   <div class="settings-api-field wardrobe-panel-field ward-desktop-icon-url-field">
-                    <label class="settings-api-field-k" for="ward-desktop-tile-bg-url-app">格底图 · 用链接设置（可选）</label>
+                    <label class="settings-api-field-k" for="ward-desktop-tile-bg-url-app">也可以用图片网址设置（可选）</label>
                     <div class="ward-desktop-icon-url-row">
                       <select id="ward-desktop-tile-bg-url-app" class="settings-ai-select ward-desktop-icon-url-select">
                         <option value="">选择应用…</option>
@@ -1394,7 +1405,7 @@
                 </div>
                 <div class="settings-panel wardrobe-panel ward-app-tower-bg-panel">
                   <p class="settings-ai-blurb wardrobe-panel-lead">
-                    <strong>应用塔整体背景</strong>（铺满 `#app-grid` 容器内）。可与「桌面主屏墙纸」叠加；未设置时仍为默认浅色/深色卡片底。
+                    整块应用区域的大背景图。不设置就用默认的白色 / 深色卡片。
                   </p>
                   <div class="ward-hero-card-preview-row">
                     <div class="ward-hero-card-preview-wrap">
@@ -1436,7 +1447,7 @@
                 </div>
                 <div class="settings-panel wardrobe-panel ward-dock-bg-panel">
                   <p class="settings-ai-blurb wardrobe-panel-lead">
-                    <strong>Dock 栏背景</strong>：底部胶囊条（<code>.dock-plate</code>）铺底，图标按钮仍在上方；未设置时沿用默认卡片色。
+                    屏幕最底下那条胶囊形 Dock 栏的背景图。不设置就用默认颜色。
                   </p>
                   <div class="ward-hero-card-preview-row">
                     <div class="ward-hero-card-preview-wrap">
@@ -1488,8 +1499,7 @@
                 </div>
                 <div class="settings-panel wardrobe-panel" id="ward-desktop-wallpaper-panel">
                   <p class="settings-ai-blurb wardrobe-panel-lead">
-                    替换<strong>整支手机主屏</strong>最底层墙纸（状态栏、应用格、Dock 下方的铺底）。未设置时仍用 Palette 按钮切换的<strong>机内渐变</strong>；自定义后可继续用 Palette 换<strong>配色</strong>（强调色等）。支持本地上传或
-                    <code>https</code> 链接。
+                    整个桌面的壁纸（铺在所有东西最下面）。不设置就用 Palette 按钮切换的渐变色。
                   </p>
                   <div class="ward-hero-card-preview-row">
                     <div class="ward-hero-card-preview-wrap">
@@ -1527,7 +1537,7 @@
                       />
                       <button type="button" class="chip solid chip-xs" id="ward-desktop-wallpaper-url-apply">应用链接</button>
                     </div>
-                    <p class="settings-ai-key-note">外链若无法加载请改上传。</p>
+                    <p class="settings-ai-key-note">图片网址打不开的话就改用上传。</p>
                   </div>
                 </div>
               </section>
@@ -1537,13 +1547,12 @@
                   <span class="settings-sec-idx" aria-hidden="true">07</span>
                   <div class="settings-sec-head-text">
                     <span class="settings-sec-tape" aria-hidden="true"></span>
-                    <p class="widget-label"><i class="ph ph-image-square" aria-hidden="true"></i> 首页时钟卡背景</p>
+                    <p class="widget-label"><i class="ph ph-image-square" aria-hidden="true"></i> 时间卡片背景</p>
                   </div>
                 </div>
                 <div class="settings-panel wardrobe-panel" id="ward-hero-card-panel">
                   <p class="settings-ai-blurb wardrobe-panel-lead">
-                    替换桌面<strong>最上方大卡片</strong>（日期、时间、状态句、Palette 按钮所在区域）的<strong>背景图</strong>，文字与按钮仍叠在上层；本地上传或
-                    <code>https</code> 链接，存于本机。
+                    桌面最上面那张显示日期和时间的大卡片的背景图。
                   </p>
                   <div class="ward-hero-card-preview-row">
                     <div class="ward-hero-card-preview-wrap">
@@ -1581,7 +1590,7 @@
                       />
                       <button type="button" class="chip solid chip-xs" id="ward-hero-card-url-apply">应用链接</button>
                     </div>
-                    <p class="settings-ai-key-note">外链若无法加载请改上传。</p>
+                    <p class="settings-ai-key-note">图片网址打不开的话就改用上传。</p>
                   </div>
                 </div>
               </section>
@@ -3106,7 +3115,11 @@
                 </button>
                 <button type="button" class="chip ghost chip-xs mx-png-import" data-mxpng="char">
                   <i class="ph ph-cat" aria-hidden="true"></i>
-                  导入 Meow OS 卡
+                  导入 PNG
+                </button>
+                <button type="button" class="chip ghost chip-xs mx-png-import" data-mxpng-export="char">
+                  <i class="ph ph-export" aria-hidden="true"></i>
+                  导出为 PNG
                 </button>
               </div>
             </div>
@@ -3744,6 +3757,9 @@
                     <button type="button" class="chip ghost chip-xs mx-png-import" data-mxpng="worldbook" aria-label="导入 Meow OS 世界书卡">
                       <i class="ph ph-cat" aria-hidden="true"></i> 导入 PNG
                     </button>
+                    <button type="button" class="chip ghost chip-xs mx-png-import" data-mxpng-export="worldbook" aria-label="导出为 Meow OS PNG">
+                      <i class="ph ph-export" aria-hidden="true"></i> 导出 PNG
+                    </button>
                     <button type="button" class="chip solid chip-xs world-book-add-btn" id="world-book-add">＋ 新书</button>
                   </div>
                 </div>
@@ -4278,6 +4294,7 @@
                   <div class="chat-detail-slab">
                     <div class="chat-detail-field chat-detail-field--first">
                       <span class="chat-detail-field-k">显示标题</span>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">聊天列表和聊天顶部显示的名字。</p>
                       <p class="chat-detail-readonly" id="chat-detail-display-title">—</p>
                     </div>
                     <div class="chat-detail-field" id="chat-detail-dm-remark-field" data-chat-detail-dm-only>
@@ -4285,6 +4302,7 @@
                         <label class="chat-detail-field-k chat-detail-field-k--label" for="chat-detail-char-remark-name-input">备注名</label>
                         <button type="button" class="chip solid chip-xs" id="chat-detail-remark-save">保存</button>
                       </div>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">你给 TA 的备注，只有你自己看得到。</p>
                       <input
                         type="text"
                         id="chat-detail-char-remark-name-input"
@@ -4298,7 +4316,7 @@
                     <div class="chat-detail-field" id="chat-detail-char-remark-for-user-field" data-chat-detail-dm-only>
                       <span class="chat-detail-field-k">TA 对我的备注</span>
                       <p class="chat-detail-readonly" id="chat-detail-char-remark-for-user-value">—</p>
-                      <p class="chat-detail-lead chat-detail-lead--compact" id="chat-detail-char-remark-for-user-hint" hidden>角色在聊天里给你起的昵称；仅本密谈，不改面具显示名。</p>
+                      <p class="chat-detail-lead chat-detail-lead--compact" id="chat-detail-char-remark-for-user-hint" hidden>TA 在聊天里怎么称呼你（比如「宝贝」），只在这个聊天里生效。</p>
                     </div>
                     <div id="chat-detail-group-fields" hidden>
                       <div class="chat-detail-field">
@@ -4349,6 +4367,7 @@
                     </div>
                     <div class="chat-detail-field" data-chat-detail-dm-only id="chat-detail-linked-group-field">
                       <label class="chat-detail-field-k chat-detail-field-k--label" for="chat-detail-linked-group-select">关联群聊记忆</label>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">选一个群聊，TA 私聊时会记得你们在那个群里聊过什么。不需要就选「不关联」。</p>
                       <select id="chat-detail-linked-group-select" class="chat-detail-memory-rounds-input" aria-describedby="chat-detail-linked-group-hint">
                         <option value="">不关联</option>
                       </select>
@@ -4359,6 +4378,7 @@
                         <span class="chat-detail-field-k chat-detail-field-k--label">记忆摘要</span>
                         <button type="button" class="chip solid chip-xs" id="chat-memo-screen-open">打开</button>
                       </div>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">自动总结的你们之间的重要事情，TA 聊天时会参考。点开可以查看和修改。</p>
                       <p id="chat-detail-memo-blurb" class="settings-ai-key-note chat-detail-memo-blurb">
                         暂无记忆摘要
                       </p>
@@ -4368,6 +4388,7 @@
                         <label class="chat-detail-field-k chat-detail-field-k--label" for="chat-detail-scene-input">顶栏装饰文案</label>
                         <button type="button" class="chip solid chip-xs" id="chat-detail-scene-save">保存</button>
                       </div>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">聊天顶部那行小字，只是装饰，TA 看不到。</p>
                       <textarea
                         id="chat-detail-scene-input"
                         class="char-textarea chat-detail-scene-input"
@@ -4382,6 +4403,7 @@
                         <span class="chat-detail-field-k chat-detail-field-k--label">对话记忆</span>
                         <button type="button" class="chip solid chip-xs" id="chat-detail-memory-rounds-save">保存</button>
                       </div>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">TA 每次回复时能看到多少条最近的聊天记录。越多越记得前面的事，但更费 API 额度。</p>
                       <fieldset class="chat-detail-memory-mode" aria-describedby="chat-detail-memory-mode-hint">
                         <legend class="visually-hidden">对话记忆模式</legend>
                         <label class="chat-detail-memory-mode-opt">
@@ -4425,7 +4447,7 @@
                         <span class="visually-hidden">旁白模式</span>
                       </button>
                       <div class="chat-detail-field chat-detail-field--translation-sub" id="chat-detail-narrator-sub" hidden>
-                        <p class="chat-detail-lead chat-detail-lead--compact">气泡上旁白；<code>*</code> 内心可斜体。</p>
+                        <p class="chat-detail-lead chat-detail-lead--compact">开启后，TA 的回复会带上动作、神态描写（像小说旁白）。</p>
                         <div class="chat-detail-actions chat-detail-bg-actions">
                           <button
                             type="button"
@@ -4461,6 +4483,7 @@
                       >
                         <span class="visually-hidden">心声手记</span>
                       </button>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">开启后，TA 的消息可以点开看 TA 心里真正在想什么。</p>
                     </div>
                     <div class="chat-detail-field" id="chat-detail-prompt-pack-field">
                       <label class="chat-detail-field-k chat-detail-field-k--label" for="chat-detail-prompt-pack">提示词套装</label>
@@ -4474,7 +4497,7 @@
                         <option value="thick">版本2</option>
                         <option value="v3">版本3</option>
                       </select>
-                      <p class="chat-detail-lead chat-detail-lead--compact">只换活人骨架；未选则沿用全局。私聊、晤面、群聊都生效。</p>
+                      <p class="chat-detail-lead chat-detail-lead--compact">决定 TA 说话方式的一套底层指令。看不懂就保持「跟随全局」。</p>
                     </div>
                     <div class="chat-detail-field" data-chat-detail-dm-only id="chat-detail-im-human-pace-field">
                       <label class="chat-detail-field-k chat-detail-field-k--label" for="chat-detail-im-human-pace">打字节奏</label>
@@ -4488,7 +4511,7 @@
                         <option value="S">慢回</option>
                         <option value="off">关闭</option>
                       </select>
-                      <p class="chat-detail-lead chat-detail-lead--compact">连发多泡时的停顿与输入态；未选则沿用全局。</p>
+                      <p class="chat-detail-lead chat-detail-lead--compact">TA 连发好几条消息时，中间停多久、「正在输入」显示多久。保持「跟随全局」就好。</p>
                     </div>
                     <div class="chat-detail-field chat-detail-field--switch" data-chat-detail-dm-only>
                       <span class="chat-detail-field-k">小剧场</span>
@@ -4500,6 +4523,7 @@
                       >
                         <span class="visually-hidden">小剧场</span>
                       </button>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">开启后，TA 回复后会额外生成一些小番外（日记、朋友圈、来信等），在「手记」里看。</p>
                     </div>
                     <div class="chat-detail-field chat-detail-field--switch" data-chat-detail-dm-only>
                       <span class="chat-detail-field-k">中插 HTML</span>
@@ -4512,7 +4536,7 @@
                         <span class="visually-hidden">中插 HTML</span>
                       </button>
                       <p class="chat-detail-lead chat-detail-lead--compact" id="chat-detail-inline-html-auto-lead">
-                        默认关闭：开启后角色回复时尽量附带一张 HTML 即兴小道具（形态每轮不同）。可在密谈详情开关。
+                        开启后，TA 回复时会附带一张能点开的小卡片（比如小票、便签、小游戏）。比较费额度，默认关闭。
                       </p>
                     </div>
                     <div class="chat-detail-field chat-detail-field--switch" data-chat-detail-dm-only>
@@ -4525,13 +4549,13 @@
                       >
                         <span class="visually-hidden">拉黑 TA</span>
                       </button>
-                      <p class="chat-detail-lead chat-detail-lead--compact">你拉黑后对方仍可回复；角色拉黑你仅由剧情触发。</p>
+                      <p class="chat-detail-lead chat-detail-lead--compact">你把 TA 拉黑后，TA 还是能给你发消息；TA 会不会拉黑你，由剧情决定。</p>
                     </div>
                     <div class="chat-detail-field" data-chat-detail-dm-only id="chat-detail-theater-preset-field">
                       <label class="chat-detail-field-k chat-detail-field-k--label">小剧场预设（最多 3 个）</label>
                       <div id="chat-detail-theater-preset-list" class="theater-preset-checklist" role="group" aria-label="本密谈启用的小剧场预设"></div>
                       <button type="button" class="chip ghost chip-xs" id="chat-detail-theater-preset-reset">恢复设置默认</button>
-                      <p class="chat-detail-lead chat-detail-lead--compact">每轮对方回复后按勾选预设自动生成；打开手记 Tab 只查看，切换预设不触发生成。</p>
+                      <p class="chat-detail-lead chat-detail-lead--compact">勾选想要的小剧场类型（最多 3 种）。TA 每次回复后会按勾选的类型自动生成，在「手记」里看。</p>
                       <div class="chat-detail-field" id="chat-detail-theater-gap-field">
                         <div class="chat-detail-scene-head">
                           <label class="chat-detail-field-k chat-detail-field-k--label" for="chat-detail-theater-prompt-min-gap">并入聊天 · 完整说明间隔（轮）</label>
@@ -4549,7 +4573,7 @@
                         />
                         <button type="button" class="chip ghost chip-xs" id="chat-detail-theater-gap-reset">跟随设置默认</button>
                         <p class="chat-detail-lead chat-detail-lead--compact" id="chat-detail-theater-gap-lead">
-                          距上次有小剧场内容隔满此轮数才再生成（并入 JSON / 单独请求均生效）。填 0 = 每轮。
+                          隔几轮对话才生成一次小剧场，可以省额度。填 0 就是每轮都生成。
                         </p>
                       </div>
                     </div>
@@ -4561,7 +4585,7 @@
                         </button>
                       </div>
                       <p class="chat-detail-lead chat-detail-lead--compact" id="chat-detail-char-rt-summary">跟随全局设置</p>
-                      <p class="chat-detail-lead chat-detail-lead--compact">仅本角色消息与来电；未设项沿用「我的 → 提示音与铃声」全局默认。</p>
+                      <p class="chat-detail-lead chat-detail-lead--compact">只给这个角色换消息提示音和来电铃声；不设置就用「我的 → 提示音与铃声」里的。</p>
                       <div id="chat-detail-char-rt-picker" class="rt-char-picker" hidden></div>
                     </div>
                     <div class="chat-detail-field chat-detail-field--switch" data-chat-detail-dm-only>
@@ -4588,12 +4612,14 @@
                       <button type="button" class="chat-detail-switch" id="chat-detail-hide-timestamps-toggle" aria-pressed="false">
                         <span class="visually-hidden">隐藏时间戳</span>
                       </button>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">不显示每条消息的发送时间。</p>
                     </div>
                     <div class="chat-detail-field chat-detail-field--switch">
                       <span class="chat-detail-field-k">时间感知</span>
                       <button type="button" class="chat-detail-switch" id="chat-detail-time-aware-toggle" aria-pressed="false">
                         <span class="visually-hidden">时间感知</span>
                       </button>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">让 TA 知道现在几点、星期几、是不是节假日，聊天更真实。</p>
                       <div class="chat-detail-field chat-detail-field--translation-sub" id="chat-detail-time-aware-options" hidden>
                         <label class="chat-detail-field-k chat-detail-field-k--label" for="chat-detail-time-aware-region">所在地区</label>
                         <select
@@ -4601,7 +4627,7 @@
                           class="settings-ai-select chat-detail-wb-select"
                           aria-label="所在地区（节假日与调休）"
                         ></select>
-                        <p class="chat-detail-lead chat-detail-lead--compact">按当前主控面具保存；各密谈共用。用于法定假、调休上班与临近节日提示。</p>
+                        <p class="chat-detail-lead chat-detail-lead--compact">你在哪个地区，用来让 TA 知道节假日和调休。所有聊天共用。</p>
                       </div>
                     </div>
 
@@ -4610,7 +4636,7 @@
                       <button type="button" class="chat-detail-switch" id="chat-detail-char-reverse-snoop-toggle" aria-pressed="false">
                         <span class="visually-hidden">主动查岗</span>
                       </button>
-                      <p class="chat-detail-lead chat-detail-lead--compact">开启后角色偶发会偷偷翻你微信（频率较低，约数小时一次；须已配置 API）。</p>
+                      <p class="chat-detail-lead chat-detail-lead--compact">开启后，TA 偶尔（几小时一次左右）会偷偷翻你的手机，然后来找你聊。需要先填好 API。</p>
                     </div>
 
                     <div class="chat-detail-field chat-detail-field--switch" data-chat-detail-dm-only>
@@ -4618,6 +4644,7 @@
                       <button type="button" class="chat-detail-switch" id="chat-detail-char-proactive-toggle" aria-pressed="false">
                         <span class="visually-hidden">主动发消息</span>
                       </button>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">开启后，你不说话 TA 也会隔一段时间主动找你，下面设置隔多久。</p>
                       <div class="chat-detail-field chat-detail-field--translation-sub" id="chat-detail-char-proactive-options" hidden>
                         <div class="chat-detail-field chat-detail-field--wb">
                           <div class="chat-detail-scene-head">
@@ -4662,7 +4689,7 @@
                         <span class="visually-hidden">允许 char 锁手机</span>
                       </button>
                       <div class="chat-detail-field chat-detail-field--translation-sub">
-                        <p class="chat-detail-lead chat-detail-lead--compact">关则不会出现。开时 Ta 可按剧情用 charLock 占屏宣读、出题、同屏聊；离开需对口令。</p>
+                        <p class="chat-detail-lead chat-detail-lead--compact">开启后，TA 可能会按剧情「锁住」你的手机屏幕：念话给你听、出题考你，要说对口令才能解锁。关掉就不会发生。</p>
                       </div>
                     </div>
 
@@ -4677,7 +4704,7 @@
                         <span class="visually-hidden">异地模式</span>
                       </button>
                       <div class="chat-detail-field chat-detail-field--translation-sub">
-                        <p class="chat-detail-lead chat-detail-lead--compact">开则注入「纯线上互动」提示：无线下关系、不提见面或转联系方式；程序同时屏蔽晤面与自动线下。</p>
+                        <p class="chat-detail-lead chat-detail-lead--compact">你们是网恋 / 异地：TA 不会提见面，也不会出现线下见面的剧情。</p>
                       </div>
                     </div>
 
@@ -4687,7 +4714,7 @@
                         <span class="visually-hidden">自动线下</span>
                       </button>
                       <div class="chat-detail-field chat-detail-field--translation-sub">
-                        <p class="chat-detail-lead chat-detail-lead--compact">开时 TA 解锁后会根据锁屏里你的选择与人设决定是否来找你晤面。</p>
+                        <p class="chat-detail-lead chat-detail-lead--compact">开启后，TA 可能会按剧情主动来找你见面（进入「晤面」线下剧情）。</p>
                       </div>
                     </div>
 
@@ -4720,7 +4747,7 @@
                           晤面简述
                         </button>
                       </div>
-                      <p class="chat-detail-lead chat-detail-lead--compact">简述：更多菜单「线下」写归档；记忆里与完整晤面一样当真发生过。</p>
+                      <p class="chat-detail-lead chat-detail-lead--compact">线下见面时写完整剧情，还是只写简短经过。「简述」更快、更省额度，TA 一样会记得。</p>
                     </div>
 
                     <div class="chat-detail-field chat-detail-field--switch" data-chat-detail-dm-only>
@@ -4728,6 +4755,7 @@
                       <button type="button" class="chat-detail-switch" id="chat-detail-sticker-suggest-toggle" aria-pressed="true">
                         <span class="visually-hidden">表情联想</span>
                       </button>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">开启后，TA 会根据聊天内容自己挑表情包发。</p>
                     </div>
 
                     <div class="chat-detail-field chat-detail-field--wb" data-chat-detail-dm-only>
@@ -4735,11 +4763,13 @@
                         <label class="chat-detail-field-k chat-detail-field-k--label" for="chat-detail-sticker-bind-chips">表情分类绑定</label>
                         <button type="button" class="chip ghost chip-xs" id="chat-detail-sticker-bind-clear">清空</button>
                       </div>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">选 TA 能用哪几类表情包。</p>
                       <div id="chat-detail-sticker-bind-chips" class="chat-detail-chipbox" role="listbox" aria-label="选择绑定给角色的表情分类（可多选）"></div>
                     </div>
 
                     <div class="chat-detail-field chat-detail-field--minimax-voice" data-chat-detail-dm-only>
                       <label class="chat-detail-field-k chat-detail-field-k--label" for="chat-detail-minimax-voice">角色音色（MiniMax）</label>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">TA 发语音时用的声音（要先在设置里配置 MiniMax 语音）。</p>
                       <select id="chat-detail-minimax-voice" class="settings-ai-select chat-detail-wb-select" aria-label="选择本角色的 MiniMax 音色">
                         <option value="">跟随全局默认</option>
                         <option value="__custom__">自定义…</option>
@@ -4781,19 +4811,28 @@
                           角色提示词…
                         </button>
                       </div>
-                      <p class="chat-detail-lead chat-detail-lead--compact">可覆盖角色档案里的默认外貌 tag；本密谈留空则用档案或人设推断。</p>
+                      <p class="chat-detail-lead chat-detail-lead--compact">在这个聊天里生成图片时，TA 长什么样（外貌描述）。不填就用角色档案里的。</p>
                     </div>
 
                     <div class="chat-detail-field chat-detail-field--image-ref" data-chat-detail-dm-only>
                       <div class="chat-detail-scene-head">
                         <span class="chat-detail-field-k chat-detail-field-k--label">角色立绘 · 生图参考</span>
                       </div>
-                      <p class="chat-detail-lead chat-detail-lead--compact">可覆盖档案默认立绘；锁脸：NovelAI img2img / OpenAI gpt-image edits。</p>
+                      <p class="chat-detail-lead chat-detail-lead--compact">放一张 TA 的参考图，生成图片时会照着这张脸画（叫「锁脸」）。不放就用角色档案里的立绘。</p>
                       <p class="chat-detail-readonly chat-detail-bg-status" id="chat-detail-image-ref-status">未设置</p>
                       <div class="chat-detail-actions chat-detail-bg-actions">
                         <button type="button" class="chip ghost chip-xs" id="chat-detail-image-ref-pick">选择图片</button>
                         <button type="button" class="chip ghost chip-xs" id="chat-detail-image-ref-clear">清除</button>
                       </div>
+                      <label class="chat-detail-field-k chat-detail-field-k--label mx-facelock-k" for="chat-detail-face-lock">锁脸程度</label>
+                      <select id="chat-detail-face-lock" class="chat-detail-select settings-ai-select mx-facelock">
+                        <option value="off">关闭（不参考立绘）</option>
+                        <option value="light">轻（只像个大概）</option>
+                        <option value="normal">中（默认）</option>
+                        <option value="strong">强（尽量画成同一张脸）</option>
+                        <option value="force">强制锁脸（每张有 TA 的图都按立绘画）</option>
+                      </select>
+                      <p class="chat-detail-lead chat-detail-lead--compact">越强越像参考图，但动作、构图也会更像原图。「强制锁脸」连合照、场景图里的 TA 也会参考立绘。</p>
                       <div class="chat-detail-image-ref-test" id="chat-detail-image-ref-test" hidden>
                         <img
                           id="chat-detail-image-ref-thumb"
@@ -4835,7 +4874,7 @@
                         <span class="chat-detail-field-k chat-detail-field-k--label">视频通话 · 通话立绘</span>
                         <button type="button" class="chip ghost chip-xs" id="chat-detail-call-illust-clear-all">清空本密谈覆盖</button>
                       </div>
-                      <p class="chat-detail-lead chat-detail-lead--compact">可覆盖档案；内置 + 自定义情绪。角色 mood 含自定义名时会切换对应立绘。</p>
+                      <p class="chat-detail-lead chat-detail-lead--compact">视频通话时显示的 TA 的图片，可以按心情（开心、难过…）各放一张，通话时会自动切换。</p>
                       <p class="chat-detail-readonly chat-detail-bg-status" id="chat-detail-call-illust-status">未上传</p>
                       <div id="chat-detail-call-illust-grid" class="call-illust-grid" data-call-illust-scope="thread"></div>
                     </div>
@@ -4845,6 +4884,7 @@
                       <button type="button" class="chat-detail-switch" id="chat-detail-image-every-round-toggle" aria-pressed="false">
                         <span class="visually-hidden">每轮对话后生图</span>
                       </button>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">开启后，TA 每次回复都会自动配一张图。很费额度，慎开。</p>
                     </div>
                   </div>
                 </section>
@@ -4855,7 +4895,7 @@
                     <span class="chat-detail-group-label">绑定世界书</span>
                   </div>
                   <div class="chat-detail-slab">
-                    <p class="chat-detail-lead chat-detail-lead--compact">全局卷自动注入；此处选局部，整段密谈共用（线上与线下底稿）。合计≤8 本。</p>
+                    <p class="chat-detail-lead chat-detail-lead--compact">选这个聊天要用的世界书（设定资料）。全局世界书会自动生效；这里加的只在这个聊天里用，最多 8 本。</p>
                     <div id="chat-detail-wb-bind-area" class="chat-detail-field chat-detail-field--wb">
                       <div class="chat-detail-scene-head">
                         <span class="chat-detail-field-k">卷册（可多选）</span>
@@ -4996,6 +5036,7 @@
                   <div class="chat-detail-slab">
                     <div class="chat-detail-field">
                       <span class="chat-detail-field-k">界面主题</span>
+                      <p class="chat-detail-lead chat-detail-lead--compact mx-hint">这个聊天用「经典」还是「玻璃」风格的界面。</p>
                       <div class="chat-ui-theme-switch" id="chat-ui-theme-switch" role="group" aria-label="界面主题">
                         <button type="button" class="chip ghost chip-xs chat-ui-theme-btn" data-chat-ui-theme="default">经典</button>
                         <button type="button" class="chip ghost chip-xs chat-ui-theme-btn" data-chat-ui-theme="glass">玻璃</button>
@@ -8600,7 +8641,7 @@
       </div>
 
   <!-- app.js / ai-api 由 db.js 在 #phone 就绪后注入；图标字体需尽早加载 -->
-  <script src="fun-desk.js?v=9"></script>
+  <script src="fun-desk.js?v=10"></script>
   <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web"></script>
 </body>
 </html>

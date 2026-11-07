@@ -551,12 +551,20 @@
   const BUCKET = "mx-shares";
   const COLS0 = "id,created_at,kind,title,description,author,file_path,thumb_path,size,downloads,likes";
   /** 分类：云端还没运行 share-category.sql 时自动退回不带分类 */
-  const CATEGORIES = ["现代", "古风", "校园", "奇幻", "科幻", "末世", "悬疑", "甜宠", "虐心", "搞笑", "简约", "可爱", "暗黑", "其他"];
+  /** 每种资源各自的分类 */
+  const CATS = {
+    look: ["简约", "可爱", "清新", "暗黑", "复古", "梦幻", "二次元", "其他"],
+    worldbook: ["现代", "古风", "校园", "奇幻", "科幻", "末世", "悬疑", "其他"],
+    char: ["现代", "古风", "校园", "奇幻", "科幻", "末世", "甜宠", "虐心", "搞笑", "其他"],
+    preset: ["文风", "剧情", "日常", "恋爱", "玩法", "其他"],
+    font: ["中文", "英文", "手写", "可爱", "艺术", "其他"]
+  };
+  const catsOf = (kind) => CATS[kind] || ["其他"];
   let hasCat = true;
   const cols = () => (hasCat ? COLS0 + ",category" : COLS0);
   const isCatErr = (err) => /category/i.test(String(err && err.message));
-  function catChips(cur, attr, withAll) {
-    const list = (withAll ? [["", "全部分类"]] : []).concat(CATEGORIES.map((c) => [c, c]));
+  function catChips(cur, attr, withAll, kind) {
+    const list = (withAll ? [["", "全部分类"]] : []).concat(catsOf(kind).map((c) => [c, c]));
     return `<div class="sh-chips sh-cats">${list.map(([v, n]) => `<button type="button" class="fun-chip-btn${cur === v ? " is-on" : ""}" ${attr}="${esc(v)}">${esc(n)}</button>`).join("")}</div>`;
   }
   function cfg() {
@@ -723,11 +731,11 @@
       p.innerHTML = noCloudHtml();
       return;
     }
-    p.innerHTML = `${kindChips()}${hasCat ? catChips(filter.cat, "data-fcat", true) : ""}
+    p.innerHTML = `${kindChips()}${hasCat && filter.kind ? catChips(filter.cat, "data-fcat", true, filter.kind) : ""}
       <div class="sh-search"><input type="search" placeholder="搜索标题 / 作者" value="${esc(filter.q)}" /><select><option value="new">最新</option><option value="hot">最多下载</option><option value="like">最多点赞</option></select></div>
       <div class="sh-grid" id="sh-grid"><div class="sh-empty"><span class="fun-spin"></span></div></div>`;
     p.querySelector("select").value = filter.sort;
-    p.querySelectorAll("[data-kind]").forEach((b) => (b.onclick = () => ((filter.kind = b.dataset.kind), renderSquare(p))));
+    p.querySelectorAll("[data-kind]").forEach((b) => (b.onclick = () => ((filter.kind = b.dataset.kind), (filter.cat = ""), renderSquare(p))));
     p.querySelectorAll("[data-fcat]").forEach((b) => (b.onclick = () => ((filter.cat = b.dataset.fcat), renderSquare(p))));
     p.querySelector("select").onchange = (e) => ((filter.sort = e.target.value), renderSquare(p));
     let t;
@@ -941,12 +949,12 @@
         <label class="fun-field"><span>简介（选填）</span><textarea id="sh-desc" rows="2" maxlength="200" placeholder="风格、适用场景、注意事项…"></textarea></label>
         <label class="fun-field"><span>作者署名</span><input id="sh-author" maxlength="20" value="${esc(localStorage.getItem("mx_share_author") || user.name)}" /></label>
         <p class="fun-kicker">4 · 选择分类</p>
-        ${catChips(makeState.cat, "data-mcat", false)}
+        ${catChips(makeState.cat, "data-mcat", false, makeState.kind)}
         <div class="sh-preview" id="sh-preview"></div>
         <div class="fun-setup-btns"><button type="button" class="fun-btn ghost" id="sh-dl">生成并下载 PNG</button><button type="button" class="fun-btn solid" id="sh-up" ${cfg() ? "" : "disabled"}>上传到广场</button></div>
         ${cfg() ? "" : `<p class="fun-note">广场未开通，暂时只能下载 PNG。</p>`}
       </div>`;
-    p.querySelectorAll("[data-mk]").forEach((b) => (b.onclick = () => ((makeState.kind = b.dataset.mk), (makeState.ids = []), renderMake(p))));
+    p.querySelectorAll("[data-mk]").forEach((b) => (b.onclick = () => ((makeState.kind = b.dataset.mk), (makeState.ids = []), (makeState.cat = ""), renderMake(p))));
     p.querySelectorAll("[data-sub]").forEach((b) => (b.onclick = () => ((makeState.sub = b.dataset.sub), (makeState.ids = []), renderMake(p))));
     p.querySelectorAll("[data-pid]").forEach(
       (b) =>
@@ -1015,13 +1023,18 @@
     }
     const ok = batch.items.filter((x) => x.payload);
     const pending = ok.filter((x) => x.status !== "done");
+    const kinds = [...new Set(ok.map((x) => x.payload.kind))];
+    const oneKind = kinds.length === 1 ? kinds[0] : "";
     p.innerHTML = `<div class="sh-batch">
       <div class="sh-drop" id="sh-bdrop"><div class="sh-empty-ico">📤</div><p>${batch.items.length ? "继续添加资源卡" : "选择要上传的资源卡（可以一次选好几张）"}</p><small>只能上传 Meow OS 资源卡 PNG；在「制作卡片」里生成并下载的都可以</small></div>
       <input type="file" accept="image/png" multiple hidden />
       ${
         batch.items.length
-          ? `<p class="fun-kicker">选择分类（全部套用，也可以单独改）</p>
-        ${catChips(batch.cat, "data-bcat", false)}
+          ? `${
+              oneKind
+                ? `<p class="fun-kicker">选择分类（全部套用，也可以单独改）</p>${catChips(batch.cat, "data-bcat", false, oneKind)}`
+                : `<p class="fun-note">这次选的卡片类型不一样，请在每张下面单独选分类。</p>`
+            }
         <div class="sh-blist">${batch.items
           .map((x, i) =>
             x.payload
@@ -1031,7 +1044,7 @@
                 <small>${KIND_META[x.payload.kind]?.icon || ""} ${KIND_META[x.payload.kind]?.name || ""} · ${(x.file.size / 1024).toFixed(0)}KB</small>
                 <input class="sh-btitle" maxlength="40" value="${esc(x.title)}" ${x.status === "done" ? "disabled" : ""} />
                 <div class="sh-brow-foot">
-                  <select class="sh-bcat" ${x.status === "done" ? "disabled" : ""}><option value="">选分类</option>${CATEGORIES.map((c) => `<option${x.cat === c ? " selected" : ""}>${c}</option>`).join("")}</select>
+                  <select class="sh-bcat" ${x.status === "done" ? "disabled" : ""}><option value="">选分类</option>${catsOf(x.payload.kind).map((c) => `<option${x.cat === c ? " selected" : ""}>${c}</option>`).join("")}</select>
                   <span class="sh-bstat ${x.status || ""}">${x.status === "done" ? "✓ 已上传" : x.status === "up" ? "上传中…" : x.status === "err" ? "失败：" + esc(x.err || "") : ""}</span>
                 </div>
               </div>
@@ -1068,7 +1081,7 @@
         } catch (_) {
           payload = null;
         }
-        batch.items.push({ file: f, payload, url: URL.createObjectURL(f), title: payload ? String(payload.title || f.name.replace(/\.(mxj\.)?png$/i, "")) : "", cat: batch.cat, status: "" });
+        batch.items.push({ file: f, payload, url: URL.createObjectURL(f), title: payload ? String(payload.title || f.name.replace(/\.(mxj\.)?png$/i, "")) : "", cat: payload && catsOf(payload.kind).includes(batch.cat) ? batch.cat : "", status: "" });
       }
       renderBatch(p);
     }
@@ -1085,7 +1098,7 @@
         (b.onclick = () => {
           syncInputs();
           batch.cat = b.dataset.bcat;
-          batch.items.forEach((x) => x.status !== "done" && (x.cat = batch.cat));
+          batch.items.forEach((x) => x.payload && x.status !== "done" && (x.cat = batch.cat));
           renderBatch(p);
         })
     );
@@ -1255,6 +1268,101 @@
       toast("导入失败：" + err.message);
     }
   }
+  /* ───── 世界书 / 角色 / 装扮页里的「导出为 PNG」 ───── */
+  async function exportPngFor(kind) {
+    await hydrateStores();
+    const user = await F.loadUser();
+    const list =
+      kind === "char"
+        ? readChars().map((c) => ({ id: String(c.id), name: c.displayName || "未命名" }))
+        : kind === "worldbook"
+          ? readVolumes().map((v) => ({ id: String(v.id), name: v.title || "未命名", sub: `${v.entries?.length || 0} 条` }))
+          : [];
+    if (kind !== "look" && !list.length) return toast(kind === "char" ? "角色库里还没有角色" : "还没有世界书");
+    const multi = kind === "worldbook";
+    let ids = list.length ? [list[0].id] : [];
+    const sh = F.openSheet(
+      `<div class="sh-exp">
+        ${
+          kind === "look"
+            ? `<p class="fun-note">会把你现在的装扮（壁纸、图标、字体、聊天样式等）打包成一张 Meow OS 卡片 PNG。别人在「装扮」里点「导入 PNG」就能一键用上。</p>`
+            : `<p class="fun-note">${multi ? "选要导出的世界书（可以多选）" : "选一个要导出的角色"}，会生成一张只有 Meow OS 能读的 PNG 卡片。</p>
+          <div class="sh-pick">${list.map((x, i) => `<button type="button" class="sh-pick-item${i === 0 ? " is-on" : ""}" data-pid="${esc(x.id)}"><strong>${esc(x.name)}</strong>${x.sub ? `<small>${esc(x.sub)}</small>` : ""}</button>`).join("")}</div>
+          ${kind === "char" ? `<label class="fun-switch"><input type="checkbox" class="sh-exp-books" checked /><span>附带角色绑定的世界书</span></label>` : ""}`
+        }
+        <label class="fun-field"><span>卡片标题</span><input class="sh-exp-title" maxlength="40" value="${esc(kind === "look" ? `${user.name}的装扮` : list[0]?.name || "")}" /></label>
+        <label class="fun-field"><span>作者署名</span><input class="sh-exp-author" maxlength="20" value="${esc(localStorage.getItem("mx_share_author") || user.name)}" /></label>
+        <button type="button" class="fun-btn solid sh-exp-go">生成并保存 PNG</button>
+      </div>`,
+      { title: "导出为 PNG" }
+    );
+    const titleIn = sh.body.querySelector(".sh-exp-title");
+    sh.body.querySelectorAll("[data-pid]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          const id = b.dataset.pid;
+          if (multi) ids = ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
+          else ids = [id];
+          sh.body.querySelectorAll("[data-pid]").forEach((x) => x.classList.toggle("is-on", ids.includes(x.dataset.pid)));
+          if (ids.length === 1) titleIn.value = list.find((x) => x.id === ids[0])?.name || titleIn.value;
+        })
+    );
+    sh.body.querySelector(".sh-exp-go").onclick = async (ev) => {
+      const btn = ev.currentTarget;
+      if (kind !== "look" && !ids.length) return toast("先选内容");
+      const meta = {
+        title: titleIn.value.trim() || "未命名",
+        author: sh.body.querySelector(".sh-exp-author").value.trim() || "匿名",
+        desc: "",
+        withBooks: !!sh.body.querySelector(".sh-exp-books")?.checked
+      };
+      try {
+        localStorage.setItem("mx_share_author", meta.author);
+      } catch (_) {
+        /* ignore */
+      }
+      btn.disabled = true;
+      btn.textContent = "生成中…";
+      try {
+        const { blob } = await makeCard(kind, ids, meta);
+        downloadBlob(blob, `${safeName(meta.title)}.mxj.png`);
+        sh.close();
+        toast("已生成，保存到「文件」里就行（别发到会压缩图片的地方）");
+      } catch (err) {
+        toast("导出失败：" + err.message);
+        btn.disabled = false;
+        btn.textContent = "生成并保存 PNG";
+      }
+    };
+  }
+  /* 装扮页顶部：一键导入 / 导出整套装扮 */
+  function injectWardLookIo() {
+    const host = document.getElementById("ward-widgets-entry");
+    if (!host) return false;
+    if (document.getElementById("mx-look-io")) return true;
+    const panel = document.createElement("div");
+    panel.id = "mx-look-io";
+    panel.className = "settings-panel wardrobe-panel wg-ward";
+    panel.innerHTML = `<div><p class="widget-label"><i class="ph ph-palette" aria-hidden="true"></i> 装扮卡片</p>
+      <p class="settings-ai-blurb wardrobe-panel-lead">把整套装扮存成一张 PNG 发给朋友，或导入别人分享的装扮卡片。</p></div>
+      <div class="mx-look-io-btns"><button type="button" class="chip ghost" data-mxpng="look">导入 PNG</button><button type="button" class="chip solid" data-mxpng-export="look">导出为 PNG</button></div>`;
+    host.insertBefore(panel, host.firstChild);
+    return true;
+  }
+  if (!injectWardLookIo()) {
+    let n = 0;
+    const t = setInterval(() => {
+      if (injectWardLookIo() || ++n > 40) clearInterval(t);
+    }, 500);
+  }
+
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest?.("[data-mxpng-export]");
+    if (!b) return;
+    e.preventDefault();
+    void exportPngFor(b.dataset.mxpngExport);
+  });
+
   document.addEventListener("click", (e) => {
     const b = e.target.closest?.("[data-mxpng]");
     if (!b) return;
