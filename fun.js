@@ -297,7 +297,11 @@
   );
 
   screen.querySelector("#fun-back").addEventListener("click", () => {
-    if (current && current.parent && apps[current.parent]) openFunApp(current.parent);
+    if (current && typeof current.back === "function") {
+      const fn = current.back;
+      closeFunScreen();
+      fn();
+    } else if (current && current.parent && apps[current.parent]) openFunApp(current.parent);
     else closeFunScreen();
   });
 
@@ -887,7 +891,15 @@
     if (act === "close") stopMusic();
   });
 
+  const musicSubs = new Set();
   function syncMini() {
+    musicSubs.forEach((fn) => {
+      try {
+        fn();
+      } catch (_) {
+        /* ignore */
+      }
+    });
     const t = curTrack();
     const onMusicPage = screen.classList.contains("is-open");
     mini.hidden = !t || onMusicPage;
@@ -1204,5 +1216,16 @@
     }
   };
   window.openFunApp = openFunApp;
+  /** 给桌面小组件用的音乐接口 */
+  window.XXJ_MUSIC = {
+    current: () => curTrack(),
+    playing: () => !!curTrack() && !audio.paused,
+    toggle: () => togglePlay(),
+    next: () => step(1),
+    prev: () => step(-1),
+    progress: () => (Number.isFinite(audio.duration) && audio.duration > 0 ? audio.currentTime / audio.duration : 0),
+    subscribe: (fn) => (musicSubs.add(fn), () => musicSubs.delete(fn)),
+    ready: () => loadTracks()
+  };
   window.closeFunScreen = closeFunScreen;
 })();

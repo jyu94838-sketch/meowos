@@ -5225,3 +5225,583 @@ body.dark .desk-app-ico {
 .desk-apps {
   position: relative;
 }
+
+/* ═════════ 桌面小组件 ═════════ */
+.wg-area {
+  margin-bottom: 6px;
+}
+.wg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.wg-edit {
+  border: 0;
+  background: none;
+  color: var(--text-sub);
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.wg-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 74px;
+  grid-auto-flow: dense;
+  gap: 12px;
+}
+.wg {
+  position: relative;
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+  color: var(--text-main);
+  cursor: pointer;
+}
+.wg-s {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+.wg-m {
+  grid-column: span 4;
+  grid-row: span 2;
+}
+.wg-l {
+  grid-column: span 4;
+  grid-row: span 4;
+}
+.wg-add-tile {
+  width: 100%;
+  height: 92px;
+  border: 1.5px dashed var(--line);
+  border-radius: 22px;
+  background: none;
+  color: var(--text-sub);
+  font: inherit;
+  font-size: 0.88rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  margin: 6px 0 4px;
+}
+.wg-add-tile small {
+  font-size: 0.68rem;
+}
+.wg-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 1.6rem;
+  color: var(--text-sub);
+}
+.wg-empty small {
+  font-size: 0.66rem;
+}
+.wg-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.wg-cap {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  right: 10px;
+  color: #fff;
+  font-size: 0.74rem;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+/* 音乐 */
+.wg-t-music {
+  background: linear-gradient(150deg, #2a2a35, #15151b);
+  color: #fff;
+  border: 0;
+}
+.wg-music {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+}
+.wg-music.s {
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+}
+.wg-music.s strong {
+  font-size: 0.72rem;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wg-disc {
+  flex-shrink: 0;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #f1f1f1 0 7%, transparent 7.5%), var(--cover, radial-gradient(circle, var(--accent) 0 30%, transparent 31%)) center / 52% 52% no-repeat,
+    repeating-radial-gradient(circle, #111 0 2px, #222 2px 4px);
+  box-shadow: inset 0 0 0 3px #000;
+  animation: fm-rot 8s linear infinite paused;
+}
+.wg-music.s .wg-disc {
+  width: 62px;
+  height: 62px;
+}
+.is-playing .wg-disc {
+  animation-play-state: running;
+}
+.wg-music-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wg-music-meta small {
+  font-size: 0.62rem;
+  opacity: 0.6;
+  letter-spacing: 0.08em;
+}
+.wg-music-meta strong {
+  font-size: 0.92rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wg-music-meta > span {
+  font-size: 0.72rem;
+  opacity: 0.7;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wg-prog {
+  display: block;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.18);
+  margin: 4px 0 2px;
+}
+.wg-prog b {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: #fff;
+}
+.wg-ctrls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.wg-btn {
+  border: 0;
+  background: none;
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.wg-btn.big {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  font-size: 0.78rem;
+}
+/* 便签 */
+.wg-t-note {
+  border: 0;
+}
+.wg-note {
+  height: 100%;
+  padding: 14px 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+  color: #3a3226;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+.wg-note p {
+  margin: 0;
+}
+.wg-note.c-yellow {
+  background: #fff3b0;
+}
+.wg-note.c-pink {
+  background: #ffd6e0;
+}
+.wg-note.c-blue {
+  background: #d6ecff;
+}
+.wg-note.c-green {
+  background: #d9f5dc;
+}
+.wg-note.c-dark {
+  background: #2b2b33;
+  color: #f2f2f5;
+}
+/* 倒数日 */
+.wg-count {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 16px;
+  background: linear-gradient(150deg, rgba(var(--tint-rgb), 0.12), transparent);
+}
+.wg-count small {
+  font-size: 0.72rem;
+  color: var(--text-sub);
+}
+.wg-count b {
+  font-family: "Times New Roman", serif;
+  font-style: italic;
+  font-size: 2.6rem;
+  line-height: 1.05;
+}
+.wg-count span {
+  font-size: 0.72rem;
+}
+.wg-count em {
+  font-style: normal;
+  font-size: 0.66rem;
+  color: var(--text-sub);
+}
+/* 时钟 */
+.wg-analog {
+  position: absolute;
+  left: calc(50% - 60px);
+  top: calc(50% - 60px);
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: var(--bg-device);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.wg-analog i {
+  position: absolute;
+  left: 59px;
+  top: 5px;
+  width: 2px;
+  height: 7px;
+  background: var(--text-sub);
+  transform-origin: 1px 55px;
+}
+.wg-analog b {
+  position: absolute;
+  left: 50%;
+  bottom: 50%;
+  border-radius: 2px;
+  background: var(--text-main);
+  transform-origin: 50% 100%;
+}
+.wg-analog b.h {
+  width: 4px;
+  height: 26%;
+  margin-left: -2px;
+}
+.wg-analog b.m {
+  width: 2px;
+  height: 38%;
+  margin-left: -1px;
+}
+.wg-analog span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.wg-digital {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 18px;
+}
+.wg-digital small {
+  font-size: 0.74rem;
+  color: var(--text-sub);
+}
+.wg-digital b {
+  font-family: "Times New Roman", serif;
+  font-style: italic;
+  font-size: 3rem;
+  line-height: 1;
+}
+/* 情侣 */
+.wg-t-couple {
+  background: linear-gradient(150deg, #fff0f3, #ffd9e2);
+  border: 0;
+  color: #5a2a36;
+}
+body.dark .wg-t-couple {
+  background: linear-gradient(150deg, #3a2430, #2a1b23);
+  color: #ffd9e2;
+}
+.wg-couple {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.wg-cavs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #ff6b8a;
+}
+.wg-couple b {
+  font-family: "Times New Roman", serif;
+  font-style: italic;
+  font-size: 2rem;
+  color: #ff6b8a;
+  line-height: 1.1;
+}
+.wg-couple small {
+  font-size: 0.7rem;
+}
+/* 角色 */
+.wg-char {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+}
+.wg-char.s {
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+.wg-char-av {
+  width: 64px;
+  height: 64px;
+  font-size: 1.4rem;
+}
+.wg-char strong {
+  font-size: 0.92rem;
+}
+.wg-char p {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-sub);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.wg-char.l {
+  padding: 0;
+  display: block;
+  position: relative;
+}
+.wg-char.l img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.wg-char.l > div {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 30px 16px 14px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
+  color: #fff;
+}
+.wg-char.l p {
+  color: rgba(255, 255, 255, 0.85);
+}
+/* 运势 */
+.wg-t-astro {
+  background: linear-gradient(150deg, #2d2357, #1c1b3a);
+  border: 0;
+  color: #f2efff;
+}
+.wg-astro {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 16px;
+}
+.wg-astro small {
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+.wg-astro small b {
+  color: #ffd76a;
+}
+.wg-astro p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+.wg-astro span {
+  font-size: 0.66rem;
+  opacity: 0.6;
+}
+/* 管理页 */
+.wgm {
+  padding: 14px 16px 40px;
+}
+.wgm .fun-kicker {
+  display: block;
+  margin: 14px 0 8px;
+}
+.wgm-types {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.wgm-types button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg-card);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.wgm-types span {
+  grid-row: span 2;
+  font-size: 1.5rem;
+}
+.wgm-types strong {
+  font-size: 0.86rem;
+}
+.wgm-types small {
+  font-size: 0.66rem;
+  color: var(--text-sub);
+  line-height: 1.3;
+}
+.wgm-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.wgm-prev {
+  width: 120px;
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 26px;
+  gap: 4px;
+  pointer-events: none;
+}
+.wgm-prev .wg {
+  border-radius: 12px;
+  zoom: 0.36;
+}
+.wgm-prev .wg-s {
+  grid-column: 2 / span 2;
+}
+.wgm-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wgm-sizes,
+.wgm-ops {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.wgm-sizes button,
+.wgm-ops button {
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+  color: var(--text-main);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.wgm-sizes button.is-on {
+  background: var(--text-main);
+  color: var(--bg-card);
+  border-color: var(--text-main);
+}
+.wgm-ops button:disabled {
+  opacity: 0.35;
+}
+.wgm-ops .is-del {
+  color: #e5484d;
+}
+.wge-photo {
+  height: 180px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--line);
+  display: grid;
+  place-items: center;
+  margin-bottom: 8px;
+  color: var(--text-sub);
+}
+.wge-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.wge-colors {
+  display: flex;
+  gap: 10px;
+}
+.wge-colors button {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  cursor: pointer;
+}
+.wge-colors button.is-on {
+  border-color: var(--text-main);
+}
+.wg-ward {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+.wg-ward .chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
