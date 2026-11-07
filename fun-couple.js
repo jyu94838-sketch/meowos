@@ -139,6 +139,7 @@
         <button type="button" class="cp-tile" data-tab="qa"><span>💬</span>今日一问${R.qa[t]?.me ? " ✓" : ""}</button>
         <button type="button" class="cp-tile" data-tab="list"><span>✅</span>恋爱清单 ${Object.values(R.list).filter((v) => v.done).length}/${LIST.length}</button>
       </div>
+      <button type="button" class="cp-tile cp-tile-wide" data-a="theater"><span>🎬</span><b>小剧场</b><small>${(R.theaters || []).length ? `已收藏 ${R.theaters.length} 个` : "生成一段你们俩的小故事"}</small></button>
       <div class="cp-foot"><button type="button" class="sh-link" data-a="settings">小屋设置</button> · <button type="button" class="sh-link" data-a="switch">换一位恋人</button></div>`;
   }
 
@@ -286,6 +287,124 @@
       <div class="ww-row"><button type="button" class="fun-btn ghost sm" data-a="petask">问问 ${esc(partner.name)} 关于${esc(pet.name)}</button></div>
       <p class="fun-kicker" style="margin-top:12px">养育日记</p>
       <div class="cp-petlog">${pet.log.slice().reverse().map((l) => `<p class="${l.who}"><small>${new Date(l.at).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</small>${esc(l.text)}</p>`).join("")}</div>`;
+  }
+
+  /* ───── 小剧场 ───── */
+  const THEMES = ["下雨天没带伞", "TA 吃醋了", "你生病了", "同居的早晨", "第一次见面", "平行世界 AU", "吵架后和好", "深夜打电话", "一起去旅行", "纪念日惊喜", "TA 喝醉了", "十年后的我们"];
+  function readTheaterPresets() {
+    try {
+      const D = window.XXJ_DB;
+      const arr = D.getKv(D.K.THEATER_PRESETS);
+      return Array.isArray(arr) ? arr.filter((x) => x && x.name) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+  function openTheater() {
+    const R = room();
+    R.theaters = R.theaters || [];
+    const presets = readTheaterPresets();
+    let theme = THEMES[0];
+    const sh = F.openSheet(
+      `<p class="fun-kicker">选一个主题</p>
+       <div class="cp-themes">${THEMES.map((t, i) => `<button type="button" class="fun-chip-btn${i === 0 ? " is-on" : ""}" data-th="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+       <label class="fun-field"><span>或者自己写设定（选填）</span><input id="cp-th-custom" maxlength="80" placeholder="比如：TA 是吸血鬼，我是送外卖的" /></label>
+       ${presets.length ? `<label class="fun-field"><span>套用我的小剧场预设（选填）</span><select id="cp-th-preset"><option value="">不用</option>${presets.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("")}</select></label>` : ""}
+       <button type="button" class="fun-btn solid wide" data-a="gen">🎬 开拍</button>
+       <p class="fun-kicker" style="margin-top:16px">收藏的小剧场</p>
+       <div class="cp-th-list">${R.theaters.length ? R.theaters.slice().reverse().map((t) => `<button type="button" class="cp-th-item" data-tid="${t.id}">${t.img ? `<img src="${esc(t.img)}" alt="" />` : `<span>🎬</span>`}<div><strong>${esc(t.title)}</strong><small>${esc(t.theme)} · ${t.date}</small></div></button>`).join("") : `<p class="fun-note">还没有小剧场</p>`}</div>`,
+      { title: "🎬 小剧场" }
+    );
+    sh.el.classList.add("fun-sheet--tall");
+    sh.body.addEventListener("click", async (e) => {
+      const th = e.target.closest("[data-th]");
+      if (th) {
+        theme = th.dataset.th;
+        sh.body.querySelectorAll("[data-th]").forEach((b) => b.classList.toggle("is-on", b === th));
+        return;
+      }
+      const it = e.target.closest("[data-tid]");
+      if (it) {
+        sh.close();
+        return readTheater(R.theaters.find((t) => t.id === it.dataset.tid));
+      }
+      if (!e.target.closest('[data-a="gen"]')) return;
+      if (needKey()) return;
+      const btn = e.target.closest("button");
+      const custom = sh.body.querySelector("#cp-th-custom").value.trim();
+      const pid = sh.body.querySelector("#cp-th-preset")?.value;
+      const preset = presets.find((x) => String(x.id) === pid);
+      btn.disabled = true;
+      btn.textContent = "正在拍摄…";
+      try {
+        const txt = await F.aiText(
+          [
+            { role: "system", content: ctx().replace("只输出你说的话。", "") + "\n现在请你作为编剧，写你和" + user.name + "的恋爱小剧场。只输出 JSON。" },
+            {
+              role: "user",
+              content: `主题：${custom || theme}\n${preset ? `写作要求（来自用户的小剧场预设「${preset.name}」）：${String(preset.instruction || "").slice(0, 800)}\n` : ""}要求：300~600 字，有画面、有动作、有对白，两个人都要符合各自的性格；称呼用名字；结尾留一点余韵。\n格式：{"title":"小剧场标题，12 字内","text":"正文，可以分段"}`
+            }
+          ],
+          { maxTokens: 2000, temperature: 0.95 }
+        );
+        const o = F.parseJsonLoose(txt) || { title: custom || theme, text: txt };
+        const t = { id: uid(), theme: custom || theme, title: String(o.title || theme).slice(0, 24), text: String(o.text || "").slice(0, 3000), date: dayKey() };
+        R.theaters.push(t);
+        save();
+        sh.close();
+        render();
+        readTheater(t);
+      } catch (err) {
+        toast("失败：" + err.message);
+        btn.disabled = false;
+        btn.textContent = "🎬 开拍";
+      }
+    });
+  }
+
+  function readTheater(t) {
+    if (!t) return;
+    const sh = F.openSheet(
+      `<div class="cp-th-read">${t.img ? `<img src="${esc(t.img)}" alt="" />` : ""}<p class="fun-kicker">${esc(t.theme)} · ${t.date}</p>
+        ${esc(t.text).split(/\n+/).map((x) => `<p>${x}</p>`).join("")}</div>
+       <div class="fun-sheet-actions">${F.hasImageGen() ? `<button type="button" class="fun-btn ghost" data-a="img">🎨 ${t.img ? "重新配图" : "配一张图"}</button>` : ""}<button type="button" class="fun-btn ghost" data-a="del">删除</button><button type="button" class="fun-btn solid" data-a="more">再来一个</button></div>`,
+      { title: t.title }
+    );
+    sh.el.classList.add("fun-sheet--tall");
+    sh.body.addEventListener("click", async (e) => {
+      const a = e.target.closest("[data-a]")?.dataset.a;
+      const btn = e.target.closest("button");
+      if (a === "more") {
+        sh.close();
+        return openTheater();
+      }
+      if (a === "del") {
+        if (btn.dataset.sure !== "1") {
+          btn.dataset.sure = "1";
+          btn.textContent = "再点一次删除";
+          return;
+        }
+        const R = room();
+        R.theaters = R.theaters.filter((x) => x !== t);
+        save();
+        sh.close();
+        return render();
+      }
+      if (a === "img") {
+        btn.disabled = true;
+        btn.textContent = "配图中…";
+        try {
+          t.img = await F.genImage(`恋爱小剧场插图。${t.title}。${t.text.slice(0, 300)}`, { chars: [{ name: partner.name, look: partner.look }], style: "romantic illustration, soft light" });
+          save();
+          sh.close();
+          readTheater(t);
+        } catch (err) {
+          toast(err.message);
+          btn.disabled = false;
+          btn.textContent = "🎨 配一张图";
+        }
+      }
+    });
   }
 
   function renderAnniv(p) {
@@ -442,6 +561,7 @@
         return render();
       }
       if (a === "settings") return openSettings();
+      if (a === "theater") return openTheater();
       if (a === "daily") {
         if (needKey()) return;
         busy("拆信中…");

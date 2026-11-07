@@ -120,7 +120,8 @@
           .filter((v) => String(v || "").trim())
           .join("\n")
           .slice(0, 700),
-        avatar: await resolveImg(x.avatar)
+        avatar: await resolveImg(x.avatar),
+        look: String(x.charImageGenPrompt || "").slice(0, 600)
       }))
     );
   }
@@ -203,6 +204,62 @@
     s = s.replace(/^["“「『]+|["”」』]+$/g, "").trim();
     return s.slice(0, max || 200);
   };
+
+  /* ───────────── 生图（复用「设置 → 生图」里配置的接口） ───────────── */
+  function imageGenConfig() {
+    try {
+      return typeof readImageGenConfig === "function" ? readImageGenConfig() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+  function hasImageGen() {
+    const c = imageGenConfig();
+    return !!(c && String(c.apiKey || "").trim() && typeof executeImageGenRequestToDataUrl === "function");
+  }
+  function shrinkDataUrl(dataUrl, max) {
+    return new Promise((resolve) => {
+      const im = new Image();
+      im.onload = () => {
+        const s = Math.min(1, (max || 900) / Math.max(im.width, im.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(im.width * s);
+        c.height = Math.round(im.height * s);
+        c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+        resolve(c.toDataURL("image/jpeg", 0.86));
+      };
+      im.onerror = () => resolve(dataUrl);
+      im.src = dataUrl;
+    });
+  }
+  /**
+   * 根据一段中文场景生成配图：先让聊天模型写英文生图提示词（带上出场角色的外貌 tag），再调生图接口
+   * @param {string} scene 场景描述
+   * @param {{ chars?: {name:string, look?:string}[], style?: string }} [o]
+   */
+  async function genImage(scene, o) {
+    const opt = o || {};
+    if (!hasImageGen()) throw new Error("还没配置生图：去「设置 → 生图」填好接口和 Key");
+    const cfg = imageGenConfig();
+    let prompt = scene;
+    if (hasApiKey()) {
+      const looks = (opt.chars || []).filter((c) => c && c.look).map((c) => `${c.name}: ${c.look}`).join("\n");
+      try {
+        prompt = await aiText(
+          [
+            { role: "system", content: "You write prompts for an image generation model. Output ONE English prompt only: comma-separated tags/phrases describing subject, action, setting, lighting, composition, style. No explanations." },
+            { role: "user", content: `Scene (Chinese):\n${scene}\n${looks ? `\nCharacter appearance tags (keep them):\n${looks}` : ""}${opt.style ? `\nStyle: ${opt.style}` : ""}` }
+          ],
+          { maxTokens: 400 }
+        );
+      } catch (_) {
+        prompt = scene;
+      }
+    }
+    const r = await executeImageGenRequestToDataUrl(cfg, String(prompt).slice(0, 1500), {});
+    if (!r || !r.ok || !r.dataUrl) throw new Error(r?.error || "生图失败");
+    return shrinkDataUrl(r.dataUrl, 900);
+  }
 
   /* ───────────── 全屏页面 + 弹层 ───────────── */
   const screen = document.createElement("section");
@@ -1200,6 +1257,8 @@
     loadCast,
     loadUser,
     hasApiKey,
+    hasImageGen,
+    genImage,
     aiText,
     parseJsonLoose,
     cleanLine,

@@ -339,9 +339,23 @@
     sec.innerHTML = `<div class="settings-panel wardrobe-panel wg-ward">
       <div><p class="widget-label"><i class="ph ph-squares-four" aria-hidden="true"></i> 桌面小组件</p>
       <p class="settings-ai-blurb wardrobe-panel-lead">照片、音乐、便签、倒数日、时钟、情侣天数、角色、今日运势，放在桌面第二页。</p></div>
-      <button type="button" class="chip solid" id="ward-widgets-open">管理小组件</button></div>`;
+      <button type="button" class="chip solid" id="ward-widgets-open">管理小组件</button></div>
+      <div class="settings-panel wardrobe-panel wg-ward">
+      <div><p class="widget-label"><i class="ph ph-eye-slash" aria-hidden="true"></i> 隐藏顶部状态栏</p>
+      <p class="settings-ai-blurb wardrobe-panel-lead">桌面最上面那行时间、5G、电量。添加到手机主屏后，手机自己的状态栏已经有这些了。</p></div>
+      <label class="wg-switch"><input type="checkbox" id="ward-hide-status" /><span></span></label></div>`;
     mast.after(sec);
     sec.querySelector("#ward-widgets-open").addEventListener("click", () => openManager(true));
+    const sw = sec.querySelector("#ward-hide-status");
+    sw.checked = document.documentElement.classList.contains("mx-hide-status");
+    sw.addEventListener("change", () => {
+      document.documentElement.classList.toggle("mx-hide-status", sw.checked);
+      try {
+        localStorage.setItem("meowos_hide_status", sw.checked ? "1" : "0");
+      } catch (_) {
+        /* ignore */
+      }
+    });
   }
 
   /* ───── 启动 ───── */

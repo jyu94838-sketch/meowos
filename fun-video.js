@@ -170,6 +170,7 @@
         <button type="button" class="sv-rbtn${p.liked ? " is-on" : ""}" data-like><i class="ph-fill ph-heart"></i><span>${fmtNum(p.likes + (p.liked ? 1 : 0))}</span></button>
         <button type="button" class="sv-rbtn" data-cmt><i class="ph-fill ph-chat-circle-dots"></i><span>${fmtNum(p.comments.length)}</span></button>
         <button type="button" class="sv-rbtn" data-share><i class="ph-fill ph-share-fat"></i><span>分享</span></button>
+        ${!p.mine && F.hasImageGen() ? `<button type="button" class="sv-rbtn" data-genimg><span class="sv-gi">🎨</span><span>${p.image ? "重画" : "画面"}</span></button>` : ""}
         ${p.mine ? `<button type="button" class="sv-rbtn" data-del><i class="ph ph-trash"></i><span>删除</span></button>` : ""}
       </div>
       <div class="sv-info">
@@ -437,6 +438,25 @@
     }
     if (e.target.closest("[data-prof]")) return openProfile(posts[i].author);
     if (e.target.closest("[data-like]")) return toggleLike(i);
+    const gi = e.target.closest("[data-genimg]");
+    if (gi) {
+      if (gi.dataset.busy) return;
+      gi.dataset.busy = "1";
+      gi.querySelector("span:last-child").textContent = "生成中";
+      const p = posts[i];
+      const c = castByName(p.author);
+      F.genImage(`短视频画面截图（竖屏 9:16）。${p.scene}。文案：${p.caption}`, { chars: c ? [c] : [], style: "vertical video frame, cinematic, candid" })
+        .then((img) => {
+          p.image = img;
+          save();
+          updateSlide(i);
+        })
+        .catch((err) => {
+          toast(err.message);
+          updateSlide(i);
+        });
+      return;
+    }
     if (e.target.closest("[data-cmt]")) return openComments(i);
     if (e.target.closest("[data-share]")) {
       const p = posts[i];

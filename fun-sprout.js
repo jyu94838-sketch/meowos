@@ -161,7 +161,8 @@
     const sh = F.openSheet(
       `<div class="sp-detail">
         <div class="sp-author">${avHtml({ name: n.author, avatar: avOf(n.author, n.mine) }, "fun-av")}<strong>${esc(n.author)}</strong>${charByName(n.author) ? `<em class="wb-chartag">角色</em>` : ""}${n.mine ? "" : `<button type="button" class="fun-btn ${following ? "ghost" : "solid"} sm sp-follow" data-a="follow">${following ? "已关注" : "关注"}</button>`}</div>
-        <div class="sp-dcover" style="--h:${n.hue}">${n.image ? `<img src="${esc(n.image)}" alt="" />` : `<span>${esc(n.emoji)}</span>${n.cover ? `<small>${esc(n.cover)}</small>` : ""}`}</div>
+        <div class="sp-dcover" style="--h:${n.hue}">${n.image ? `<img src="${esc(n.image)}" alt="" />` : `<span>${esc(n.emoji)}</span>${n.cover ? `<small>${esc(n.cover)}</small>` : ""}`}
+          ${!n.mine && F.hasImageGen() ? `<button type="button" class="sp-genimg" data-a="genimg">🎨 ${n.image ? "重新生成配图" : "生成配图"}</button>` : ""}</div>
         <h3>${esc(n.title)}</h3>
         <p class="sp-text">${esc(n.text).replace(/\n/g, "<br/>")}</p>
         <p class="sp-tags">${n.tags.map((t) => `<b>#${esc(t)}</b>`).join(" ")}</p>
@@ -225,6 +226,25 @@
         S.follows = on ? [...S.follows, n.author] : S.follows.filter((x) => x !== n.author);
         b.className = `fun-btn ${on ? "ghost" : "solid"} sm sp-follow`;
         b.textContent = on ? "已关注" : "关注";
+      }
+      if (a === "genimg") {
+        b.disabled = true;
+        b.textContent = "生成中…";
+        const c = charByName(n.author);
+        F.genImage(`小红书笔记配图。标题：${n.title}。${n.cover ? "画面：" + n.cover + "。" : ""}${n.text.slice(0, 200)}`, { chars: c ? [c] : [], style: "photo, social media post, natural light" })
+          .then((img) => {
+            n.image = img;
+            save();
+            const box = sh.body.querySelector(".sp-dcover");
+            if (box) box.innerHTML = `<img src="${esc(img)}" alt="" />`;
+            render();
+          })
+          .catch((err) => {
+            toast(err.message);
+            b.disabled = false;
+            b.textContent = "🎨 生成配图";
+          });
+        return;
       }
       if (a === "del") {
         S.notes = S.notes.filter((x) => x !== n);

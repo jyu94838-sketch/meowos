@@ -62,6 +62,8 @@
       S = null;
     }
     if (!S) S = { mySign: "", myBirthday: "", chars: {}, fortune: {}, matches: {} };
+    S.births = S.births || {};
+    S.natalReads = S.natalReads || {};
   }
   function save() {
     // 运势只留最近 30 条
@@ -107,12 +109,15 @@
 
   async function aiMatch(a, b) {
     const base = baseScore(a.sign, b.sign);
+    const ca = chartOf(a.id);
+    const cb = chartOf(b.id);
+    const N = window.XXJ_NATAL;
     const txt = await F.aiText(
       [
         { role: "system", content: "你是温柔专业的星座合盘师。结合两人的星座元素和各自的性格人设做合盘，要具体，不要只说星座套话；建议要能落地。只输出 JSON。" },
         {
           role: "user",
-          content: `A：${a.name}，${a.sign}${a.persona ? "，人设：" + a.persona.slice(0, 300) : ""}\nB：${b.name}，${b.sign}${b.persona ? "，人设：" + b.persona.slice(0, 300) : ""}\n元素参考分：${base}（可以在±12 范围内按性格调整）\n\n格式：{"score":0到100,"title":"这对组合的称号，8字内","summary":"整体分析，60~100字","good":["合拍的地方","",""],"clash":["容易摩擦的地方",""],"advice":["给 A 的相处建议","给 B 的相处建议","两人一起的建议"],"date_idea":"适合的约会方式","b_says":"B 用自己的口吻对 A 说一句话"}`
+          content: `A：${a.name}，${a.sign}${a.persona ? "，人设：" + a.persona.slice(0, 300) : ""}${ca ? "\nA 的星盘：" + N.describe(ca) : ""}\nB：${b.name}，${b.sign}${b.persona ? "，人设：" + b.persona.slice(0, 300) : ""}${cb ? "\nB 的星盘：" + N.describe(cb) : ""}${ca && cb ? "\n请重点参考两人的太阳、月亮、金星、火星和上升之间的关系。" : ""}\n元素参考分：${base}（可以在±12 范围内按性格调整）\n\n格式：{"score":0到100,"title":"这对组合的称号，8字内","summary":"整体分析，60~100字","good":["合拍的地方","",""],"clash":["容易摩擦的地方",""],"advice":["给 A 的相处建议","给 B 的相处建议","两人一起的建议"],"date_idea":"适合的约会方式","b_says":"B 用自己的口吻对 A 说一句话"}`
         }
       ],
       { maxTokens: 1400 }
@@ -120,6 +125,156 @@
     const o = F.parseJsonLoose(txt);
     if (!o || o.score == null) throw new Error("合盘格式不对");
     o.score = Math.max(0, Math.min(100, Number(o.score) || base));
+    return o;
+  }
+
+  /* ───── 星盘 ───── */
+  let natalWho = "me";
+  function chartOf(id) {
+    const b = S.births?.[id];
+    const N = window.XXJ_NATAL;
+    if (!b || !b.date || !N) return null;
+    const [y, m, d] = b.date.split("-").map(Number);
+    const [hh, mm] = (b.time || "12:00").split(":").map(Number);
+    return N.compute({ y, m, d, hour: hh, min: mm, tz: Number(b.tz ?? 8), lat: Number(b.lat), lon: Number(b.lon), noTime: !b.time });
+  }
+  const birthKey = (b) => [b.date, b.time, b.lat, b.lon, b.tz].join("|");
+
+  function renderNatal(p) {
+    const N = window.XXJ_NATAL;
+    if (!N) {
+      p.innerHTML = `<p class="fun-note as-center">星盘模块未加载</p>`;
+      return;
+    }
+    const people = [{ id: "me", name: user?.name || "我", avatar: user?.avatar }, ...cast];
+    const who = people.find((x) => x.id === natalWho) || people[0];
+    const b = S.births[who.id];
+    const chart = chartOf(who.id);
+    const read = S.natalReads[who.id];
+    const readOk = read && b && read.key === birthKey(b);
+    p.innerHTML = `<div class="nt-people">${people
+      .map((x) => `<button type="button" class="nt-person${x.id === who.id ? " is-on" : ""}" data-nw="${esc(x.id)}">${avHtml(x, "fun-av sm")}<span>${esc(x.id === "me" ? "我" : x.name)}</span></button>`)
+      .join("")}</div>
+      ${
+        chart
+          ? `<div class="as-card nt-wrap">${N.svg(chart, 320)}</div>
+             <p class="fun-note as-center">${esc(b.date)} ${esc(b.time || "（时间未知）")} · ${esc(b.city || `${b.lat}, ${b.lon}`)} <button type="button" class="sh-link" data-a="editbirth">修改</button></p>
+             <div class="as-card"><p class="fun-kicker">行星落座</p><div class="nt-table">${chart.planets
+               .map((x) => `<span><b class="p-${x.k}">${x.g}</b>${x.n}</span><span>${N.SIGN_GLYPH[x.sign]} ${N.SIGNS[x.sign]} ${N.fmtDeg(x.deg)}</span><span>${x.house ? `第${x.house}宫` : ""}</span>`)
+               .join("")}${
+               chart.asc != null
+                 ? `<span><b>AC</b>上升</span><span>${N.SIGN_GLYPH[Math.floor(chart.asc / 30)]} ${N.SIGNS[Math.floor(chart.asc / 30)]} ${N.fmtDeg(chart.asc % 30)}</span><span></span><span><b>MC</b>天顶</span><span>${N.SIGN_GLYPH[Math.floor(chart.mc / 30)]} ${N.SIGNS[Math.floor(chart.mc / 30)]} ${N.fmtDeg(chart.mc % 30)}</span><span></span>`
+                 : ""
+             }</div>${chart.noTime ? `<p class="fun-note">没有出生时间，所以没有上升、天顶和宫位；月亮星座在当天也可能有偏差。</p>` : ""}</div>
+             ${chart.aspects.length ? `<div class="as-card"><p class="fun-kicker">主要相位</p><div class="nt-asps">${chart.aspects.slice(0, 12).map((a) => `<span style="--c:${a.type.c}">${a.a.g}${a.a.n} <b>${a.type.n}</b> ${a.b.g}${a.b.n}</span>`).join("")}</div></div>` : ""}
+             ${
+               readOk
+                 ? natalReadHtml(read.data, who)
+                 : `<div class="fun-setup-btns"><button type="button" class="fun-btn solid" data-a="natalread">✨ 解读${who.id === "me" ? "我" : " " + esc(who.name) + " "}的星盘</button></div>`
+             }
+             <p class="fun-note as-center">行星位置用天文算法计算（误差约 1°），宫位为等宫制，未计算冥王星。</p>`
+          : birthForm(who, b)
+      }`;
+    if (!chart) bindBirthForm(p, who);
+  }
+
+  function natalReadHtml(r, who) {
+    const sec = [
+      ["🌞 核心性格", r.core],
+      ["🌙 内心与情绪", r.emotion],
+      ["💗 爱情模式", r.love],
+      ["💼 事业与天赋", r.work],
+      ["🌱 成长课题", r.growth]
+    ].filter(([, t]) => t);
+    return sec.map(([k, t]) => `<div class="as-card"><p class="fun-kicker">${k}</p><p>${esc(t)}</p></div>`).join("") + (r.quote && who.id !== "me" ? `<div class="as-card as-tip">${avHtml(who, "fun-av sm")} ${esc(who.name)}：「${esc(r.quote)}」</div>` : "") + `<div class="fun-setup-btns"><button type="button" class="fun-btn ghost" data-a="natalread">重新解读</button></div>`;
+  }
+
+  function birthForm(who, b) {
+    const N = window.XXJ_NATAL;
+    const v = b || { date: who.id === "me" ? S.myBirthday || "" : "", time: "", city: "北京", lat: 39.9, lon: 116.4, tz: 8 };
+    return `<div class="as-card nt-form">
+      <p class="fun-kicker">${who.id === "me" ? "你的" : esc(who.name) + " 的"}出生信息</p>
+      <label class="fun-field"><span>出生日期</span><input type="date" id="nt-date" value="${esc(v.date)}" /></label>
+      <label class="fun-field"><span>出生时间（知道的话填，能算上升和宫位）</span><input type="time" id="nt-time" value="${esc(v.time)}" /></label>
+      <label class="fun-field"><span>出生城市</span><select id="nt-city">${N.CITIES.map(([n]) => `<option ${v.city === n ? "selected" : ""}>${n}</option>`).join("")}<option value="__custom__" ${v.city && !N.CITIES.some(([n]) => n === v.city) ? "selected" : ""}>其他（手填经纬度）</option></select></label>
+      <div class="nt-ll" ${v.city && !N.CITIES.some(([n]) => n === v.city) ? "" : "hidden"}><input id="nt-lat" type="number" step="0.01" placeholder="纬度 北正南负" value="${esc(v.lat)}" /><input id="nt-lon" type="number" step="0.01" placeholder="经度 东正西负" value="${esc(v.lon)}" /></div>
+      <label class="fun-field"><span>时区</span><select id="nt-tz">${[-8, -5, 0, 1, 7, 8, 9, 10].map((t) => `<option value="${t}" ${Number(v.tz) === t ? "selected" : ""}>UTC${t >= 0 ? "+" : ""}${t}${t === 8 ? "（北京时间）" : ""}</option>`).join("")}</select></label>
+      <div class="fun-setup-btns">${who.id !== "me" ? `<button type="button" class="fun-btn ghost" data-a="aibirth">让 AI 按人设设定</button>` : ""}<button type="button" class="fun-btn solid" data-a="savebirth">生成星盘</button></div>
+    </div>`;
+  }
+
+  function bindBirthForm(p, who) {
+    const city = p.querySelector("#nt-city");
+    if (!city) return;
+    city.onchange = () => (p.querySelector(".nt-ll").hidden = city.value !== "__custom__");
+  }
+
+  function readBirthForm(p) {
+    const N = window.XXJ_NATAL;
+    const date = p.querySelector("#nt-date").value;
+    if (!date) {
+      toast("填一下出生日期");
+      return null;
+    }
+    const cv = p.querySelector("#nt-city").value;
+    const c = N.CITIES.find(([n]) => n === cv);
+    const lat = c ? c[1] : Number(p.querySelector("#nt-lat").value);
+    const lon = c ? c[2] : Number(p.querySelector("#nt-lon").value);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      toast("填一下经纬度");
+      return null;
+    }
+    return { date, time: p.querySelector("#nt-time").value, city: c ? cv : "", lat, lon, tz: Number(p.querySelector("#nt-tz").value) };
+  }
+
+  function saveBirth(id, b) {
+    S.births[id] = b;
+    const ch = chartOf(id);
+    const sun = window.XXJ_NATAL.SIGNS[ch.planets[0].sign];
+    if (id === "me") {
+      S.mySign = sun;
+      S.myBirthday = b.date;
+    } else {
+      S.chars[id] = { ...(S.chars[id] || {}), sign: sun };
+    }
+    save();
+  }
+
+  async function aiBirth(who) {
+    const N = window.XXJ_NATAL;
+    const known = S.chars[who.id]?.sign;
+    const txt = await F.aiText(
+      [
+        { role: "system", content: "你在为虚构角色设定出生信息，用来排星盘。如果人设里写了生日就用它；否则按性格挑一个合适的日期和时间。只输出 JSON。" },
+        { role: "user", content: `角色：${who.name}\n人设：${who.persona || "（无）"}\n${known ? `TA 的太阳星座应该是 ${known}。` : ""}\n可选城市：${N.CITIES.map((c) => c[0]).join("、")}\n格式：{"date":"YYYY-MM-DD","time":"HH:MM","city":"城市名","reason":"一句话说明"}` }
+      ],
+      { maxTokens: 400 }
+    );
+    const o = F.parseJsonLoose(txt);
+    if (!o || !/^\d{4}-\d{2}-\d{2}$/.test(o.date || "")) throw new Error("格式不对，再试一次");
+    const c = N.CITIES.find(([n]) => n === o.city) || N.CITIES[0];
+    const TZ = { 东京: 9, 首尔: 9, 伦敦: 0, 巴黎: 1, 纽约: -5, 洛杉矶: -8, 悉尼: 10 };
+    return { b: { date: o.date, time: /^\d{2}:\d{2}$/.test(o.time || "") ? o.time : "", city: c[0], lat: c[1], lon: c[2], tz: TZ[c[0]] ?? 8 }, reason: o.reason };
+  }
+
+  async function natalRead(who) {
+    const N = window.XXJ_NATAL;
+    const ch = chartOf(who.id);
+    const txt = await F.aiText(
+      [
+        {
+          role: "system",
+          content: `你是温柔专业的占星师，根据本命盘做解读：具体、有洞察，避免空泛和宿命论，多给可执行的建议。${who.id === "me" ? "" : "这是一个虚构角色的星盘，请把星盘和 TA 的人设结合起来，说明星盘如何解释 TA 的性格。"}只输出 JSON。`
+        },
+        {
+          role: "user",
+          content: `${who.id === "me" ? `${who.name}` : `角色「${who.name}」`}的本命盘：${N.describe(ch)}\n${who.persona ? "人设：" + who.persona.slice(0, 400) : ""}\n\n格式：{"core":"核心性格（太阳、上升），60~100字","emotion":"内心与情绪（月亮），50~80字","love":"爱情模式（金星、火星、第7宫），60~100字","work":"事业与天赋（天顶、第10宫、土星），50~80字","growth":"成长课题，40~70字"${who.id === "me" ? "" : ',"quote":"TA 用自己的口吻对自己的星盘说一句话"'}}`
+        }
+      ],
+      { maxTokens: 1600 }
+    );
+    const o = F.parseJsonLoose(txt);
+    if (!o || !o.core) throw new Error("解读格式不对，再试一次");
     return o;
   }
 
@@ -134,12 +289,13 @@
     if (!root) return;
     root.innerHTML = `<div class="as">
       <div class="as-sky"></div>
-      <div class="sh-tabs as-tabs">${[["fortune", "今日运势"], ["chars", "角色档案"], ["match", "合盘"]].map(([k, n]) => `<button type="button" data-tab="${k}" class="${tab === k ? "is-on" : ""}">${n}</button>`).join("")}</div>
+      <div class="sh-tabs as-tabs">${[["fortune", "今日运势"], ["natal", "星盘"], ["chars", "角色档案"], ["match", "合盘"]].map(([k, n]) => `<button type="button" data-tab="${k}" class="${tab === k ? "is-on" : ""}">${n}</button>`).join("")}</div>
       <div class="as-panel" id="as-panel"></div></div>`;
     const p = root.querySelector("#as-panel");
     if (tab === "fortune") renderFortune(p);
     if (tab === "chars") renderChars(p);
     if (tab === "match") renderMatch(p);
+    if (tab === "natal") renderNatal(p);
   }
 
   function signPicker(cur) {
@@ -303,6 +459,49 @@
         const A = personOf(matchSel.a);
         const B = personOf(matchSel.b);
         S.matches[[matchSel.a, matchSel.b].join("|")] = await aiMatch(A, B);
+        save();
+      } catch (err) {
+        toast("失败：" + err.message);
+      }
+      return render();
+    }
+    const nw = e.target.closest("[data-nw]");
+    if (nw) {
+      natalWho = nw.dataset.nw;
+      return render();
+    }
+    const who = natalWho === "me" ? { id: "me", name: user?.name || "我", persona: user?.persona || "", avatar: user?.avatar } : cast.find((x) => x.id === natalWho);
+    if (a === "editbirth") {
+      delete S.births[natalWho];
+      return render();
+    }
+    if (a === "savebirth") {
+      const b = readBirthForm(root);
+      if (!b) return;
+      saveBirth(natalWho, b);
+      return render();
+    }
+    if (a === "aibirth" && who) {
+      if (!F.hasApiKey()) return toast("请先在设置里填写 API Key");
+      const btn = e.target.closest("button");
+      btn.disabled = true;
+      btn.textContent = "AI 正在设定…";
+      try {
+        const r = await aiBirth(who);
+        saveBirth(who.id, r.b);
+        if (r.reason) toast(r.reason);
+      } catch (err) {
+        toast("失败：" + err.message);
+      }
+      return render();
+    }
+    if (a === "natalread" && who) {
+      if (!F.hasApiKey()) return toast("请先在设置里填写 API Key");
+      const btn = e.target.closest("button");
+      btn.disabled = true;
+      btn.textContent = "正在解读星盘…";
+      try {
+        S.natalReads[who.id] = { key: birthKey(S.births[who.id]), data: await natalRead(who) };
         save();
       } catch (err) {
         toast("失败：" + err.message);

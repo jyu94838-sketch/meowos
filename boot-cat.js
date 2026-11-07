@@ -6,6 +6,9 @@
  */
 (function () {
   "use strict";
+  try {
+    if (localStorage.getItem("meowos_hide_status") === "1") document.documentElement.classList.add("mx-hide-status");
+  } catch (_) {}
   var reduced = false;
   try {
     reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

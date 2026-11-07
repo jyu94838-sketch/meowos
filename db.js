@@ -1766,22 +1766,23 @@
   const ROLEPLAY_MODULE = "roleplay.js?v=16";
   /** 娱乐：音乐 / UNO / 狼人杀 / 短视频 */
   const FUN_MODULES = [
-    "fun.js?v=7",
+    "fun.js?v=8",
     "fun-uno.js?v=2",
     "fun-wolf.js?v=2",
-    "fun-video.js?v=2",
+    "fun-video.js?v=3",
     "fun-games.js?v=2",
     "fun-ludo.js?v=2",
     "fun-bubble.js?v=2",
     "fun-town.js?v=1",
-    "fun-astro.js?v=1",
-    "fun-couple.js?v=2",
+    "fun-natal.js?v=1",
+    "fun-astro.js?v=2",
+    "fun-couple.js?v=3",
     "fun-weibo.js?v=1",
-    "fun-sprout.js?v=1",
+    "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
     "fun-desk.js?v=2",
-    "fun-widgets.js?v=1",
-    "changelog.js?v=9",
+    "fun-widgets.js?v=2",
+    "changelog.js?v=10",
     "share-config.js?v=3",
     "fun-share.js?v=3"
   ];
