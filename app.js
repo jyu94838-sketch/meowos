@@ -30320,6 +30320,45 @@ function readChatLogForMaskThread(maskId, threadId) {
   );
 }
 
+/**
+ * 让某个角色在你们的单聊里主动发一条消息（柚子经期提醒等用）。
+ * 会写进聊天记录（TA 以后记得），并弹通知。text 里用 ||| 分成多个气泡。
+ * @returns {Promise<boolean>}
+ */
+async function mxPushCharMessage(charId, text) {
+  const cid = String(charId || "").trim();
+  const body = String(text || "").trim();
+  if (!cid || !body) return false;
+  try {
+    if (typeof ensureChatInboxForUi === "function") await ensureChatInboxForUi();
+  } catch (_) {
+    /* ignore */
+  }
+  const mid = getActiveMaskIdForInbox();
+  const th = listDmThreadsForChar(mid, cid)[0];
+  if (!th) return false;
+  const found = findChatThreadInInbox(mid, th.id);
+  if (!found) return false;
+  if (threadMessagesNeedHydrate(found.thread)) {
+    const ok = await ensureThreadMessagesHydrated(mid, th.id, found.thread, { uiOnly: true });
+    if (!ok) return false;
+  }
+  const log = readChatLogForMaskThread(mid, th.id);
+  const entry = { role: "assistant", content: body, at: Date.now() };
+  log.push(entry);
+  saveChatLogForMaskThread(mid, th.id, log);
+  try {
+    invalidateChatLogViewCache();
+    maybePushChatNotify(mid, th.id, entry);
+    scheduleRenderChatMessages();
+    renderChatThreadList();
+  } catch (_) {
+    /* ignore */
+  }
+  return true;
+}
+window.mxPushCharMessage = mxPushCharMessage;
+
 function saveChatLogForMaskThread(maskId, threadId, entries, persistOpts) {
   const D = window.XXJ_DB;
   if (!D) return;

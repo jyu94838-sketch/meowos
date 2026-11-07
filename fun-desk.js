@@ -57,6 +57,8 @@
     astro: ["星座", "ph-moon-stars", 265, "Stars", fun("星座")],
     games: ["游戏厅", "ph-game-controller", 300, "Arcade", fun("游戏厅")],
     share: ["资源站", "ph-package", 175, "Share", fun("资源站")],
+    yuzu: ["柚子", "ph-drop", 15, "Cycle", fun("柚子")],
+    names: ["名字生成器", "ph-feather", 40, "Names", fun("名字生成器")],
     mimi: ["弥弥", "ph-cat", 0, "Butler", fun("弥弥")],
     news: ["更新公告", "ph-megaphone", 40, "News", call("openChangelog")]
   };

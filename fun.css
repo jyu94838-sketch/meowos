@@ -7253,7 +7253,7 @@ body.dark .desk-app-ico {
 }
 .mxc-types {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
 }
 .mxc-type {
@@ -7310,4 +7310,304 @@ body.dark .desk-app-ico {
   font-weight: 600;
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.2);
   cursor: pointer;
+}
+
+/* ═════════ 柚子 · 经期记录 ═════════ */
+.yz {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 16px 40px;
+  --yz: #ff8a5c;
+  --yz2: #ffd9c7;
+}
+.yz-ring {
+  align-self: center;
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: radial-gradient(circle, #fff7f1 0 62%, transparent 63%), conic-gradient(#ffb48a, #ff8a5c, #ffc7a8, #ffb48a);
+  box-shadow: 0 10px 30px -12px rgba(255, 120, 70, 0.55);
+  text-align: center;
+}
+.yz-ring b {
+  font-size: 2.6rem;
+  line-height: 1.1;
+  color: #e8673a;
+}
+.yz-ring span {
+  font-size: 0.85rem;
+  color: #b8613f;
+}
+.yz-ring small {
+  font-size: 0.7rem;
+  color: #a57a68;
+  max-width: 130px;
+}
+.yz-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.yz-btns .fun-btn.solid {
+  background: var(--yz);
+  border-color: var(--yz);
+}
+.yz-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.yz-stats span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 4px;
+  border-radius: 14px;
+  background: #fff6f1;
+  font-size: 0.66rem;
+  color: #a57a68;
+}
+.yz-stats b {
+  font-size: 1.3rem;
+  color: #e8673a;
+}
+.yz-cal,
+.yz-card {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--bg-card);
+  padding: 14px;
+}
+.yz-card h3 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+}
+.yz-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.yz-cal-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.yz-cal-h button {
+  border: 0;
+  background: none;
+  font-size: 1.4rem;
+  color: var(--text-main);
+  cursor: pointer;
+  padding: 0 10px;
+}
+.yz-wk,
+.yz-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+}
+.yz-wk span {
+  font-size: 0.66rem;
+  color: var(--text-sub);
+}
+.yz-d {
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.yz-d.is-today {
+  box-shadow: inset 0 0 0 1.5px var(--text-main);
+  font-weight: 700;
+}
+.yz-d.is-period,
+.yz-legend .is-period::before {
+  background: #ff8a5c;
+  color: #fff;
+}
+.yz-d.is-predict,
+.yz-legend .is-predict::before {
+  background: #ffe1d3;
+  box-shadow: inset 0 0 0 1.5px #ffb48a;
+  color: #c4582e;
+}
+.yz-d.is-fertile,
+.yz-legend .is-fertile::before {
+  background: #ece4ff;
+  color: #6c55c4;
+}
+.yz-d.is-ovu,
+.yz-legend .is-ovu::before {
+  background: #b9a5f0;
+  color: #fff;
+}
+.yz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 0.64rem;
+  color: var(--text-sub);
+}
+.yz-legend span::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+.yz-cast {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.yz-cast .fun-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.yz-note {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #fff6f1;
+}
+.yz-note small {
+  font-size: 0.64rem;
+  color: #a57a68;
+}
+.yz-note p {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+.yz-rec {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.yz-rec small {
+  flex: 1;
+  font-size: 0.7rem;
+  color: var(--text-sub);
+}
+.yz-del {
+  border: 0;
+  background: none;
+  color: var(--text-sub);
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.yz-foot {
+  text-align: center;
+  font-size: 0.66rem;
+}
+.yz-acts {
+  flex-direction: column;
+}
+
+/* ═════════ 名字生成器 ═════════ */
+.nm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 16px 40px;
+}
+.nm-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 18px 0 6px;
+}
+.nm-hero b {
+  font-family: "Songti SC", "Noto Serif SC", serif;
+  font-size: 1.8rem;
+  letter-spacing: 0.3em;
+}
+.nm-hero small {
+  font-size: 0.72rem;
+  color: var(--text-sub);
+}
+.nm-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.nm-row > span {
+  font-size: 0.75rem;
+  color: var(--text-sub);
+  width: 34px;
+}
+.nm-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.nm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(170deg, var(--bg-card), color-mix(in srgb, var(--bg-card) 90%, #e9dcc6));
+}
+.nm-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.nm-top b {
+  font-family: "Songti SC", "Noto Serif SC", serif;
+  font-size: 1.45rem;
+  letter-spacing: 0.08em;
+}
+.nm-ic {
+  border: 0;
+  background: none;
+  font-size: 1rem;
+  color: var(--text-sub);
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.nm-ic.is-on {
+  color: #e2577a;
+}
+.nm-line {
+  margin: 2px 0 0;
+  font-family: "Songti SC", "Noto Serif SC", serif;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+.nm-card small {
+  font-size: 0.64rem;
+  color: var(--text-sub);
+}
+.nm-mean {
+  margin: 2px 0 0;
+  font-size: 0.72rem;
+  color: var(--text-sub);
+}
+.mxc-uses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }

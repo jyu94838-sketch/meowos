@@ -15,6 +15,7 @@
     food: { icon: "🍜", name: "吃什么", q: "今天吃什么" },
     wear: { icon: "👗", name: "穿什么", q: "今天穿什么" },
     drink: { icon: "🧋", name: "喝什么", q: "喝点什么" },
+    copy: { icon: "✍️", name: "想文案", q: "" },
     custom: { icon: "✨", name: "自定义", q: "" }
   };
   const splitOpts = (s) =>
@@ -31,6 +32,16 @@
     if (type === "music") {
       let t = `【让你帮我选】${img ? "看看这张图，" : ""}帮我挑一首歌听吧${note ? `，${note}` : ""}～说一下歌名和歌手哦`;
       if (opts.length) t += `\n我在这几首里纠结：${opts.join(" / ")}`;
+      if (img) t += `\n【图片】${img}`;
+      return t;
+    }
+    if (type === "copy") {
+      const use = String(f.use || "朋友圈").trim();
+      const what = String(f.what || "").trim();
+      if (!what && !img) return "";
+      let t = `【让你帮我想】帮我想几条${use}文案吧${what ? `，是关于：${what}` : ""}`;
+      if (note) t += `，想要${note}一点的`;
+      t += "，你最懂我了～";
       if (img) t += `\n【图片】${img}`;
       return t;
     }
@@ -60,7 +71,12 @@
         .map(([k, t]) => `<button type="button" class="mxc-type${k === type ? " is-on" : ""}" data-t="${k}"><span>${t.icon}</span>${t.name}</button>`)
         .join("");
       form.innerHTML =
-        type === "music"
+        type === "copy"
+          ? `<div class="mxc-uses">${["朋友圈", "小红书", "微博", "个性签名", "生日祝福", "表白"].map((u, i) => `<button type="button" class="fun-chip-btn${i === 0 ? " is-on" : ""}" data-use="${u}">${u}</button>`).join("")}</div>
+             <label class="fun-field"><span>想发什么？</span><input class="mxc-what" placeholder="比如：今天去海边玩了 / 闺蜜生日" /></label>
+             <label class="fun-field"><span>配的图（可选）：写写图里是什么</span><textarea class="mxc-img" rows="2" placeholder="比如：夕阳下的自拍，风把头发吹乱了"></textarea></label>
+             <label class="fun-field"><span>想要什么风格（可选）</span><input class="mxc-note" placeholder="比如：可爱 / 文艺 / 搞笑 / 高冷" /></label>`
+          : type === "music"
           ? `<label class="fun-field"><span>配一张图（可选）：写写图里是什么</span><textarea class="mxc-img" rows="2" placeholder="比如：傍晚的海边，天空是粉色的"></textarea></label>
              <label class="fun-field"><span>现在的心情 / 场景（可选）</span><input class="mxc-note" placeholder="比如：下雨天一个人在家" /></label>
              <label class="fun-field"><span>候选歌曲（可选）</span><input class="mxc-opts" placeholder="不填就让 TA 自己推荐" /></label>`
@@ -69,6 +85,11 @@
              <label class="fun-field"><span>补充一句（可选）</span><input class="mxc-note" placeholder="${type === "wear" ? "比如：今天要去约会，外面有点冷" : "比如：不想太辣 / 在减肥"}" /></label>`;
     }
     draw();
+    form.addEventListener("click", (e) => {
+      const u = e.target.closest("[data-use]");
+      if (!u) return;
+      form.querySelectorAll("[data-use]").forEach((x) => x.classList.toggle("is-on", x === u));
+    });
     typesEl.addEventListener("click", (e) => {
       const b = e.target.closest("[data-t]");
       if (!b) return;
@@ -77,8 +98,9 @@
     });
     sh.body.querySelector(".mxc-go").onclick = async () => {
       const val = (c) => sh.body.querySelector(c)?.value || "";
-      const text = compose(type, { img: val(".mxc-img"), note: val(".mxc-note"), opts: val(".mxc-opts"), what: val(".mxc-what") });
-      if (!text) return toast("写一下要 TA 帮你选什么");
+      const use = sh.body.querySelector("[data-use].is-on")?.dataset.use || "朋友圈";
+      const text = compose(type, { img: val(".mxc-img"), note: val(".mxc-note"), opts: val(".mxc-opts"), what: val(".mxc-what"), use });
+      if (!text) return toast(type === "copy" ? "写一下想发什么" : "写一下要 TA 帮你选什么");
       const input = document.getElementById("chat-input");
       if (!input) return toast("先打开一个聊天");
       sh.close();
