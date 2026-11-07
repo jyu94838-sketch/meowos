@@ -462,12 +462,26 @@
     return { title: base || "未命名", artist: "" };
   }
 
+  /** 网易云歌曲 id：支持歌曲页、手机分享页、带 #/ 的网页版链接 */
+  function neteaseId(text) {
+    const s = String(text || "");
+    const m = s.match(/music\.163\.com\/[^\s]*?[?&#/]id=(\d+)/) || s.match(/music\.163\.com\/(?:#\/)?song\/(\d+)/) || s.match(/music\.163\.com\/song\/media\/outer\/url\?id=(\d+)/);
+    return m ? m[1] : "";
+  }
   function normalizeMusicUrl(raw) {
     const u = String(raw || "").trim();
-    // 网易云歌曲页 → 外链直链（仅部分免费歌曲可播）
-    const ne = u.match(/music\.163\.com\/.*?[?&#]id=(\d+)/) || u.match(/music\.163\.com\/song\/(\d+)/);
-    if (ne) return `https://music.163.com/song/media/outer/url?id=${ne[1]}.mp3`;
+    // 网易云官方外链：免费歌曲可以完整播放
+    const id = neteaseId(u);
+    if (id) return `https://music.163.com/song/media/outer/url?id=${id}.mp3`;
     return u;
+  }
+  /** 从网易云 App 的分享文字里拆出链接、歌名、歌手 */
+  function parseShareText(text) {
+    const s = String(text || "").trim();
+    const url = (s.match(/https?:\/\/[^\s，。、"'）)]+/) || [""])[0];
+    const title = (s.match(/《([^》]+)》/) || [])[1] || "";
+    const artist = (s.match(/分享(.+?)的(?:单曲|歌曲)/) || [])[1] || "";
+    return { url, title, artist, isShort: /163cn\.tv|y\.music\.163\.com\/m\/[a-z]/i.test(url) && !neteaseId(url) };
   }
 
   const curTrack = () => music.tracks[music.idx] || null;
@@ -809,7 +823,10 @@
     } else step(1);
   });
   audio.addEventListener("error", () => {
-    if (audio.getAttribute("src")) toast("这首歌放不了：链接失效或格式不支持");
+    if (!audio.getAttribute("src")) return;
+    const t = curTrack();
+    if (t && neteaseId(t.url)) toast("这首网易云歌曲放不了：可能是 VIP 或版权受限歌曲，只有免费歌曲能在网页里完整播放");
+    else toast("这首歌放不了：链接失效或格式不支持");
   });
   ["play", "pause", "loadedmetadata", "timeupdate"].forEach((ev) =>
     audio.addEventListener(ev, () => {
@@ -948,10 +965,10 @@
 
   function openAddLink() {
     const sh = openSheet(
-      `<label class="fun-field"><span>音频链接</span><input id="fm-l-url" type="url" placeholder="https://…/xxx.mp3 或网易云歌曲页链接" /></label>
+      `<label class="fun-field"><span>网易云分享内容 / 音频链接</span><textarea id="fm-l-url" rows="3" placeholder="在网易云 App 里点歌曲「分享 → 复制链接」，整段粘贴到这里就行；也可以填 mp3 直链"></textarea></label>
        <label class="fun-field"><span>歌名</span><input id="fm-l-title" type="text" placeholder="可不填" /></label>
        <label class="fun-field"><span>歌手</span><input id="fm-l-artist" type="text" placeholder="可不填" /></label>
-       <p class="fun-note">支持 mp3 / m4a 等音频直链。网易云歌曲页链接会自动转换（仅部分免费歌曲能播）。</p>
+       <p class="fun-note">网易云的<b>免费歌曲</b>可以完整播放；VIP 和版权受限的歌曲网页里放不了。歌名和歌手会从分享文字里自动识别。</p>
        <div class="fun-sheet-actions"><button type="button" class="fun-btn ghost" data-act="cancel">取消</button><button type="button" class="fun-btn solid" data-act="ok">添加</button></div>`,
       { title: "添加链接" }
     );
@@ -959,12 +976,18 @@
       const act = e.target.closest("[data-act]")?.dataset.act;
       if (act === "cancel") sh.close();
       if (act !== "ok") return;
-      const raw = sh.body.querySelector("#fm-l-url").value.trim();
-      if (!/^https?:\/\//i.test(raw)) {
-        toast("请填一个 http(s) 开头的链接");
+      const share = parseShareText(sh.body.querySelector("#fm-l-url").value);
+      if (!share.url) {
+        toast("没找到链接，请粘贴网易云的分享内容或 http(s) 链接");
         return;
       }
-      const url = normalizeMusicUrl(raw);
+      if (share.isShort) {
+        toast("这是短链接，请在浏览器里打开它，再复制地址栏里的完整链接");
+        return;
+      }
+      const url = normalizeMusicUrl(share.url);
+      if (!sh.body.querySelector("#fm-l-title").value.trim() && share.title) sh.body.querySelector("#fm-l-title").value = share.title;
+      if (!sh.body.querySelector("#fm-l-artist").value.trim() && share.artist) sh.body.querySelector("#fm-l-artist").value = share.artist;
       const guess = parseName(decodeURIComponent(url.split("/").pop().split("?")[0] || ""));
       const rec = {
         id: uid(),
@@ -1022,7 +1045,7 @@
             <div class="fm-list-head"><span class="fun-kicker">PLAYLIST · <b id="fm-count">0 首</b></span>
               <div class="fm-list-tools">
                 <button type="button" class="fun-btn solid sm" id="fm-search-btn">🔍 搜歌</button>
-                <button type="button" class="fun-btn ghost sm" id="fm-add-link"><i class="ph ph-link"></i> 链接</button>
+                <button type="button" class="fun-btn ghost sm" id="fm-add-link"><i class="ph ph-link"></i> 网易云</button>
                 <button type="button" class="fun-btn ghost sm" id="fm-add-file"><i class="ph ph-upload-simple"></i> 上传</button>
               </div>
             </div>
