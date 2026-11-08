@@ -21899,6 +21899,9 @@ async function resolveMomentPostImageUrlsForApi(stored) {
 async function buildMomentsCharReactionUserMessageContent(mm, promptText) {
   const text = String(promptText || "").trim();
   if (!text) return "";
+  if (mm && mm.video && typeof mm.video === "object") {
+    return mxVideoApiParts(mm.video, text, true);
+  }
   const apiUrls = await resolveMomentPostImageUrlsForApi(getMomentPostStoredImageUrls(mm));
   if (!apiUrls.length) {
     const descCards = getMomentPostImageDescCards(mm);
@@ -21918,6 +21921,7 @@ async function buildMomentsCharReactionUserMessageContent(mm, promptText) {
 
 /** @param {ReturnType<typeof normalizeMoment> | null | undefined} mm */
 function momentsPostImageNoteForReactionPrompt(mm) {
+  if (mm && mm.video && typeof mm.video === "object") return `（发了一段约 ${Math.max(1, Math.round(Number(mm.video.duration) || 0))} 秒的视频，截图见附图）`;
   const imgs = getMomentPostStoredImageUrls(mm);
   const descCards = getMomentPostImageDescCards(mm);
   if (imgs.length) {
@@ -28324,8 +28328,33 @@ function buildMomentsMusicCard(host, mm) {
   host.appendChild(card);
 }
 
+/** 朋友圈视频：封面 + 播放键，点开全屏播放 */
+function buildMomentsVideoBlock(host, mm) {
+  const v = mm && mm.video && typeof mm.video === "object" ? mm.video : null;
+  if (!v) return;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "moments-video";
+  btn.setAttribute("aria-label", `播放视频 ${mxFmtVideoDur(v.duration)}`);
+  if (v.w && v.h) btn.style.aspectRatio = `${v.w} / ${v.h}`;
+  if (v.poster) {
+    const im = document.createElement("img");
+    im.alt = "";
+    im.decoding = "async";
+    applyChatImageUrlToElement(im, v.poster);
+    btn.appendChild(im);
+  }
+  btn.insertAdjacentHTML("beforeend", `<span class="mx-vplay"><i class="ph-fill ph-play" aria-hidden="true"></i></span><span class="mx-vdur">${mxFmtVideoDur(v.duration)}</span>`);
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    void mxOpenVideoPlayer(v);
+  });
+  host.appendChild(btn);
+}
+
 function buildMomentsPostMedia(host, mm) {
   buildMomentsMusicCard(host, mm);
+  buildMomentsVideoBlock(host, mm);
   const descCards = getMomentPostImageDescCards(mm);
   const imgs = (Array.isArray(mm.images) ? mm.images : [])
     .map((x) => sanitizeMomentImageUrl(String(x || "").trim()))
@@ -28404,13 +28433,31 @@ function buildMomentsPostActions(body, mm) {
   body.appendChild(bar);
 }
 
-function buildMomentsPostFooter(body, mm) {
+/** 文案（放在图片 / 歌曲 / 视频上面） */
+function buildMomentsPostCaption(body, mm) {
+  const displayName = getMomentDisplayLabel(mm);
+  const text = getMomentPostDisplayText(mm);
+  if (!text) return false;
+  const cap = document.createElement("p");
+  cap.className = "moments-post-caption";
+  const user = document.createElement("span");
+  user.className = "moments-post-caption-user";
+  user.textContent = displayName + " ";
+  const txt = document.createElement("span");
+  txt.className = "moments-post-caption-text";
+  txt.textContent = text;
+  cap.append(user, txt);
+  body.appendChild(cap);
+  return true;
+}
+
+function buildMomentsPostFooter(body, mm, opts) {
   const liked = mm.likedByMe === true;
   const likeCnt = Math.max(0, Math.floor(Number(mm.likeCount) || 0));
   const cmts = Array.isArray(mm.comments) ? mm.comments : [];
   const momentId = String(mm.id || "");
   const displayName = getMomentDisplayLabel(mm);
-  const text = getMomentPostDisplayText(mm);
+  const text = opts?.noCaption ? "" : getMomentPostDisplayText(mm);
 
   if (text) {
     const cap = document.createElement("p");
@@ -28952,13 +28999,17 @@ function buildMomentsTimelineItem(mm) {
     .map((x) => String(x || "").trim())
     .filter(Boolean);
   const descCards = getMomentPostImageDescCards(mm);
-  if (!imgs.length && !descCards.length) art.classList.add("moments-post--no-media");
+  if (!imgs.length && !descCards.length && !mm.video && !mm.music) art.classList.add("moments-post--no-media");
 
   art.appendChild(head);
+  // 先文案，再歌曲 / 图片 / 视频
+  const capBody = document.createElement("div");
+  capBody.className = "moments-post-body moments-post-body--caption";
+  if (buildMomentsPostCaption(capBody, mm)) art.appendChild(capBody);
   buildMomentsPostMedia(art, mm);
   const body = document.createElement("div");
   body.className = "moments-post-body";
-  buildMomentsPostFooter(body, mm);
+  buildMomentsPostFooter(body, mm, { noCaption: true });
   art.appendChild(body);
   return art;
 }
@@ -29378,12 +29429,47 @@ function applyMomentsMomentAction(momentId, action) {
   }
 }
 
+let momentsComposeDraftVideo = null;
+
+/** 朋友圈发布：「添加视频」按钮（从 JS 插，旧缓存页面也有） */
+function ensureMomentsComposeVideoBtn() {
+  const pick = document.getElementById("moments-compose-pick");
+  if (!pick || document.getElementById("moments-compose-video")) return;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "moments-compose-pick";
+  b.id = "moments-compose-video";
+  b.innerHTML = '<i class="ph ph-film-strip" aria-hidden="true"></i><span>添加视频</span>';
+  pick.insertAdjacentElement("afterend", b);
+  b.addEventListener("click", async () => {
+    if (momentsComposeBusy) return;
+    const file = await mxPickVideoFile();
+    if (!file) return;
+    momentsComposeBusy = true;
+    updateMomentsComposeSubmitState();
+    b.querySelector("span").textContent = "处理中…";
+    try {
+      momentsComposeDraftVideo = await mxProcessVideoFile(file);
+      if (momentsComposeDraftImages.length) {
+        momentsComposeDraftImages = [];
+        showToast("视频和图片只能二选一，已换成视频");
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "视频处理失败");
+    } finally {
+      momentsComposeBusy = false;
+      b.querySelector("span").textContent = "添加视频";
+      renderMomentsComposePreviews();
+    }
+  });
+}
+
 function updateMomentsComposeSubmitState() {
   const btn = document.getElementById("moments-compose-submit");
   const ta = document.getElementById("moments-compose-text");
   if (!(btn instanceof HTMLButtonElement)) return;
   const text = String(ta?.value || "").trim();
-  const hasImg = momentsComposeDraftImages.length > 0;
+  const hasImg = momentsComposeDraftImages.length > 0 || !!momentsComposeDraftVideo;
   btn.disabled = momentsComposeBusy || (!text && !hasImg);
 }
 
@@ -29392,8 +29478,30 @@ function renderMomentsComposePreviews() {
   const countEl = document.getElementById("moments-compose-img-count");
   if (!root) return;
   const imgs = momentsComposeDraftImages;
-  if (countEl) countEl.textContent = `${imgs.length} / ${MOMENTS_POST_MAX_IMAGES}`;
+  if (countEl) countEl.textContent = momentsComposeDraftVideo ? "视频" : `${imgs.length} / ${MOMENTS_POST_MAX_IMAGES}`;
   root.replaceChildren();
+  ensureMomentsComposeVideoBtn();
+  if (momentsComposeDraftVideo) {
+    const cell = document.createElement("div");
+    cell.className = "moments-compose-thumb moments-compose-thumb--video";
+    if (momentsComposeDraftVideo.poster) {
+      const im = document.createElement("img");
+      im.alt = "";
+      im.src = momentsComposeDraftVideo.poster;
+      cell.appendChild(im);
+    }
+    cell.insertAdjacentHTML("beforeend", `<span class="mx-vplay"><i class="ph-fill ph-play" aria-hidden="true"></i></span><span class="mx-vdur">${mxFmtVideoDur(momentsComposeDraftVideo.duration)}</span>`);
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "moments-compose-thumb-rm";
+    rm.dataset.composeRmVideo = "1";
+    rm.setAttribute("aria-label", "移除视频");
+    rm.innerHTML = '<i class="ph ph-x" aria-hidden="true"></i>';
+    cell.appendChild(rm);
+    root.appendChild(cell);
+    updateMomentsComposeSubmitState();
+    return;
+  }
   for (let i = 0; i < imgs.length; i++) {
     const src = imgs[i];
     const cell = document.createElement("div");
@@ -29434,6 +29542,7 @@ function openMomentsComposeSheet() {
     return;
   }
   momentsComposeDraftImages = [];
+  momentsComposeDraftVideo = null;
   momentsComposeBusy = false;
   const root = document.getElementById("moments-compose-sheet");
   const ta = document.getElementById("moments-compose-text");
@@ -29453,6 +29562,7 @@ function closeMomentsComposeSheet() {
   root.hidden = true;
   root.setAttribute("aria-hidden", "true");
   momentsComposeDraftImages = [];
+  momentsComposeDraftVideo = null;
   momentsComposeBusy = false;
   const ta = document.getElementById("moments-compose-text");
   const fileInp = document.getElementById("moments-compose-file");
@@ -29462,6 +29572,10 @@ function closeMomentsComposeSheet() {
 }
 
 function triggerMomentsComposeFilePick() {
+  if (momentsComposeDraftVideo) {
+    showToast("已经选了视频，图片和视频只能二选一");
+    return;
+  }
   if (momentsComposeDraftImages.length >= MOMENTS_POST_MAX_IMAGES) {
     showToast(`最多 ${MOMENTS_POST_MAX_IMAGES} 张配图`);
     return;
@@ -29539,7 +29653,8 @@ function submitMomentsCompose() {
     .slice(0, MOMENTS_POST_MAX_IMAGES)
     .map((x) => sanitizeMomentImageUrl(String(x || "").trim()))
     .filter(Boolean);
-  if (!text && !images.length) {
+  const video = momentsComposeDraftVideo;
+  if (!text && !images.length && !video) {
     showToast(draftCount ? "配图保存失败，请重选图片后再发" : "写点文字或选张图吧");
     return;
   }
@@ -29567,6 +29682,10 @@ function submitMomentsCompose() {
     comments: []
   };
   if (images.length) row.sourceChatImageRole = "user";
+  if (video) {
+    row.video = video;
+    row.images = [];
+  }
   const published = normalizeMoment(row);
   arr.unshift(published);
   bucket.moments = arr;
@@ -29584,6 +29703,12 @@ function submitMomentsCompose() {
 
 function onMomentsComposeClick(e) {
   if (!(e.target instanceof Element)) return;
+  if (e.target.closest("[data-compose-rm-video]")) {
+    e.preventDefault();
+    momentsComposeDraftVideo = null;
+    renderMomentsComposePreviews();
+    return;
+  }
   const rm = e.target.closest("[data-compose-rm]");
   if (rm) {
     e.preventDefault();
@@ -39988,6 +40113,14 @@ function appendChatPhotoCardToStack(stack, photoReusePool, msgIdx, role, m, phot
     );
   }
   card.dataset.chatBubbleSeg = "0";
+  if (m && typeof m === "object" && m.video && typeof m.video === "object") mxDecorateVideoCard(card, m.video);
+  else if (card.classList.contains("chat-msg-card--video")) {
+    card.classList.remove("chat-msg-card--video");
+    card.__mxVideo = null;
+    card.querySelectorAll(".mx-vplay, .mx-vdur").forEach((n) => n.remove());
+    const st0 = card.querySelector(".chat-photo-polaroid-stamp");
+    if (st0 && st0.textContent === "VIDEO") st0.textContent = "PHOTO";
+  }
   stack.appendChild(card);
 }
 
@@ -40444,6 +40577,29 @@ function renderChatMessages() {
         });
       });
       stack.appendChild(card);
+      appendChatMsgInnerBubbleRow(inner, stack, avatarEl, "user", showGlassAvatar, rowGlassCtx);
+      wrap.appendChild(inner);
+      root.appendChild(wrap);
+      continue;
+    }
+    if (m.role === "user" && m.musicShare && normalizeMusicShare(m.musicShare)) {
+      const wrap = document.createElement("div");
+      wrap.className = "chat-msg chat-msg--user chat-msg--music-share";
+      wrap.dataset.chatMsgIdx = String(idx);
+      const inner = document.createElement("div");
+      inner.className = "chat-msg-inner";
+      const showGlassAvatar = shouldShowGlassThemeRowAvatar(
+        renderEntries,
+        j,
+        personaFoldWindows,
+        threadRefRender,
+        thChat
+      );
+      const rowGlassCtx = isChatScreenThemeGlassActive() ? glassChatRowRebuildCtx(charP, userM, m) : null;
+      const avatarEl = prepareChatRowAvatarForRender("user", charP, userM, m, showGlassAvatar, rowGlassCtx);
+      const stack = document.createElement("div");
+      stack.className = "chat-msg-bubble-stack";
+      buildChatMusicShareStack(stack, m.musicShare);
       appendChatMsgInnerBubbleRow(inner, stack, avatarEl, "user", showGlassAvatar, rowGlassCtx);
       wrap.appendChild(inner);
       root.appendChild(wrap);
@@ -50553,6 +50709,10 @@ function expandUserMessageContentForApi(m, logSlice) {
     const spec = normalizeForumShareRaw(m.forumShare);
     if (spec) return formatForumShareUserMessageForApi(spec);
   }
+  if (m && typeof m === "object" && String(m.role) === "user" && m.musicShare) {
+    const t = formatMusicShareForApi(m.musicShare);
+    if (t) return t;
+  }
   let baseExtra = "";
   if (
     m &&
@@ -50830,6 +50990,13 @@ function buildChatApiMessagesFromLog(emptySend, logSlice, opts, roundSurface, ap
     if (tryAppendMomentsFeedNoticeToChatApiMessages(msgs, m, momentsApiMap, apiMaskId)) continue;
     // 不把系统提示塞进模型上下文（微信灰字那种）
     if (m.role !== "user" && m.role !== "assistant") continue;
+    // 用户发的视频：最近几条带上截帧让模型「看」，早的只给文字
+    if (m.role === "user" && m.video && typeof m.video === "object") {
+      const pos = logSlice.indexOf(m);
+      const recent = pos >= 0 && pos >= logSlice.length - 8;
+      msgs.push({ role: "user", content: mxVideoApiParts(m.video, String(m.content || "").trim(), recent) });
+      continue;
+    }
     if (m.role === "assistant" && m.restoring && !String(m.content ?? "").trim()) continue;
     if (m.charLockSessionOnly) {
       if (!includeLockLog) continue;
@@ -64244,6 +64411,11 @@ document.querySelectorAll("#chat-more-drawer .drawer-item").forEach((btn) => {
       closeChatMoreSheet();
       return;
     }
+    if (action === "video") {
+      closeChatMoreSheet();
+      void sendChatVideoFromPicker();
+      return;
+    }
     if (action === "call-audio") {
       minimaxPrimeTtsAudioOnUserGesture();
       openChatCallScreen("audio");
@@ -74096,3 +74268,410 @@ img,video,svg,table{max-width:100%!important;height:auto}
   const pending = window.__XXJ_CORE_FOR_EXT;
   if (pending && typeof pending === "object") init(pending);
 })();
+
+/* ───────────────── 视频：抽帧给 AI 看、存到本机、点开播放 ─────────────────
+ * 聊天 / 朋友圈 / Bubble 共用。视频文件存在 IndexedDB（xxj-blob: 引用），
+ * 另外按时间顺序截几张小图存在消息里，发给模型时当图片传，模型就能「看」视频了（声音听不到） */
+const MX_VIDEO_MAX_BYTES = 120 * 1024 * 1024;
+
+function mxPickVideoFile() {
+  return new Promise((resolve) => {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "video/*,.mp4,.mov,.m4v,.webm";
+    inp.style.display = "none";
+    let done = false;
+    const finish = (f) => {
+      if (done) return;
+      done = true;
+      inp.remove();
+      resolve(f || null);
+    };
+    inp.addEventListener("change", () => finish(inp.files?.[0] || null));
+    inp.addEventListener("cancel", () => finish(null));
+    document.body.appendChild(inp);
+    inp.click();
+  });
+}
+
+function mxFmtVideoDur(sec) {
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** @param {File} file @param {{ frames?: number }} [opts] */
+async function mxProcessVideoFile(file, opts) {
+  if (!file) throw new Error("没有选到视频");
+  if (file.size > MX_VIDEO_MAX_BYTES) throw new Error("视频太大了（最多 120MB），剪短一点再发");
+  const objUrl = URL.createObjectURL(file);
+  const v = document.createElement("video");
+  v.muted = true;
+  v.playsInline = true;
+  v.setAttribute("playsinline", "");
+  v.setAttribute("webkit-playsinline", "");
+  v.preload = "auto";
+  v.src = objUrl;
+  try {
+    await new Promise((res, rej) => {
+      const t = setTimeout(() => rej(new Error("视频加载太久了，换一个试试")), 20000);
+      v.addEventListener("loadeddata", () => (clearTimeout(t), res()), { once: true });
+      v.addEventListener("error", () => (clearTimeout(t), rej(new Error("读不了这个视频，换成 MP4 试试"))), { once: true });
+      try {
+        v.load();
+      } catch (_) {
+        /* ignore */
+      }
+    });
+    // iOS 上先播一下再停，才能画出画面
+    try {
+      await v.play();
+      v.pause();
+    } catch (_) {
+      /* ignore */
+    }
+    const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0;
+    const n = opts?.frames || Math.min(6, Math.max(3, Math.round(dur / 4) || 3));
+    const times = dur > 0 ? Array.from({ length: n }, (_, i) => Math.max(0.05, Math.min(dur - 0.1, (dur * (i + 0.5)) / n))) : [0];
+    const seek = (t) =>
+      new Promise((res) => {
+        if (Math.abs(v.currentTime - t) < 0.01) return res();
+        const h = () => (v.removeEventListener("seeked", h), res());
+        v.addEventListener("seeked", h);
+        setTimeout(h, 3000);
+        try {
+          v.currentTime = t;
+        } catch (_) {
+          h();
+        }
+      });
+    const grab = (maxSide, q) => {
+      const w0 = v.videoWidth || 0;
+      const h0 = v.videoHeight || 0;
+      if (!w0 || !h0) return "";
+      const k = Math.min(1, maxSide / Math.max(w0, h0));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(w0 * k));
+      c.height = Math.max(1, Math.round(h0 * k));
+      c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+      try {
+        return c.toDataURL("image/jpeg", q);
+      } catch (_) {
+        return "";
+      }
+    };
+    /** @type {string[]} */
+    const frames = [];
+    let poster = "";
+    for (let i = 0; i < times.length; i++) {
+      await seek(times[i]);
+      if (i === 0) poster = grab(720, 0.82);
+      const f = grab(448, 0.7);
+      if (f) frames.push(f);
+    }
+    if (!poster) poster = frames[0] || "";
+    let url = objUrl;
+    const D = window.XXJ_DB;
+    const M = window.XXJ_MEDIA;
+    if (D && typeof D.putMediaBlob === "function" && M) {
+      await D.ready;
+      const id = await D.putMediaBlob(file, file.type || "video/mp4");
+      url = M.blobRefFromId(id);
+    }
+    return {
+      url,
+      poster,
+      frames,
+      duration: Math.round(dur * 10) / 10,
+      w: v.videoWidth || 0,
+      h: v.videoHeight || 0,
+      name: String(file.name || "").slice(0, 60),
+      mime: String(file.type || "video/mp4").slice(0, 40)
+    };
+  } finally {
+    try {
+      v.removeAttribute("src");
+      v.load();
+    } catch (_) {
+      /* ignore */
+    }
+    if (window.XXJ_DB && typeof window.XXJ_DB.putMediaBlob === "function") URL.revokeObjectURL(objUrl);
+  }
+}
+
+async function mxResolveVideoSrc(video) {
+  const u = String(video?.url || "").trim();
+  if (!u) return "";
+  if (window.XXJ_MEDIA?.isBlobRef?.(u)) return (await window.XXJ_MEDIA.resolveDisplayUrl(u)) || "";
+  return u;
+}
+
+/** 全屏播放 */
+async function mxOpenVideoPlayer(video) {
+  if (!video) return;
+  const src = await mxResolveVideoSrc(video);
+  document.getElementById("mx-vplayer")?.remove();
+  const ov = document.createElement("div");
+  ov.id = "mx-vplayer";
+  ov.className = "mx-vplayer";
+  ov.innerHTML = `<button type="button" class="mx-vplayer-x" aria-label="关闭">✕</button>`;
+  if (src) {
+    const el = document.createElement("video");
+    el.controls = true;
+    el.autoplay = true;
+    el.playsInline = true;
+    el.setAttribute("playsinline", "");
+    if (video.poster) el.poster = video.poster;
+    el.src = src;
+    ov.appendChild(el);
+  } else {
+    const p = document.createElement("div");
+    p.className = "mx-vplayer-miss";
+    p.innerHTML = `${video.poster ? `<img src="${String(video.poster).replace(/"/g, "&quot;")}" alt="" />` : ""}<p>这段视频的文件不在这台设备上了（换了设备或清过缓存），只剩封面。</p>`;
+    ov.appendChild(p);
+  }
+  const close = () => {
+    ov.querySelector("video")?.pause();
+    ov.remove();
+  };
+  ov.addEventListener("click", (e) => {
+    if (e.target === ov || e.target.closest(".mx-vplayer-x")) close();
+  });
+  document.body.appendChild(ov);
+}
+
+/** 视频 → 发给模型的多模态内容 */
+function mxVideoApiParts(video, text, withFrames) {
+  const frames = withFrames && Array.isArray(video?.frames) ? video.frames.filter((f) => /^data:image\//.test(String(f))) : [];
+  const head = `（发来一段约 ${Math.max(1, Math.round(Number(video?.duration) || 0))} 秒的视频${
+    frames.length
+      ? `。下面 ${frames.length} 张图是从视频里按时间顺序截的画面，请当作你看了这段视频来回应：注意画面里的人、动作、场景和前后变化；视频里的声音你听不到，别编造声音内容`
+      : "（较早发的，只记得大概）"
+  }）`;
+  const body = [head, String(text || "").trim()].filter(Boolean).join("\n");
+  if (!frames.length) return body;
+  return [...frames.map((url) => ({ type: "image_url", image_url: { url } })), { type: "text", text: body }];
+}
+
+/** 给图片卡片加上「视频」样式（播放按钮 + 时长） */
+function mxDecorateVideoCard(card, video) {
+  if (!card || !video) return;
+  card.classList.add("chat-msg-card--video");
+  card.__mxVideo = video;
+  card.setAttribute("aria-label", `视频 ${mxFmtVideoDur(video.duration)}`);
+  const stamp = card.querySelector(".chat-photo-polaroid-stamp");
+  if (stamp && stamp.textContent !== "VIDEO") stamp.textContent = "VIDEO";
+  if (!card.querySelector(".mx-vplay")) {
+    const shell = card.querySelector("img.chat-photo-polaroid-img")?.parentElement || card.querySelector(".chat-photo-polaroid-inner, .chat-photo-polaroid") || card;
+    if (getComputedStyle(shell).position === "static") shell.style.position = "relative";
+    const pl = document.createElement("span");
+    pl.className = "mx-vplay";
+    pl.innerHTML = `<i class="ph-fill ph-play" aria-hidden="true"></i>`;
+    const du = document.createElement("span");
+    du.className = "mx-vdur";
+    du.textContent = mxFmtVideoDur(video.duration);
+    shell.append(pl, du);
+  }
+}
+
+/* 聊天里点视频卡片 → 播放（抢在图片查看器前面） */
+document.addEventListener(
+  "click",
+  (e) => {
+    const card = e.target instanceof Element ? e.target.closest(".chat-msg-card--video") : null;
+    if (!card || !card.__mxVideo) return;
+    e.preventDefault();
+    e.stopPropagation();
+    void mxOpenVideoPlayer(card.__mxVideo);
+  },
+  true
+);
+
+/** 聊天 ➕ 面板「视频」 */
+async function sendChatVideoFromPicker() {
+  reconcileActiveThreadRef();
+  const ref = readChatActiveThreadRef();
+  if (!ref.threadId) {
+    showChatThreadUnavailableToast("missing-ref");
+    return;
+  }
+  if (getActiveChatDmSurfaceForContext() === "offline") {
+    showToast("线下模式里不能发视频，回到线上再发");
+    return;
+  }
+  const file = await mxPickVideoFile();
+  if (!file) return;
+  showToast("正在处理视频…");
+  try {
+    const v = await mxProcessVideoFile(file);
+    const log = readChatLogForMaskThread(ref.maskId, ref.threadId);
+    const row = { role: "user", at: Date.now(), content: "", image: { url: v.poster || "" }, video: v };
+    if (!row.image.url) delete row.image;
+    log.push(row);
+    saveChatLogForMaskThread(ref.maskId, ref.threadId, log);
+    scheduleRenderChatMessagesAfterUserSend();
+    scheduleChatContextTokenLabelUpdate();
+    showToast("视频已发送");
+  } catch (err) {
+    showToast(err instanceof Error ? err.message : "视频处理失败");
+  }
+}
+
+/** 聊天 ➕ 面板里插一个「视频」按钮（从 JS 插，旧缓存页面也有） */
+function ensureChatMoreVideoItem() {
+  const grid = document.querySelector("#chat-more-drawer .chat-more-drawer-grid");
+  if (!grid || grid.querySelector('[data-action="video"]')) return;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "drawer-item chat-more-drawer-item";
+  b.dataset.action = "video";
+  b.innerHTML = '<i class="ph ph-film-strip" aria-hidden="true"></i><span>视频</span>';
+  const after = grid.querySelector('[data-action="photo"]');
+  if (after) after.insertAdjacentElement("afterend", b);
+  else grid.prepend(b);
+}
+ensureChatMoreVideoItem();
+
+/* ───────────────── 音乐分享：发到角色聊天 / 朋友圈 ───────────────── */
+function normalizeMusicShare(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const title = String(raw.title || "").trim().slice(0, 80);
+  if (!title) return null;
+  const out = { title, artist: String(raw.artist || "").trim().slice(0, 80) };
+  const cover = String(raw.cover || "").trim();
+  if (/^https?:\/\//i.test(cover)) out.cover = cover.slice(0, 600);
+  const note = String(raw.note || "").trim().slice(0, 200);
+  if (note) out.note = note;
+  return out;
+}
+
+function formatMusicShareForApi(ms) {
+  const s = normalizeMusicShare(ms);
+  if (!s) return "";
+  return `（分享了一首歌给你：《${s.title}》${s.artist ? " - " + s.artist : ""}${s.note ? `，还说：「${s.note}」` : ""}）`;
+}
+
+/** 聊天里的歌曲卡片 + 附言 */
+function buildChatMusicShareStack(stack, ms) {
+  const s = normalizeMusicShare(ms);
+  if (!s) return;
+  const holder = document.createElement("div");
+  holder.className = "chat-msg-card chat-msg-card--music";
+  buildMomentsMusicCard(holder, { id: "", music: s });
+  stack.appendChild(holder);
+  if (s.note) {
+    const b = document.createElement("div");
+    b.className = "chat-msg-bubble";
+    b.dataset.chatBubbleSeg = "1";
+    const body = document.createElement("div");
+    body.className = "chat-msg-bubble-body";
+    body.textContent = s.note;
+    b.appendChild(body);
+    stack.appendChild(b);
+  }
+}
+
+async function ensureDmThreadForChar(maskId, charId) {
+  await ensureChatInboxForUi();
+  const mid = String(maskId || "").trim();
+  const cid = String(charId || "").trim();
+  if (!mid || !cid) return "";
+  const dm = listDmThreadsForChar(mid, cid)[0];
+  if (dm) return String(dm.id || "").trim();
+  const inbox = readChatInboxStore();
+  ensureMaskBucket(inbox, mid);
+  const bucket = inbox.byMask[maskBucketKey(mid)];
+  if (!bucket || !Array.isArray(bucket.threads)) return "";
+  const id = newEntityId();
+  bucket.threads.push({ id, charId: cid, kind: "dm", messages: [], updatedAt: Date.now() });
+  writeChatInboxStore(inbox);
+  return id;
+}
+
+/** 音乐 App 调用：把歌分享给某个角色（附一句话），然后打开那个聊天 */
+async function shareMusicToCharChat(charId, track, note, opts) {
+  const maskId = String(getActiveMaskIdForInbox() || "").trim();
+  if (!maskId) {
+    showToast("请先创建并选择一个主控面具");
+    return false;
+  }
+  const ms = normalizeMusicShare({ ...track, note });
+  if (!ms) return false;
+  const threadId = await ensureDmThreadForChar(maskId, charId);
+  if (!threadId) {
+    showToast("打不开这个聊天");
+    return false;
+  }
+  const ok = appendChatLogEntryForMaskThread(maskId, threadId, {
+    role: "user",
+    content: ms.note || `分享了歌曲《${ms.title}》`,
+    at: Date.now(),
+    musicShare: ms
+  });
+  if (!ok) {
+    showToast("没发出去，再试一次");
+    return false;
+  }
+  if (opts?.open !== false) {
+    try {
+      activateCharPersonaById(charId);
+      writeChatActiveThreadRef({ maskId, threadId });
+      renderChatThreadList();
+      if (typeof window.closeFunScreen === "function") window.closeFunScreen();
+      openChatScreen();
+      scheduleChatUiRefreshForRound(maskId, threadId, { flush: true });
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  return true;
+}
+
+/** 音乐 App 调用：把歌发到朋友圈（文案 + 歌曲卡片），角色会来点赞评论 */
+function shareMusicToMoments(track, note) {
+  const ms = normalizeMusicShare(track);
+  if (!ms) return false;
+  const { inbox, maskId, bucket } = getActiveMomentsBucket();
+  if (!maskId) {
+    showToast("请先创建并选择一个主控面具");
+    return false;
+  }
+  const st = readUserMaskStore();
+  const slot = st.items.find((x) => x.id === maskId);
+  const userLabel = (slot?.displayName && String(slot.displayName).trim()) || "主控";
+  const newId = newEntityId();
+  const row = normalizeMoment({
+    id: newId,
+    kind: "user",
+    displayName: userLabel,
+    timeIso: new Date().toISOString(),
+    text: String(note || "").trim().slice(0, 1000),
+    images: [],
+    music: { title: ms.title, artist: ms.artist, ...(ms.cover ? { cover: ms.cover } : {}) },
+    likedByMe: false,
+    likeCount: 0,
+    shareCount: 0,
+    comments: []
+  });
+  bucket.moments = [row, ...(Array.isArray(bucket.moments) ? bucket.moments : [])];
+  writeChatInboxStore(inbox, { fast: true });
+  try {
+    recordUserMomentFeedNoticesForMask(maskId, row, userLabel);
+  } catch (_) {
+    /* ignore */
+  }
+  try {
+    renderMomentsFeed();
+  } catch (_) {
+    /* ignore */
+  }
+  queueMomentsCharReactions(() => triggerMomentsReactionsOnUserPost(newId));
+  return true;
+}
+window.shareMusicToCharChat = shareMusicToCharChat;
+window.shareMusicToMoments = shareMusicToMoments;
+window.mxPickVideoFile = mxPickVideoFile;
+window.mxProcessVideoFile = mxProcessVideoFile;
+window.mxOpenVideoPlayer = mxOpenVideoPlayer;
+window.mxResolveVideoSrc = mxResolveVideoSrc;
+window.mxVideoApiParts = mxVideoApiParts;
+window.mxFmtVideoDur = mxFmtVideoDur;

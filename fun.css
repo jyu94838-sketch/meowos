@@ -8605,3 +8605,41 @@ html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-a
 .mx-pov-rewrite-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
 .mx-pov-rewrite-row select { flex: 1; min-width: 0; }
 .mx-pov-rewrite-row button { flex-shrink: 0; white-space: nowrap; }
+
+/* ───── 视频（聊天 / 朋友圈 / Bubble 共用） ───── */
+.mx-vplay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 46px; height: 46px; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; display: grid; place-items: center; font-size: 22px; pointer-events: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 2; }
+.mx-vdur { position: absolute; right: 8px; bottom: 7px; padding: 1px 6px; border-radius: 6px; background: rgba(0,0,0,.5); color: #fff; font-size: 11px; font-variant-numeric: tabular-nums; pointer-events: none; z-index: 2; }
+.chat-msg-card--video { cursor: pointer; position: relative; }
+.mx-vplayer { position: fixed; inset: 0; z-index: 99999; background: rgba(0,0,0,.94); display: flex; align-items: center; justify-content: center; }
+.mx-vplayer video { max-width: 100%; max-height: 100%; }
+.mx-vplayer-x { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 14px); right: 16px; width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(255,255,255,.18); color: #fff; font-size: 16px; cursor: pointer; z-index: 2; }
+.mx-vplayer-miss { color: #ddd; text-align: center; padding: 24px; font-size: 14px; line-height: 1.6; }
+.mx-vplayer-miss img { max-width: 80vw; max-height: 50vh; border-radius: 10px; display: block; margin: 0 auto 12px; opacity: .7; }
+.moments-video { position: relative; display: block; width: calc(100% - 24px); max-width: 360px; max-height: 420px; margin: 4px 12px 8px; padding: 0; border: 0; border-radius: 6px; overflow: hidden; background: #111; aspect-ratio: 3 / 4; cursor: pointer; }
+.moments-video img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.moments-compose-thumb--video { position: relative; }
+.moments-compose-thumb--video img { width: 100%; height: 100%; object-fit: cover; }
+.moments-compose-thumb--video .mx-vplay { width: 30px; height: 30px; font-size: 14px; }
+.bb-video { position: relative; display: block; padding: 0; border: 0; background: #111; border-radius: 12px; overflow: hidden; max-width: 240px; margin-bottom: 6px; cursor: pointer; }
+.bb-video img { display: block; width: 100%; height: auto; }
+
+/* 朋友圈：先文案，再歌曲 / 图片 / 视频 */
+.moments-post-body--caption { padding-bottom: 6px; }
+.moments-post-body--caption .moments-post-caption { margin-bottom: 0; }
+.moments-post-body--caption + .moments-music-card,
+.moments-post-body--caption + .moments-video { margin-top: 2px; }
+
+/* 聊天里的歌曲卡片 */
+.chat-msg-card--music { background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+.chat-msg-card--music .moments-music-card { margin: 0; max-width: 260px; }
+
+/* 音乐分享面板 */
+.fm-share-song { display: flex; align-items: center; gap: 12px; padding: 4px 0 10px; }
+.fm-share-song img, .fm-share-song > span { width: 52px; height: 52px; border-radius: 8px; object-fit: cover; flex-shrink: 0; display: grid; place-items: center; background: linear-gradient(135deg, #f3a6c8, #b9a0f5); color: #fff; font-size: 22px; }
+.fm-share-song div { display: flex; flex-direction: column; min-width: 0; }
+.fm-share-song small { color: var(--text-sub); }
+.fm-share-cast { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.fm-share-char { display: flex; flex-direction: column; align-items: center; gap: 4px; border: 0; background: none; color: var(--text-main); font: inherit; font-size: 0.74rem; cursor: pointer; padding: 4px 0; }
+.fm-share-char span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fm-share-char:disabled { opacity: .5; }
+.moments-video img { width: 100% !important; max-width: none !important; height: 100% !important; object-fit: cover; }

@@ -27,6 +27,7 @@
   let replyTo = null;
   let busy = false;
   let pendingImg = "";
+  let pendingVideo = null;
 
   async function load() {
     try {
@@ -61,7 +62,7 @@
     const lines = [];
     const recent = S.msgs.slice(-40);
     for (const m of recent) {
-      if (m.from === "idol") lines.push(`【${S.idol.name}】${m.replyTo ? `（回复 ${m.replyTo.name}：「${m.replyTo.text.slice(0, 30)}」）` : ""}${m.text || ""}${m.image ? "［发了一张照片］" : ""}`);
+      if (m.from === "idol") lines.push(`【${S.idol.name}】${m.replyTo ? `（回复 ${m.replyTo.name}：「${m.replyTo.text.slice(0, 30)}」）` : ""}${m.text || ""}${m.image ? "［发了一张照片］" : ""}${m.video ? `［发了一段 ${Math.round(m.video.duration || 0)} 秒的视频］` : ""}`);
       else if (m.from === "letter") lines.push(`（${fanById(m.fan)?.name || "粉丝"} 写了一封信）`);
       else lines.push(`  ${fanById(m.fan)?.name || "粉丝"}：${m.text}`);
     }
@@ -118,7 +119,8 @@
     ]
       .filter(Boolean)
       .join("\n");
-    const userContent = `之前的聊天记录：\n${recentContext()}\n\n爱豆刚刚发来：${msg.replyTo ? `（回复 ${msg.replyTo.name} 的「${msg.replyTo.text}」）` : ""}「${msg.text || ""}」${msg.image ? "（附了一张照片，见图）" : ""}\n\n请生成 ${chosen.length} 条粉丝回复。`;
+    const userContent = `之前的聊天记录：\n${recentContext()}\n\n爱豆刚刚发来：${msg.replyTo ? `（回复 ${msg.replyTo.name} 的「${msg.replyTo.text}」）` : ""}「${msg.text || ""}」${msg.image ? "（附了一张照片，见图）" : ""}${msg.video ? `（附了一段约 ${Math.max(1, Math.round(msg.video.duration || 0))} 秒的视频，下面几张图是按时间顺序从视频里截的画面，请当作看了这段视频来回应，视频声音听不到）` : ""}\n\n请生成 ${chosen.length} 条粉丝回复。`;
+    const vFrames = msg.video && Array.isArray(msg.video.frames) ? msg.video.frames.filter(Boolean) : [];
     const mk = (withImg) => [
       { role: "system", content: sys },
       {
@@ -126,16 +128,19 @@
         content: withImg
           ? [
               { type: "text", text: userContent },
-              { type: "image_url", image_url: { url: msg.image } }
+              ...(msg.image ? [{ type: "image_url", image_url: { url: msg.image } }] : []),
+              ...vFrames.map((url) => ({ type: "image_url", image_url: { url } }))
             ]
-          : userContent.replace("（附了一张照片，见图）", "（附了一张照片，粉丝看得到但你看不到，可以根据文字猜照片内容来回应）")
+          : userContent
+              .replace("（附了一张照片，见图）", "（附了一张照片，粉丝看得到但你看不到，可以根据文字猜照片内容来回应）")
+              .replace(/（附了一段约 (\d+) 秒的视频[^）]*）/, "（附了一段约 $1 秒的视频，粉丝看得到但你看不到，可以根据文字猜视频内容来回应）")
       }
     ];
     let txt;
     try {
-      txt = await F.aiText(mk(!!msg.image), { maxTokens: 1800, temperature: 0.9 });
+      txt = await F.aiText(mk(!!msg.image || vFrames.length > 0), { maxTokens: 1800, temperature: 0.9 });
     } catch (err) {
-      if (!msg.image) throw err;
+      if (!msg.image && !vFrames.length) throw err;
       txt = await F.aiText(mk(false), { maxTokens: 1800, temperature: 0.9 }); // 模型不支持看图时退回纯文字
     }
     const arr = F.parseJsonLoose(txt);
@@ -206,6 +211,7 @@
         <div class="bb-reply" id="bb-reply" hidden></div>
         <div class="bb-input">
           <button type="button" class="fun-icon-btn" data-a="img" aria-label="发图"><i class="ph ph-image"></i></button>
+          <button type="button" class="fun-icon-btn" data-a="video" aria-label="发视频"><i class="ph ph-film-strip"></i></button>
           <div class="bb-input-box"><img id="bb-img-prev" hidden alt="" /><textarea id="bb-text" rows="1" placeholder="对${esc(i.fandom || "粉丝")}说点什么…"></textarea></div>
           <button type="button" class="fun-btn solid sm" data-a="send">发送</button>
           <input type="file" accept="image/*" hidden id="bb-file" />
@@ -223,6 +229,7 @@
       e.target.value = "";
       if (!f) return;
       pendingImg = await compress(f);
+      pendingVideo = null;
       const im = root.querySelector("#bb-img-prev");
       im.src = pendingImg;
       im.hidden = false;
@@ -242,6 +249,7 @@
           return `<div class="bb-idol-msg">
             ${m.replyTo ? `<div class="bb-quote">↪ ${esc(m.replyTo.name)}：${esc(m.replyTo.text.slice(0, 40))}</div>` : ""}
             ${m.image ? `<img src="${esc(m.image)}" alt="" />` : ""}
+            ${m.video ? `<button type="button" class="bb-video" data-video="${m.id}">${m.video.poster ? `<img src="${esc(m.video.poster)}" alt="" />` : ""}<span class="mx-vplay"><i class="ph-fill ph-play"></i></span><span class="mx-vdur">${esc(window.mxFmtVideoDur ? window.mxFmtVideoDur(m.video.duration) : "")}</span></button>` : ""}
             ${m.text ? `<p>${esc(m.text)}</p>` : ""}
             <small>${timeStr(m.at)} · 已读 ${fmtW(m.reads || 0)}</small></div>`;
         }
@@ -288,9 +296,10 @@
     if (busy) return;
     const ta = root.querySelector("#bb-text");
     const text = ta.value.trim();
-    if (!text && !pendingImg) return;
+    if (!text && !pendingImg && !pendingVideo) return;
     if (!F.hasApiKey()) return toast("请先在设置里填写 API Key");
     const msg = { id: uid(), from: "idol", text, image: pendingImg, at: Date.now(), reads: 0 };
+    if (pendingVideo) msg.video = pendingVideo;
     if (replyTo) {
       msg.replyTo = { ...replyTo };
       const f = fanById(replyTo.fanId);
@@ -302,6 +311,7 @@
     ta.value = "";
     ta.style.height = "auto";
     pendingImg = "";
+    pendingVideo = null;
     root.querySelector("#bb-img-prev").hidden = true;
     replyTo = null;
     syncReply();
@@ -402,10 +412,36 @@
     });
   }
 
+  async function pickVideo() {
+    if (!window.mxPickVideoFile || !window.mxProcessVideoFile) return toast("还在加载，稍等一下");
+    const f = await window.mxPickVideoFile();
+    if (!f) return;
+    toast("正在处理视频…");
+    try {
+      pendingVideo = await window.mxProcessVideoFile(f);
+      pendingImg = "";
+      const im = root?.querySelector("#bb-img-prev");
+      if (im) {
+        im.src = pendingVideo.poster || "";
+        im.hidden = !pendingVideo.poster;
+      }
+      toast("视频选好了，写句话一起发吧");
+    } catch (err) {
+      toast(err.message || "视频处理失败");
+    }
+  }
+
   function onClick(e) {
     const a = e.target.closest("[data-a]")?.dataset.a;
     if (a === "send") return void send();
     if (a === "img") return root.querySelector("#bb-file").click();
+    if (a === "video") return void pickVideo();
+    const vb = e.target.closest("[data-video]");
+    if (vb) {
+      const m = S.msgs.find((x) => x.id === vb.dataset.video);
+      if (m?.video && window.mxOpenVideoPlayer) window.mxOpenVideoPlayer(m.video);
+      return;
+    }
     if (a === "fans") return openFans();
     if (a === "letter" || a === "chatter") return void runExtra(a);
     if (a === "unreply") {

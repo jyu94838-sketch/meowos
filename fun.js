@@ -1597,6 +1597,7 @@
               <button type="button" class="fm-btn fm-btn--big" id="fm-play"><i class="ph ph-play"></i></button>
               <button type="button" class="fm-btn" id="fm-next"><i class="ph ph-skip-forward"></i></button>
               <button type="button" class="fm-btn fm-btn--txt" id="fm-lrc-btn" title="歌词">词</button>
+              <button type="button" class="fm-btn" id="fm-share" title="分享" aria-label="分享"><i class="ph ph-share-fat"></i></button>
             </div>
           </section>
           <section class="fm-buddy" id="fm-buddy"></section>
@@ -1630,6 +1631,7 @@
         seek.dataset.dragging = "";
       });
       body.querySelector("#fm-play").onclick = togglePlay;
+      body.querySelector("#fm-share").onclick = () => void openMusicShare();
       body.querySelector("#fm-prev").onclick = () => step(-1);
       body.querySelector("#fm-next").onclick = () => step(1);
       body.querySelector("#fm-lrc-btn").onclick = () => {
@@ -1754,6 +1756,43 @@
       return bodyEl;
     }
   };
+  /** 分享当前这首歌：发给某个角色的聊天，或者发到朋友圈，都能附一句话 */
+  async function openMusicShare() {
+    const t = curTrack();
+    if (!t) return toast("先放一首歌再分享");
+    const cast = await loadCast();
+    const sh = openSheet(
+      `<div class="fm-share-song">${t.cover ? `<img src="${esc(t.cover)}" alt="" />` : `<span>♪</span>`}<div><b>${esc(t.title || "未知歌曲")}</b><small>${esc(t.artist || "")}</small></div></div>
+       <label class="fun-field"><span>附一句话（可不填）</span><input id="fm-share-note" maxlength="120" placeholder="比如：这首好像在唱我们" /></label>
+       <p class="fun-kicker">发到朋友圈</p>
+       <div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-share="moments">发朋友圈</button></div>
+       <p class="fun-kicker">分享给 TA（发到你们的聊天里）</p>
+       <div class="fm-share-cast">${cast.length ? cast.map((c) => `<button type="button" class="fm-share-char" data-share="char" data-id="${esc(c.id)}">${avHtml(c, "fun-av")}<span>${esc(c.name)}</span></button>`).join("") : `<p class="fun-note">角色库里还没有角色</p>`}</div>`,
+      { title: "分享这首歌" }
+    );
+    sh.body.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-share]");
+      if (!b) return;
+      const note = sh.body.querySelector("#fm-share-note").value.trim();
+      const track = { title: t.title, artist: t.artist, cover: /^https?:/i.test(String(t.cover || "")) ? t.cover : "" };
+      if (b.dataset.share === "moments") {
+        if (typeof window.shareMusicToMoments !== "function") return toast("朋友圈还没加载好，稍等一下");
+        if (window.shareMusicToMoments(track, note)) {
+          sh.close();
+          toast("已发到朋友圈");
+        }
+        return;
+      }
+      if (typeof window.shareMusicToCharChat !== "function") return toast("聊天还没加载好，稍等一下");
+      b.disabled = true;
+      const ok = await window.shareMusicToCharChat(b.dataset.id, track, note);
+      if (ok) {
+        sh.close();
+        toast("已分享");
+      } else b.disabled = false;
+    });
+  }
+
   window.openFunApp = openFunApp;
   /** 给桌面小组件用的音乐接口 */
   window.XXJ_MUSIC = {

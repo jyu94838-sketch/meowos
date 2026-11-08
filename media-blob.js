@@ -110,6 +110,9 @@
           if (m.image && typeof m.image === "object" && m.image.url) {
             m.image.url = await hydrateImageUrlForExport(m.image.url);
           }
+          if (m.video && typeof m.video === "object" && m.video.url) {
+            m.video.url = await hydrateImageUrlForExport(m.video.url);
+          }
         }
       }
       const moments = Array.isArray(bucket.moments) ? bucket.moments : [];
@@ -117,6 +120,7 @@
         if (!mo || typeof mo !== "object") continue;
         if (mo.imageUrl) mo.imageUrl = await hydrateImageUrlForExport(mo.imageUrl);
         if (mo.mediaUrl) mo.mediaUrl = await hydrateImageUrlForExport(mo.mediaUrl);
+        if (mo.video && typeof mo.video === "object" && mo.video.url) mo.video.url = await hydrateImageUrlForExport(mo.video.url);
         if (Array.isArray(mo.images)) {
           for (let i = 0; i < mo.images.length; i++) {
             const prev = String(mo.images[i] || "");
@@ -162,6 +166,23 @@
       return ref;
     } catch (err) {
       console.warn("[XXJ_MEDIA] externalize failed", err);
+      return s;
+    }
+  }
+
+  /** 备份恢复回来的视频（data:video/...）存回 IndexedDB */
+  async function externalizeVideoUrl(url) {
+    const s = String(url || "").trim();
+    if (!/^data:video\//i.test(s)) return s;
+    const D = window.XXJ_DB;
+    if (!D || typeof D.putMediaBlob !== "function") return s;
+    try {
+      await D.ready;
+      const blob = await dataUrlToBlob(s);
+      const id = await D.putMediaBlob(blob, blob.type || "video/mp4");
+      return blobRefFromId(id);
+    } catch (err) {
+      console.warn("[XXJ_MEDIA] externalize video failed", err);
       return s;
     }
   }
@@ -267,6 +288,12 @@
             if (next !== prev) externalized++;
             m.image.url = next;
           }
+          if (m.video && typeof m.video === "object" && m.video.url) {
+            const prev = String(m.video.url);
+            const next = await externalizeVideoUrl(prev);
+            if (next !== prev) externalized++;
+            m.video.url = next;
+          }
         }
       }
       const moments = Array.isArray(bucket.moments) ? bucket.moments : [];
@@ -277,6 +304,12 @@
           const next = await externalizeImageUrl(prev);
           if (next !== prev) externalized++;
           mo.imageUrl = next;
+        }
+        if (mo.video && typeof mo.video === "object" && mo.video.url) {
+          const prev = String(mo.video.url);
+          const next = await externalizeVideoUrl(prev);
+          if (next !== prev) externalized++;
+          mo.video.url = next;
         }
         if (mo.mediaUrl) {
           const prev = String(mo.mediaUrl);
