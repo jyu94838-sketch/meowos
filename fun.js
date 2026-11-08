@@ -884,6 +884,36 @@
   }
   const neTrack = (x) => ({ ne: true, neId: x.id, title: x.title, artist: x.artist, album: x.album, cover: x.cover, vip: !!x.vip, dur: x.dur, url: `https://music.163.com/song/media/outer/url?id=${x.id}.mp3` });
   /** 按歌名 + 歌手找封面（朋友圈分享的歌用）：先网易云，再 iTunes；结果记在本机 */
+  /** 按歌名（可带歌手）找一个能直接播的链接：网易云免费歌 → iTunes 30 秒试听；VIP 歌不播 */
+  const playableCache = new Map();
+  async function findPlayable(title, artist) {
+    const t = String(title || "").trim();
+    if (!t) return null;
+    const k = `${t}|${String(artist || "").trim()}`.toLowerCase();
+    if (playableCache.has(k)) return playableCache.get(k);
+    const q = `${t} ${artist || ""}`.trim();
+    const norm = (x) => String(x || "").toLowerCase().replace(/\s+/g, "");
+    const best = (list) => {
+      const arr = (list || []).filter((x) => x && x.url && !x.vip);
+      return arr.find((x) => norm(x.title) === norm(t)) || arr.find((x) => norm(x.title).includes(norm(t)) || norm(t).includes(norm(x.title))) || null;
+    };
+    let hit = null;
+    try {
+      if (neApiBase()) hit = best(await neteaseSearch(q));
+    } catch (_) {
+      hit = null;
+    }
+    if (!hit) {
+      try {
+        hit = best(await itunesSearch(q));
+      } catch (_) {
+        hit = null;
+      }
+    }
+    const out = hit ? { title: hit.title, artist: hit.artist, url: hit.url, cover: hit.cover || "" } : null;
+    playableCache.set(k, out);
+    return out;
+  }
   const COVER_KEY = "meowos_cover_cache";
   let coverCache = null;
   async function findCover(title, artist) {
@@ -1805,6 +1835,10 @@
     subscribe: (fn) => (musicSubs.add(fn), () => musicSubs.delete(fn)),
     ready: () => loadTracks(),
     findCover: (title, artist) => findCover(title, artist),
+    findPlayable: (title, artist) => findPlayable(title, artist),
+    pause: () => {
+      if (!audio.paused) audio.pause();
+    },
     /** 打开搜歌（朋友圈音乐卡片、让 TA 选歌用） */
     search: (q) => {
       void loadTracks().then(() => openSearch(q || ""));

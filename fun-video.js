@@ -21,6 +21,78 @@
   let follows = new Set();
   let tab = "rec"; // rec | follow
 
+  /* ───── BGM：刷到哪条就放哪条的背景音乐（网易云免费歌 / iTunes 试听片段） ───── */
+  const BGM_MUTE_KEY = "meowos_sv_bgm_muted";
+  const bgm = new Audio();
+  bgm.loop = true;
+  bgm.volume = 0.7;
+  bgm.preload = "auto";
+  let bgmFor = null;
+  let bgmMuted = false;
+  try {
+    bgmMuted = localStorage.getItem(BGM_MUTE_KEY) === "1";
+  } catch (_) {
+    bgmMuted = false;
+  }
+  let bgmWantPlay = false;
+  function parseBgm(name) {
+    const raw = String(name || "").trim().replace(/[《》「」]/g, "");
+    if (!raw || /^(原声|原创音乐|无|没有)/.test(raw) || /原声$/.test(raw)) return null;
+    const m = raw.split(/\s*[-—–·|]\s*/);
+    return { title: m[0].trim(), artist: (m[1] || "").trim() };
+  }
+  function syncBgmUi() {
+    root?.querySelectorAll(".sv-slide").forEach((sl) => {
+      const on = sl.classList.contains("is-active") && !bgmMuted && !bgm.paused && bgmFor === posts[Number(sl.dataset.i)];
+      sl.querySelector(".sv-bgm")?.classList.toggle("is-playing", on);
+      const mb = sl.querySelector("[data-bgm-mute]");
+      if (mb) mb.innerHTML = bgmMuted ? '<i class="ph ph-speaker-slash"></i>' : '<i class="ph ph-speaker-high"></i>';
+    });
+  }
+  async function playBgmFor(p) {
+    if (!p || !root) return;
+    if (bgmFor === p && !bgm.paused) return;
+    bgmFor = p;
+    const want = parseBgm(p.bgm);
+    if (!want) {
+      bgm.pause();
+      syncBgmUi();
+      return;
+    }
+    if (!p.__bgmUrl && p.__bgmUrl !== "") {
+      try {
+        const hit = await window.XXJ_MUSIC?.findPlayable?.(want.title, want.artist);
+        p.__bgmUrl = hit?.url || "";
+      } catch (_) {
+        p.__bgmUrl = "";
+      }
+    }
+    if (bgmFor !== p || !root) return;
+    if (!p.__bgmUrl) {
+      bgm.pause();
+      syncBgmUi();
+      return;
+    }
+    if (bgm.src !== p.__bgmUrl) bgm.src = p.__bgmUrl;
+    if (bgmMuted) return syncBgmUi();
+    window.XXJ_MUSIC?.pause?.();
+    try {
+      await bgm.play();
+      bgmWantPlay = false;
+    } catch (_) {
+      // 手机上要先点一下屏幕才能出声
+      bgmWantPlay = true;
+    }
+    syncBgmUi();
+  }
+  function stopBgm() {
+    bgm.pause();
+    bgmFor = null;
+    bgmWantPlay = false;
+  }
+  bgm.addEventListener("play", syncBgmUi);
+  bgm.addEventListener("pause", syncBgmUi);
+
   async function load() {
     try {
       const v = await F.FunDB.get(KV);
@@ -77,7 +149,7 @@
           },
           {
             role: "user",
-            content: `角色列表：\n${castDesc}\n\n${want}${recent ? `\n\n最近已经发过的（避免重复）：\n${recent}` : ""}\n\n每条格式：{"author":"作者名（角色必须用原名）","emoji":"一个代表画面的emoji","scene":"画面描述，40~80字","caption":"视频文案，口语化，不超过40字","tags":["话题1","话题2"],"bgm":"背景音乐名","likes":点赞数(整数),"comments":[{"name":"评论者昵称或角色原名","text":"评论"}]} ，每条 3~5 条评论。`
+            content: `角色列表：\n${castDesc}\n\n${want}${recent ? `\n\n最近已经发过的（避免重复）：\n${recent}` : ""}\n\n每条格式：{"author":"作者名（角色必须用原名）","emoji":"一个代表画面的emoji","scene":"画面描述，40~80字","caption":"视频文案，口语化，不超过40字","tags":["话题1","话题2"],"bgm":"背景音乐：用真实存在、贴合画面情绪的歌，写成「歌名 - 歌手」；偶尔也可以写原声","likes":点赞数(整数),"comments":[{"name":"评论者昵称或角色原名","text":"评论"}]} ，每条 3~5 条评论。`
           }
         ],
         { maxTokens: 2600, temperature: 0.95 }
@@ -228,7 +300,7 @@
       <div class="sv-info">
         <strong data-prof>@${esc(p.author)}</strong>${p.likedBy && p.likedBy.length ? `<span class="sv-likedby">❤ ${esc(p.likedBy.join("、"))} 赞过</span>` : ""}
         <p>${esc(p.caption)} ${p.tags.map((t) => `<b>#${esc(t)}</b>`).join(" ")}</p>
-        <span class="sv-bgm"><i class="sv-note">♪</i><span class="sv-marquee"><span>${esc(p.bgm)} - ${esc(p.author)}</span></span></span>
+        <span class="sv-bgm"><i class="sv-note">♪</i><span class="sv-marquee"><span>${esc(p.bgm)} - ${esc(p.author)}</span></span><button type="button" class="sv-bgm-mute" data-bgm-mute aria-label="背景音乐开关">${bgmMuted ? '<i class="ph ph-speaker-slash"></i>' : '<i class="ph ph-speaker-high"></i>'}</button></span>
       </div>
       <div class="sv-prog"><i></i></div>
     </article>`;
@@ -266,7 +338,10 @@
         entries.forEach((en) => {
           const on = en.isIntersecting && en.intersectionRatio > 0.6;
           en.target.classList.toggle("is-active", on);
-          if (on) autoFrames(Number(en.target.dataset.i));
+          if (on) {
+            autoFrames(Number(en.target.dataset.i));
+            void playBgmFor(posts[Number(en.target.dataset.i)]);
+          }
         }),
       { root: feed, threshold: [0.6] }
     );
@@ -553,7 +628,38 @@
         root.querySelector("#sv-feed").scrollTo({ top: 0 });
       });
       body.appendChild(root);
-      root.addEventListener("click", onClick);
+      root.addEventListener("click", (e) => {
+        if (e.target.closest("[data-bgm-mute]")) {
+          e.stopPropagation();
+          bgmMuted = !bgmMuted;
+          try {
+            localStorage.setItem(BGM_MUTE_KEY, bgmMuted ? "1" : "0");
+          } catch (_) {
+            /* ignore */
+          }
+          if (bgmMuted) bgm.pause();
+          else if (bgmFor) {
+            const p = bgmFor;
+            bgmFor = null;
+            void playBgmFor(p);
+          }
+          toast(bgmMuted ? "背景音乐已关" : "背景音乐已开");
+          syncBgmUi();
+          return;
+        }
+        onClick(e);
+      });
+      // 手机上第一次要点一下才能出声
+      root.addEventListener(
+        "pointerdown",
+        () => {
+          if (bgmWantPlay && !bgmMuted && bgm.src) {
+            window.XXJ_MUSIC?.pause?.();
+            bgm.play().then(() => (bgmWantPlay = false)).catch(() => {});
+          }
+        },
+        true
+      );
       act.innerHTML = `<button type="button" class="fun-icon-btn" id="sv-refresh" aria-label="刷新"><i class="ph ph-arrows-clockwise"></i></button><button type="button" class="fun-icon-btn" id="sv-post" aria-label="发视频"><i class="ph ph-plus"></i></button>`;
       act.querySelector("#sv-refresh").onclick = () => void generate(4);
       act.querySelector("#sv-post").onclick = openCompose;
@@ -563,6 +669,7 @@
       renderFeed();
     },
     unmount() {
+      stopBgm();
       observer?.disconnect();
       observer = null;
       root = null;

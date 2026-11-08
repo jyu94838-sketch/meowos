@@ -8682,3 +8682,11 @@ html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-a
 #mx-net-room .net-msg.chat-msg--user > .chat-msg-inner { flex-direction: row; }
 #mx-net-room .net-bar .net-input-wrap { flex-direction: row; background: none; border-radius: 0; overflow: visible; }
 #mx-net-room .net-bar .chat-send-fab { width: auto; height: auto; transform: none; box-shadow: none; display: inline-flex; border-radius: 999px; padding: 9px 16px; white-space: nowrap; }
+/* 口袋小镇镇长页：开关的勾选框别被当成输入框撑满一整行 */
+.pt-office .fun-switch input { width: 18px !important; height: 18px; min-width: 18px; padding: 0; margin: 0; flex: none; border-radius: 4px; }
+.pt-office .fun-switch span { flex: 1; min-width: 0; }
+/* 刷刷：背景音乐 */
+.sv-bgm-mute { border: 0; background: rgba(255,255,255,.16); color: #fff; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; flex-shrink: 0; cursor: pointer; pointer-events: auto; }
+.sv-bgm.is-playing .sv-note { display: inline-block; animation: sv-note-bob 1s ease-in-out infinite; }
+@keyframes sv-note-bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-2px) rotate(-12deg); } }
+.pt-office .ww-row .fun-btn { white-space: nowrap; padding-left: 8px; padding-right: 8px; }
