@@ -8150,7 +8150,6 @@ body.dark .net-warn { background: #3a2c18; color: #f0c88a; }
 
 /* 设置 · 关于 Meow */
 .mx-about { display: flex; flex-direction: column; gap: 10px; padding: 16px 16px 4px !important; }
-.mx-about .settings-row { margin: 0 -16px; }
 .mx-about-head { display: flex; align-items: center; gap: 12px; }
 .mx-about-icon { width: 56px; height: 56px; border-radius: 15px; box-shadow: 0 4px 12px rgba(185, 133, 82, .22); flex-shrink: 0; }
 .mx-about-name { display: block; font-size: 1.05rem; }
