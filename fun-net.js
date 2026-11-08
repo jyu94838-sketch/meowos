@@ -1257,7 +1257,19 @@
     });
   }
 
+  /** 进了聊天房间就铺满整个屏幕（像和角色聊天那样），回到列表再恢复 */
+  function setNetFullscreen(on) {
+    document.getElementById("fun-screen")?.classList.toggle("fun-screen--netroom", !!on);
+  }
+  function netAvHtml(name, av) {
+    const nm = String(name || "?");
+    if (av) return `<img class="chat-msg-avatar chat-msg-avatar--image mx-net-av" src="${esc(av)}" alt="" />`;
+    const h = typeof F.hue === "function" ? F.hue(nm) : 210;
+    return `<div class="chat-msg-avatar chat-msg-avatar--ph mx-net-av" style="background:hsl(${h} 45% 62%)">${esc(nm.slice(0, 1))}</div>`;
+  }
+
   function drawHome() {
+    setNetFullscreen(false);
     if (!root || V.open) return;
     const convs = Object.values(S.convs).sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0));
     const unread = convs.reduce((n, c) => n + (c.unread || 0), 0);
@@ -1330,36 +1342,21 @@
     return v === "default" || v === "custom" ? v : "chat";
   };
   /** 把写给聊天页（#chat-screen）的 CSS 换成联机聊天页对应的元素 */
+  /** 把写给聊天页（#chat-screen）的 CSS 套到联机聊天页：
+   *  联机房间用的是和聊天页一样的结构和 class（.chat-msg / .chat-msg-inner / .chat-msg-bubble …），
+   *  所以只需要把 #chat-screen 换成 #mx-net-room，挂件、气泡尾巴、已读标记这些都能原样生效 */
   function mapChatCssToNet(css) {
-    const NO = ".mx-nomatch";
     return String(css || "")
       .replace(/#chat-list-screen(?:#chat-list-screen)*/g, "#mx-nomatch")
       .replace(/#chat-offline-screen(?:#chat-offline-screen)*/g, "#mx-nomatch")
       .replace(/#chat-screen/g, "#mx-net-room")
-      .replace(/\.chat-msg--user\b/g, ".mx-net-me")
-      .replace(/\.chat-msg--assistant\b/g, ".mx-net-them")
-      .replace(/\.chat-msg-bubble-stack\b/g, ".mx-net-stack")
-      .replace(/\.chat-msg-bubble(?:--[\w-]+|-[\w-]+)/g, NO)
-      .replace(/\.chat-msg-bubble\b/g, ".mx-net-bubble")
-      .replace(/\.chat-msg-avatar\b/g, ".mx-net-av")
-      .replace(/\.chat-msg-group-speaker\b/g, ".mx-net-name")
-      .replace(/\.chat-msg--[\w-]+/g, NO)
-      .replace(/\.chat-msg-[\w-]+/g, NO)
-      .replace(/\.chat-msg\b/g, ".mx-net-msg")
-      .replace(/\.mx-av-rep\b/g, NO)
-      .replace(/\.chat-(?:messages|scroll)\b/g, ".mx-net-list")
-      .replace(/\.(?:chat-main|chat-body-stack|settings-inner)\b/g, ".mx-net-bg")
-      .replace(/\.chat-screen-topbar\b/g, ".mx-net-top")
-      .replace(/\.mx-chat-title\b/g, ".mx-net-title")
-      .replace(/#chat-meta-label\b/g, ".mx-net-title")
       .replace(/#chat-close\b/g, ".mx-net-back")
-      .replace(/\.chat-time-divider-label\b/g, ".mx-net-sys")
-      .replace(/\.chat-composer\b/g, ".mx-net-bar")
-      .replace(/\.chat-(?:input-ruled|input)\b/g, ".mx-net-input")
-      .replace(/\.chat-send-fab\b/g, ".mx-net-send")
-      .replace(/\.chat-more-btn\b/g, ".mx-net-more")
-      .replace(/\.chat-[\w-]+/g, NO)
-      .replace(/#chat-[\w-]+/g, "#mx-nomatch");
+      .replace(/#chat-meta-label\b/g, ".mx-net-title")
+      .replace(/#chat-messages\b/g, ".chat-messages")
+      .replace(/#chat-input\b/g, ".chat-input")
+      .replace(/#chat-[\w-]+/g, "#mx-nomatch")
+      // 旧写法（自定义 CSS 里直接写 mx-net-*）继续有效：DOM 上两套 class 都有
+      .replace(/\.mx-av-rep\b/g, ".mx-nomatch");
   }
   function netChatSourceCss() {
     let skin = "";
@@ -1452,12 +1449,13 @@
     const c = S.convs[V.open];
     c.unread = 0;
     save();
-    root.innerHTML = `<div class="net-room mx-net-bg" id="mx-net-room">
+    root.innerHTML = `<div class="net-room mx-net-bg chat-main" id="mx-net-room">
       <div class="net-head" id="net-head"></div>
       <div class="net-game" id="net-game" hidden></div>
-      <div class="net-list mx-net-list" id="net-list"></div>
-      <form class="net-bar mx-net-bar"><button type="button" class="net-ico mx-net-more" data-a="games" title="一起玩">🎲</button><input type="text" class="mx-net-input" maxlength="500" placeholder="说点什么…" enterkeyhint="send" /><button type="submit" class="fun-btn solid sm mx-net-send">发送</button></form>
+      <div class="net-list mx-net-list chat-messages" id="net-list"></div>
+      <form class="net-bar mx-net-bar chat-composer"><button type="button" class="net-ico mx-net-more chat-more-btn" data-a="games" title="一起玩">🎲</button><div class="chat-input-ruled net-input-wrap"><input type="text" class="mx-net-input chat-input" maxlength="500" placeholder="说点什么…" enterkeyhint="send" /></div><button type="submit" class="fun-btn solid sm mx-net-send chat-send-fab">发送</button></form>
     </div>`;
+    setNetFullscreen(true);
     applyNetStyle();
     drawHead();
     drawGame();
@@ -1479,7 +1477,7 @@
     if (!h || !c) return;
     const onl = onlineIn(c);
     const mids = Object.keys(c.members).sort((a, b) => Number(isOn(b)) - Number(isOn(a)));
-    h.innerHTML = `<div class="net-top mx-net-top"><button type="button" class="net-back mx-net-back" data-a="back">‹</button><div><strong class="mx-net-title">${esc(convTitle(c))}</strong><small class="net-st ${stCls()}">${Net.status === "ok" ? (c.dm ? (isOn(c.dm) ? "对方在线" : "对方不在线 · 上线后会收到") : `${onl.length} 人在线`) : stText()}</small></div>
+    h.innerHTML = `<div class="net-top mx-net-top chat-screen-topbar"><button type="button" class="net-back mx-net-back" data-a="back" aria-label="返回"><i class="ph ph-caret-left"></i></button><div class="net-top-t"><strong class="mx-net-title mx-chat-title">${esc(convTitle(c))}</strong><small class="net-st ${stCls()}">${Net.status === "ok" ? (c.dm ? (isOn(c.dm) ? "对方在线" : "对方不在线 · 上线后会收到") : `${onl.length} 人在线`) : stText()}</small></div>
       <button type="button" class="fun-btn ghost sm mx-net-style-btn" data-a="netstyle" title="聊天美化">🎨</button>${c.dm ? "" : `<button type="button" class="fun-btn ghost sm" data-a="invite">邀请</button><button type="button" class="fun-btn ghost sm" data-a="gmenu">⋯</button>`}</div>
       ${
         c.dm
@@ -1667,12 +1665,16 @@
       c.msgs
         .filter((m) => !(m.from && muted.has(m.from.mid)))
         .map((m) => {
-          if (m.sys) return `<p class="net-sys mx-net-sys">${esc(m.text).replace(/\n/g, "<br/>")}</p>`;
+          if (m.sys) return `<div class="chat-time-divider net-sys-row"><span class="chat-time-divider-label net-sys mx-net-sys">${esc(m.text).replace(/\n/g, "<br/>")}</span></div>`;
           const mid = m.from?.mid || "";
           const mine = mid === S.mid && !m.from?.isChar;
           const ch = m.from?.isChar ? (mid === S.mid ? c.char : c.memberChars[mid]) : null;
           const av = m.from?.isChar ? ch?.av || "" : avOf(c, mid);
-          return `<div class="net-msg mx-net-msg ${mine ? "me mx-net-me" : "mx-net-them"} ${m.from?.isChar ? "char" : ""}" data-mid="${esc(mid)}">${F.avHtml({ name: m.from?.name, avatar: av }, "fun-av sm mx-net-av")}<div class="mx-net-stack"><small class="mx-net-name">${esc(m.from?.name || "")}${m.from?.isChar ? `<em>${esc(m.from.owner || "")}的角色</em>` : ""}</small>${m.dress && window.XXJ_DRESS ? `<div class="net-dress">${window.XXJ_DRESS.doll(m.dress)}</div>` : ""}<p class="mx-net-bubble">${esc(m.text)}</p>${m.pending ? `<i class="net-pend">发送中…</i>` : ""}</div></div>`;
+          // 一对一聊天里不用每条都写名字；群聊、或者是谁带来的角色说话时才标出来
+          const showName = !c.dm || m.from?.isChar;
+          const avEl = netAvHtml(m.from?.name, av);
+          const stack = `<div class="chat-msg-bubble-stack mx-net-stack">${showName ? `<div class="chat-msg-group-speaker mx-net-name">${esc(m.from?.name || "")}${m.from?.isChar ? `<em>${esc(m.from.owner || "")}的角色</em>` : ""}</div>` : ""}${m.dress && window.XXJ_DRESS ? `<div class="net-dress">${window.XXJ_DRESS.doll(m.dress)}</div>` : ""}<div class="chat-msg-bubble mx-net-bubble">${esc(m.text)}</div>${m.pending ? `<i class="net-pend">发送中…</i>` : ""}</div>`;
+          return `<div class="net-msg chat-msg ${mine ? "chat-msg--user me mx-net-me" : "chat-msg--assistant mx-net-them"} mx-net-msg ${m.from?.isChar ? "char" : ""}" data-mid="${esc(mid)}"><div class="chat-msg-inner">${mine ? stack + avEl : avEl + stack}</div></div>`;
         })
         .join("") || `<p class="net-sys">还很安静，打个招呼吧～对方不在线也能收到</p>`;
     if (near || c.msgs.length < 3) box.scrollTop = box.scrollHeight;
@@ -2078,7 +2080,7 @@
     }
     if (a === "tdagain") return act(c, "again");
     if (a === "tdend") return act(c, "done");
-    const mu = e.target.closest(".net-msg:not(.me) .fun-av, .net-mem")?.closest("[data-mid]");
+    const mu = e.target.closest(".net-msg:not(.me) .mx-net-av, .net-mem")?.closest("[data-mid]");
     if (mu) memberMenu(c, mu.dataset.mid);
   }
 
@@ -2107,6 +2109,7 @@
       void tick(true);
     },
     unmount() {
+      setNetFullscreen(false);
       root = null;
       schedule();
     }

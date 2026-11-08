@@ -8645,3 +8645,40 @@ html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-a
 .moments-video img { width: 100% !important; max-width: none !important; height: 100% !important; object-fit: cover; }
 /* 朋友圈文案前不显示名字 */
 .moments-post-caption-user { display: none !important; }
+
+/* ═════════ 联机聊天房间：和角色聊天页一样的结构，铺满全屏 ═════════ */
+.fun-screen--netroom .fun-top { display: none !important; }
+.fun-screen--netroom .net { padding: 0 !important; }
+.fun-screen--netroom #mx-net-room { height: 100%; }
+#mx-net-room { background: var(--bg-device); }
+#mx-net-room .net-top { min-height: 52px; padding: calc(env(safe-area-inset-top, 0px) + 6px) 10px 6px 4px; border-bottom: 1px solid var(--line); box-sizing: border-box; }
+#mx-net-room .net-back { width: 40px; height: 40px; border: 0; background: none; color: var(--text-main); font-size: 22px; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; }
+#mx-net-room .net-top-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+#mx-net-room .net-top .mx-net-title { display: flex; align-items: center; font-size: 1.05rem; }
+#mx-net-room .net-mems { padding: 8px 12px 4px; }
+#mx-net-room .net-charbar { margin: 6px 10px 0; }
+#mx-net-room .net-list { padding: 12px 12px 14px; gap: 14px; }
+#mx-net-room .net-bar { padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: var(--bg-card); }
+#mx-net-room .net-input-wrap { flex: 1; min-width: 0; display: flex; }
+#mx-net-room .net-input-wrap input { flex: 1; min-width: 0; }
+/* 消息（和聊天页同样的 class；没套美化时的默认样子） */
+#mx-net-room .net-msg { display: flex; max-width: 100%; flex-direction: row; align-self: stretch; gap: 0; }
+#mx-net-room .net-msg.chat-msg--user { justify-content: flex-end; }
+#mx-net-room .net-msg > .chat-msg-inner { display: flex; align-items: flex-start; gap: 8px; max-width: 86%; position: relative; }
+#mx-net-room .chat-msg-avatar { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; object-fit: cover; display: grid; place-items: center; color: #fff; font-size: 0.9rem; font-weight: 700; cursor: pointer; }
+#mx-net-room .chat-msg-bubble-stack { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; position: relative; }
+#mx-net-room .chat-msg--user .chat-msg-bubble-stack { align-items: flex-end; }
+#mx-net-room .chat-msg-group-speaker { font-size: 0.68rem; color: var(--text-sub); margin: 0 2px 3px; }
+#mx-net-room .chat-msg-group-speaker em { font-style: normal; margin-left: 4px; padding: 0 5px; border-radius: 5px; background: color-mix(in srgb, #b07cff 18%, transparent); color: #8a5ad8; }
+#mx-net-room .chat-msg-bubble { margin: 0; padding: 8px 12px; border-radius: 4px 16px 16px 16px; background: var(--bg-card); border: 1px solid var(--line); font-size: 0.92rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; max-width: 100%; box-sizing: border-box; }
+#mx-net-room .chat-msg--user .chat-msg-bubble { border-radius: 16px 4px 16px 16px; background: var(--text-main); color: var(--bg-card); border-color: transparent; }
+#mx-net-room .net-msg.char .chat-msg-bubble { background: color-mix(in srgb, #b07cff 10%, var(--bg-card)); }
+#mx-net-room .net-sys-row { display: flex; justify-content: center; }
+#mx-net-room .net-sys-row .net-sys { display: inline-block; }
+#mx-net-room .net-list { gap: 0 !important; }
+#mx-net-room .net-list > * + * { margin-top: 14px; }
+/* 没套美化时：聊天页的通用样式会带进来，这里拉回联机自己的默认样子（套了美化时美化优先级更高） */
+#mx-net-room .net-msg.chat-msg { width: auto; }
+#mx-net-room .net-msg.chat-msg--user > .chat-msg-inner { flex-direction: row; }
+#mx-net-room .net-bar .net-input-wrap { flex-direction: row; background: none; border-radius: 0; overflow: visible; }
+#mx-net-room .net-bar .chat-send-fab { width: auto; height: auto; transform: none; box-shadow: none; display: inline-flex; border-radius: 999px; padding: 9px 16px; white-space: nowrap; }
