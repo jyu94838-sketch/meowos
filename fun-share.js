@@ -981,7 +981,7 @@
     root.innerHTML = `
       <div class="sh">
         <div class="sh-notice" role="note" style="display:flex;gap:8px;align-items:flex-start;margin:0 0 10px;padding:9px 12px;border-radius:14px;background:#fff6dc;border:1px solid #f3dc9a;color:#7a5a12;font-size:12.5px;line-height:1.5">
-          <span aria-hidden="true">💡</span><span>温馨提示：Meow 为开源机，请确保自己上传的文件是否公开～</span>
+          <span aria-hidden="true">💡</span><span>温馨提示：Meow 为开源机，请确保上传的文件为可公开文件～</span>
         </div>
         <div class="sh-tabs">
           <button type="button" data-tab="square">广场</button>

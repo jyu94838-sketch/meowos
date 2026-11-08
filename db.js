@@ -1781,9 +1781,9 @@
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
     "fun-widgets.js?v=8", "fun-icons.js?v=5", "mx-chatsearch.js?v=3", "fun-mimi.js?v=13", "mx-choose.js?v=3", "fun-yuzu.js?v=5", "fun-names.js?v=1", "fun-net.js?v=10", "fun-arcade.js?v=4", "fun-dress.js?v=5", "mx-import.js?v=2", "fun-weather.js?v=1", "fun-snake.js?v=3", "mx-alt.js?v=1",
-    "changelog.js?v=56",
+    "changelog.js?v=57",
     "share-config.js?v=3", "st-gate.js?v=1",
-    "fun-share.js?v=13"
+    "fun-share.js?v=14"
   ];
   const PRECHAIN = [
     "media-blob.js?v=" + ASSET_V,
