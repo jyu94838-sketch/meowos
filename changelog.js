@@ -10,6 +10,12 @@
   // 每次发版在最前面加一条，例如：
   // { v: 1, date: "2026-11-08", title: "标题", items: ["改了什么"] },
   const CHANGELOG = [
+    {
+      v: 1,
+      date: "2026-11-08",
+      title: "关于 Meow",
+      items: ["「我的」里点「关于」，就能看到关于 Meow：Meow 是基于 Ruiya 的「没心机」二次创作的，再次感谢 Ruiya，再次感谢没心机 🤍"]
+    }
   ];
   const LATEST = CHANGELOG.length ? CHANGELOG[0].v : 0;
   const SEEN_KEY = "meowos_seen_v4"; // 清空后重新计数

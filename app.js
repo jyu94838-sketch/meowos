@@ -55552,44 +55552,57 @@ document.getElementById("xxji-import-file")?.addEventListener("change", async (e
   const old = document.getElementById("settings-about");
   if (old) old.outerHTML = `<div class="settings-panel settings-panel--soft"><div class="settings-row settings-row-static"><span class="settings-row-l">版本</span><span class="settings-row-r">Meow OS</span></div></div>`;
 })();
-/** 关于 Meow 的内容直接写在这里（不依赖 index.html，手机缓存了旧首页也能正常显示） */
-const MX_ABOUT_HTML = `<div class="mx-about-head">
-                  <img src="icons/icon-192.png?v=8" alt="" class="mx-about-icon" width="64" height="64">
-                  <div>
-                    <strong class="mx-about-name">关于 Meow</strong>
-                    <span class="mx-about-sub">Meow OS · 角色聊天与小世界</span>
-                  </div>
-                </div>
-                <p class="mx-about-p">Meow 是在 <b>Ruiya</b> 的开源作品 <b>「没心机」</b> 的基础上二次创作的：桌面、聊天、角色、世界书这些最核心的部分都来自没心机，Meow 只是在上面加了一些自己喜欢的小玩意儿，换了一身新衣服。</p>
-                <p class="mx-about-p">没有没心机，就不会有 Meow。</p>
-                <div class="mx-about-thanks">
-                  <p>再次感谢 <b>Ruiya</b> 🌷</p>
-                  <p>再次感谢 <b>没心机</b> 🤍</p>
-                </div>
-                <p class="mx-about-note">没心机以 AGPL-3.0 协议开源，Meow 同样遵守这个协议并公开全部源代码。</p>
-                <div class="settings-row settings-row-static">
-                  <span class="settings-row-l">原作</span>
-                  <span class="settings-row-r">没心机 · Ruiya</span>
-                </div>
-                <div class="settings-row settings-row-static">
-                  <span class="settings-row-l">Meow 源代码</span>
-                  <span class="settings-row-r"><a href="https://github.com/jyu94838-sketch/meowos" target="_blank" rel="noopener">GitHub</a></span>
-                </div>`;
+/** 关于页的样式也写在这里（手机缓存了旧的样式表也不会乱） */
+const MX_ABOUT_CSS = `
+#mx-about-page{position:fixed;inset:0;z-index:10060;display:flex;flex-direction:column;background:var(--bg-device,#f5f5f7);color:var(--text-main,#17191c);transform:translateX(100%);transition:transform .26s ease;font-family:inherit}
+#mx-about-page.is-open{transform:none}
+#mx-about-page .mxa-bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 10px}
+#mx-about-page .mxa-bar b{font-size:17px}
+#mx-about-page .mxa-back{justify-self:start;display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(0,0,0,.12);background:transparent;color:inherit;border-radius:99px;padding:6px 14px;font:inherit;font-size:13px;cursor:pointer}
+#mx-about-page .mxa-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 16px calc(28px + env(safe-area-inset-bottom,0px))}
+#mx-about-page .mxa-card{display:flex;flex-direction:column;gap:12px;padding:22px 20px 10px;border-radius:24px;background:var(--bg-card,#fff);box-shadow:0 6px 20px rgba(0,0,0,.05)}
+#mx-about-page .mxa-head{display:flex;align-items:center;gap:14px}
+#mx-about-page .mxa-head img{width:60px;height:60px;border-radius:16px;box-shadow:0 4px 12px rgba(185,133,82,.22);flex:none}
+#mx-about-page .mxa-head strong{display:block;font-size:19px}
+#mx-about-page .mxa-head span{display:block;font-size:12.5px;color:var(--text-sub,#8a8a8a);margin-top:3px}
+#mx-about-page .mxa-p{margin:0;font-size:15px;line-height:1.8}
+#mx-about-page .mxa-thanks{padding:14px;border-radius:16px;background:linear-gradient(135deg,#fff7ec,#fdeee4);color:#7a5440;text-align:center}
+#mx-about-page .mxa-thanks p{margin:3px 0;font-size:16px}
+body.dark #mx-about-page .mxa-thanks{background:linear-gradient(135deg,#3a2e24,#3a2a2c);color:#f0d9c4}
+#mx-about-page .mxa-note{margin:0;font-size:12px;line-height:1.6;color:var(--text-sub,#8a8a8a)}
+#mx-about-page .mxa-row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-top:1px solid rgba(0,0,0,.08);font-size:14px}
+#mx-about-page .mxa-row span:last-child{color:var(--text-sub,#8a8a8a)}
+#mx-about-page .mxa-row a{color:inherit}
+`;
 document.getElementById("my-open-about")?.addEventListener("click", () => {
   // 「我的 → 关于」：进入关于页（整页，左上角返回「我的」）
   if (document.getElementById("mx-about-page")) return;
+  if (!document.getElementById("mx-about-css")) {
+    const st = document.createElement("style");
+    st.id = "mx-about-css";
+    st.textContent = MX_ABOUT_CSS;
+    document.head.appendChild(st);
+  }
   const pg = document.createElement("section");
   pg.id = "mx-about-page";
-  pg.className = "mx-about-page";
-  pg.innerHTML = `<header class="mx-about-bar"><button type="button" class="chip ghost chip-xs mx-about-back"><i class="ph ph-arrow-left"></i> 我的</button><b>关于</b><span></span></header><div class="mx-about-body"><div class="mx-about">${MX_ABOUT_HTML}</div></div>`;
-  const host = document.getElementById("my-screen") || document.body;
-  host.appendChild(pg);
-  requestAnimationFrame(() => pg.classList.add("is-open"));
-  pg.querySelector(".mx-about-back").onclick = () => {
+  pg.innerHTML = `<header class="mxa-bar"><button type="button" class="mxa-back">‹ 我的</button><b>关于</b><span></span></header>
+    <div class="mxa-body"><div class="mxa-card">
+      <div class="mxa-head"><img src="icons/icon-192.png?v=8" alt=""><div><strong>关于 Meow</strong><span>Meow OS · 角色聊天与小世界</span></div></div>
+      <p class="mxa-p">Meow 是在 <b>Ruiya</b> 的开源作品 <b>「没心机」</b> 的基础上二次创作的：桌面、聊天、角色、世界书这些最核心的部分都来自没心机，Meow 只是在上面加了一些自己喜欢的小玩意儿，换了一身新衣服。</p>
+      <p class="mxa-p">没有没心机，就不会有 Meow。</p>
+      <div class="mxa-thanks"><p>再次感谢 <b>Ruiya</b> 🌷</p><p>再次感谢 <b>没心机</b> 🤍</p></div>
+      <p class="mxa-note">没心机以 AGPL-3.0 协议开源，Meow 同样遵守这个协议并公开全部源代码。</p>
+      <div class="mxa-row"><span>原作</span><span>没心机 · Ruiya</span></div>
+      <div class="mxa-row"><span>Meow 源代码</span><span><a href="https://github.com/jyu94838-sketch/meowos" target="_blank" rel="noopener">GitHub</a></span></div>
+    </div></div>`;
+  document.body.appendChild(pg);
+  requestAnimationFrame(() => requestAnimationFrame(() => pg.classList.add("is-open")));
+  pg.querySelector(".mxa-back").onclick = () => {
     pg.classList.remove("is-open");
-    setTimeout(() => pg.remove(), 260);
+    setTimeout(() => pg.remove(), 280);
   };
 });
+
 
 document.getElementById("my-wallet-topup")?.addEventListener("click", () => {
   const maskId = getActiveMaskIdForInbox();
