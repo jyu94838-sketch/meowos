@@ -8144,3 +8144,6 @@ img.cp-pet-img.is-sleepy { filter: brightness(0.85) saturate(0.8); }
 .dr-sex span { flex: 1; min-width: 0; }
 .dr-sex button { border: 1px solid var(--line); background: var(--bg-card); color: var(--text-sub); border-radius: 99px; padding: 4px 10px; font: inherit; font-size: 0.74rem; cursor: pointer; }
 .dr-sex button.is-on { background: var(--text-main); color: var(--bg-card); border-color: transparent; }
+.net-warn { margin: 0; padding: 10px 12px; border-radius: 12px; background: #fff3e0; color: #8a5300; font-size: 0.8rem; line-height: 1.55; }
+body.dark .net-warn { background: #3a2c18; color: #f0c88a; }
+.net-pend { display: block; font-style: normal; font-size: 0.64rem; color: var(--text-sub); margin: 2px 4px 0; text-align: right; }

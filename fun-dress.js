@@ -29,7 +29,7 @@
   const ol = (c) => shade(c, 0.72); // 描边色
   const stk = (c, w) => `stroke="${ol(c)}" stroke-width="${w || 1.6}" stroke-linejoin="round"`;
   const FACE_F = "M50 94 Q50 40 100 40 Q150 40 150 94 Q150 122 134 140 Q116 157 100 158 Q84 157 66 140 Q50 122 50 94Z";
-  const FACE_M = "M51 94 Q51 40 100 40 Q149 40 149 94 Q149 120 136 140 Q118 159 100 161 Q82 159 64 140 Q51 120 51 94Z";
+  const FACE_M = "M50 94 Q50 40 100 40 Q150 40 150 94 Q150 124 135 141 Q117 157 100 158 Q83 157 65 141 Q50 124 50 94Z";
   /* ───── 画头发的小工具：一缕一缕的尖发束 + 渐变 + 高光 ───── */
   const r1 = (n) => Math.round(n * 10) / 10;
   const mixW = (hex, k) => {
@@ -285,9 +285,9 @@
   };
   const HAIR_DEF = { f: "short", m: "fringe" };
   // 眼睛：(80,110) 和 (120,110)
-  const EYE_L = 80;
-  const EYE_R = 120;
-  const EY = 110;
+  const EYE_L = 78;
+  const EYE_R = 122;
+  const EY = 113;
   let gid = 0;
   const LASH = "#24161c";
   /** 一只精致眼睛；sex 决定女生大眼 / 男生细长眼 */
@@ -296,7 +296,8 @@
     const s = cx < 100 ? -1 : 1; // 外眼角方向
     const ox = cx + s * 12;
     const ix = cx - s * 12;
-    const male = sex === "m" || o.sharp;
+    const male = !!o.sharp; // 细长眼只给「冷淡眼」；平时男生女生都是圆圆的大眼睛
+    const boy = sex === "m";
     const cid = `${id}c${cx}`;
     let sclera;
     let lid;
@@ -310,10 +311,14 @@
       iris = { cy: EY + 1, rx: 6.4, ry: 7.6, p: 3.2, pr: 4.2 };
       lower = `M${cx - s * 5} ${EY + 8.6}Q${cx + s * 3} ${EY + 9.4} ${ox - s * 1} ${EY + 4}`;
     } else {
-      sclera = `M${ix} ${EY - 4}Q${cx} ${EY - 15} ${ox} ${EY - 6}C${ox + s * 1} ${EY + 6} ${cx + s * 6} ${EY + 13} ${cx} ${EY + 13}C${cx - s * 7} ${EY + 13} ${ix} ${EY + 6} ${ix} ${EY - 4}Z`;
-      lid = `M${ix - s * 1} ${EY - 4}Q${cx} ${EY - 16} ${ox + s * 1} ${EY - 6}L${ox + s * 5} ${EY - 9}L${ox + s * 2} ${EY - 9.5}Q${cx} ${EY - 20.5} ${ix - s * 1} ${EY - 7.5}Z`;
-      brow = `M${ix} ${EY - 21}Q${cx} ${EY - 27} ${ox + s * 2} ${EY - 22}L${ox + s * 2} ${EY - 21}Q${cx} ${EY - 25} ${ix} ${EY - 19.5}Z`;
-      iris = { cy: EY + 2, rx: 8.4, ry: 10.6, p: 3.8, pr: 5.2 };
+      sclera = `M${ix} ${EY - 3}Q${cx} ${EY - 15} ${ox} ${EY - 5}C${ox + s * 1.5} ${EY + 7} ${cx + s * 6} ${EY + 14} ${cx} ${EY + 14}C${cx - s * 7} ${EY + 14} ${ix - s * 0.5} ${EY + 7} ${ix} ${EY - 3}Z`;
+      lid = boy
+        ? `M${ix - s * 1} ${EY - 3}Q${cx} ${EY - 16} ${ox + s * 1} ${EY - 5}L${ox + s * 2} ${EY - 7.5}Q${cx} ${EY - 19} ${ix - s * 1} ${EY - 6}Z`
+        : `M${ix - s * 1} ${EY - 3}Q${cx} ${EY - 16} ${ox + s * 1} ${EY - 5}L${ox + s * 5} ${EY - 8}L${ox + s * 2} ${EY - 9}Q${cx} ${EY - 20} ${ix - s * 1} ${EY - 6.5}Z`;
+      brow = boy
+        ? `M${cx - 8} ${EY - 22}Q${cx} ${EY - 26} ${cx + 8} ${EY - 23}L${cx + 8} ${EY - 21}Q${cx} ${EY - 23.6} ${cx - 8} ${EY - 19.6}Z`
+        : `M${cx - 7} ${EY - 23}Q${cx} ${EY - 26.5} ${cx + 7} ${EY - 23.5}L${cx + 7} ${EY - 22.6}Q${cx} ${EY - 25} ${cx - 7} ${EY - 21.8}Z`;
+      iris = boy ? { cy: EY + 2.4, rx: 8.4, ry: 10.6, p: 3.8, pr: 5 } : { cy: EY + 2.4, rx: 8.8, ry: 11.2, p: 4, pr: 5.4 };
       lower = `M${cx - s * 6} ${EY + 13.4}Q${cx + s * 2} ${EY + 14.6} ${ox - s * 0.5} ${EY + 7}`;
     }
     if (o.closed) {
@@ -323,7 +328,7 @@
     const pupil = o.slit ? `<ellipse cx="${cx}" cy="${iris.cy}" rx="1.6" ry="${iris.ry - 2}" fill="#140c12"/>` : `<ellipse cx="${cx}" cy="${iris.cy + 0.6}" rx="${iris.p}" ry="${iris.pr}" fill="#140c12"/>`;
     const hi = o.star
       ? `<path d="M${cx + 2} ${iris.cy - 7} l1.8 3.9 4.2 .6 -3.1 2.9 .8 4.2 -3.7 -2 -3.7 2 .8 -4.2 -3.1 -2.9 4.2 -.6z" fill="#fff"/>`
-      : `<ellipse cx="${cx + s * -2.6}" cy="${iris.cy - iris.ry * 0.45}" rx="${male ? 2 : 2.8}" ry="${male ? 2.4 : 3.4}" fill="#fff"/><circle cx="${cx + s * 3}" cy="${iris.cy + iris.ry * 0.45}" r="${male ? 1 : 1.5}" fill="#fff" opacity=".9"/>`;
+      : `<ellipse cx="${cx + s * -2.8}" cy="${iris.cy - iris.ry * 0.42}" rx="${male ? 2 : 3.2}" ry="${male ? 2.4 : 3.8}" fill="#fff"/><circle cx="${cx + s * 3.2}" cy="${iris.cy + iris.ry * 0.42}" r="${male ? 1 : 1.7}" fill="#fff" opacity=".95"/><circle cx="${cx + s * 4}" cy="${iris.cy - iris.ry * 0.5}" r="${male ? 0.8 : 1.1}" fill="#fff" opacity=".85"/>`;
     const sleepy = o.sleepy ? `<path d="M${ix - s * 2} ${EY - 16}L${ox + s * 3} ${EY - 16}L${ox + s * 3} ${EY - 1}Q${cx} ${EY - 5} ${ix - s * 2} ${EY + 1}Z" fill="${o.sk}"/><path d="M${ix - s * 1} ${EY + 1}Q${cx} ${EY - 5} ${ox + s * 2} ${EY - 1}" stroke="${LASH}" stroke-width="3" fill="none" stroke-linecap="round"/>` : "";
     return `<clipPath id="${cid}"><path d="${sclera}"/></clipPath>
       <path d="${sclera}" fill="#fffdfb"/>
@@ -336,9 +341,9 @@
       </g>
       ${o.sleepy ? sleepy : ""}
       <path d="${lid}" fill="${LASH}"/>
-      ${male ? "" : `<path d="M${ox + s * 1} ${EY - 7} l${s * 4} 1.5 M${ox} ${EY - 3} l${s * 3.6} 2.6" stroke="${LASH}" stroke-width="1.4" stroke-linecap="round"/>`}
+      ${male || boy ? "" : `<path d="M${ox + s * 1} ${EY - 7} l${s * 4} 1.5 M${ox} ${EY - 3} l${s * 3.6} 2.6" stroke="${LASH}" stroke-width="1.4" stroke-linecap="round"/>`}
       <path d="${lower}" stroke="${LASH}" stroke-width="${male ? 0.9 : 1.1}" fill="none" opacity=".55" stroke-linecap="round"/>
-      <path d="${brow}" fill="${male ? "#2a1d20" : "#4a3236"}" opacity="${male ? 0.92 : 0.8}"/>`;
+      <path d="${brow}" fill="${boy ? "#3a2628" : "#5a3a3e"}" opacity="${boy ? 0.85 : 0.7}"/>`;
   };
   const irisGrad = (id, c) => `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${shade(c, 0.35)}"/><stop offset=".45" stop-color="${shade(c, 0.8)}"/><stop offset=".8" stop-color="${c}"/><stop offset="1" stop-color="${mixW(c, 0.35)}"/></linearGradient>`;
   const pair = (c, id, sex, o) => irisGrad(id, c) + eye(EYE_L, c, id, sex, o) + eye(EYE_R, c, id, sex, o);
@@ -352,11 +357,11 @@
     sharp: { name: "冷淡眼", draw: (c, id, sk, sex) => pair(c, id, sex, { sharp: 1, sleepy: sex === "m" ? 0 : 0 }) }
   };
   const MOUTH = {
-    smile: { name: "微笑", draw: () => `<path d="M93 134 Q100 140 107 134" stroke="#7a3a3a" stroke-width="2.4" fill="none" stroke-linecap="round"/>` },
-    open: { name: "张嘴笑", draw: () => `<path d="M91 132 Q100 133 109 132 Q107 145 100 145 Q93 145 91 132Z" fill="#b8434f" stroke="#7a3a3a" stroke-width="1.6"/><path d="M95 141 Q100 137 105 141" fill="#f08a9a"/>` },
-    cat: { name: "ω 嘴", draw: () => `<path d="M90 133 Q95 139 100 133 Q105 139 110 133" stroke="#7a3a3a" stroke-width="2.4" fill="none" stroke-linecap="round"/>` },
-    pout: { name: "嘟嘴", draw: () => `<ellipse cx="100" cy="136" rx="3.4" ry="3" fill="#e0707c"/>` },
-    tongue: { name: "吐舌头", draw: () => `<path d="M92 133 Q100 139 108 133" stroke="#7a3a3a" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M98 136 Q103 146 108 136Z" fill="#f08a9a" stroke="#c45a6a" stroke-width="1.2"/>` }
+    smile: { name: "微笑", draw: () => `<path d="M96 138 Q100 141.5 104 138" stroke="#a04a52" stroke-width="1.8" fill="none" stroke-linecap="round"/>` },
+    open: { name: "张嘴笑", draw: () => `<path d="M94.5 136.5 Q100 137.5 105.5 136.5 Q104.5 144 100 144 Q95.5 144 94.5 136.5Z" fill="#c0485a" stroke="#8e3a44" stroke-width="1.1"/><path d="M96.8 141.6 Q100 139.4 103.2 141.6 Q100 143.6 96.8 141.6Z" fill="#f59aaa"/>` },
+    cat: { name: "ω 嘴", draw: () => `<path d="M94 137 Q97 140.5 100 137.4 Q103 140.5 106 137" stroke="#a04a52" stroke-width="1.7" fill="none" stroke-linecap="round"/>` },
+    pout: { name: "嘟嘴", draw: () => `<path d="M97 138.5 Q100 135.5 103 138.5 Q100 141.5 97 138.5Z" fill="#e8768a"/>` },
+    tongue: { name: "吐舌头", draw: () => `<path d="M95 137 Q100 140.5 105 137" stroke="#a04a52" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M99.5 139 Q102 145 104.5 139Z" fill="#f59aaa" stroke="#c45a6a" stroke-width="1"/>` }
   };
   // 衣服
   const TORSO = "M74 168 Q74 158 88 157 L112 157 Q126 158 126 168 L128 216 Q100 222 72 216Z";
@@ -475,8 +480,8 @@
   };
   /* ───── 男生款 ───── */
   Object.assign(MOUTH, {
-    smirk: { name: "坏笑", g: "m", draw: () => `<path d="M92 135 Q102 138 110 131" stroke="#7a3a3a" stroke-width="2.4" fill="none" stroke-linecap="round"/>` },
-    flat: { name: "面无表情", g: "m", draw: () => `<path d="M94 135 h12" stroke="#7a3a3a" stroke-width="2.4" stroke-linecap="round"/>` }
+    smirk: { name: "坏笑", g: "m", draw: () => `<path d="M95.5 139 Q101 140.5 105.5 136" stroke="#a04a52" stroke-width="1.7" fill="none" stroke-linecap="round"/>` },
+    flat: { name: "面无表情", g: "m", draw: () => `<path d="M96.5 139 h7" stroke="#a04a52" stroke-width="1.7" stroke-linecap="round"/>` }
   });
   Object.assign(TOP, {
     tank: {
@@ -655,7 +660,7 @@
     const id = "dri" + ++gid;
     const g = { id: id + "h", c: hc };
     const face = sex === "m" ? FACE_M : FACE_F;
-    const blush = sex === "m" ? 0.16 : 0.42;
+    const blush = sex === "m" ? 0.3 : 0.5;
     return `<svg viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="${g.id}" gradientUnits="userSpaceOnUse" x1="0" y1="20" x2="0" y2="230"><stop offset="0" stop-color="${mixW(hc, 0.14)}"/><stop offset=".35" stop-color="${hc}"/><stop offset="1" stop-color="${shade(hc, 0.68)}"/></linearGradient>
@@ -676,8 +681,8 @@
       <path d="M50 104 Q42 104 43 114 Q45 124 53 124Z M150 104 Q158 104 157 114 Q155 124 147 124Z" fill="${sk}" stroke="${skO}" stroke-width="1.2"/><path d="M48 110 q2 4 5 6 M152 110 q-2 4 -5 6" stroke="${skO}" stroke-width="1" fill="none"/>
       <path d="${face}" fill="${sk}" stroke="${skO}" stroke-width="1.3"/>
       ${EYES[o.eyes].draw(PAL[o.eyeC], id, sk, sex)}
-      <ellipse cx="68" cy="128" rx="11" ry="6" fill="url(#${id}bl)" opacity="${blush}"/><ellipse cx="132" cy="128" rx="11" ry="6" fill="url(#${id}bl)" opacity="${blush}"/>
-      ${sex === "m" ? `<path d="M102 115 Q104 121 100 123" stroke="${shade(sk, 0.72)}" stroke-width="1.1" fill="none" stroke-linecap="round"/>` : `<path d="M64 127 l2.4 -2.4 M69 128 l2.4 -2.4 M128 127 l2.4 -2.4 M133 128 l2.4 -2.4" stroke="#ff7f99" stroke-width="1" opacity=".55" stroke-linecap="round"/><path d="M100.5 121 l-1 2.2" stroke="${shade(sk, 0.7)}" stroke-width="1.1" stroke-linecap="round"/>`}
+      <ellipse cx="67" cy="130" rx="11" ry="6" fill="url(#${id}bl)" opacity="${blush}"/><ellipse cx="133" cy="130" rx="11" ry="6" fill="url(#${id}bl)" opacity="${blush}"/>
+      ${sex === "m" ? "" : `<path d="M63 130 l2.4 -2.4 M68 131 l2.4 -2.4 M129 130 l2.4 -2.4 M134 131 l2.4 -2.4" stroke="#ff7f99" stroke-width="1" opacity=".55" stroke-linecap="round"/>`}<ellipse cx="100" cy="127" rx="1.2" ry=".9" fill="${shade(sk, 0.72)}"/>
       ${MOUTH[o.mouth].draw()}
       ${paintHair(HAIR[o.hair].front, g)}
       ${ACC[o.acc].draw(hc)}

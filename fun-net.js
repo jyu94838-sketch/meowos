@@ -1,13 +1,12 @@
 "use strict";
 
 /**
- * 联机 · Meow 用户之间加好友、建群聊，带上自己的角色一起聊天、一起玩游戏
+ * 联机 · Meow 用户之间加好友、私聊、建群聊，带上自己的角色一起聊天、一起玩游戏
  * - 每个人有一个 8 位「Meow 号」，输入对方的 Meow 号就能加好友
- * - 好友之间可以私聊，也可以拉好友建群聊；每个人都能把自己的一个角色带进群里
- * - 小游戏：掷骰子比大小、数字炸弹、真心话大冒险（大家和大家的角色一起玩）
- * - 用资源站同一个 Supabase 项目的 Realtime（广播 + 在线状态），不用建表、不存服务器
- *   好友申请 / 拉群这类通知：对方不在线时先留在自己手机上，等对方上线自动送达
- *   聊天记录存在每个人自己的手机上；有人离线时漏掉的消息，等大家同时在线时会互相补齐
+ * - 消息和好友申请都存在站长的 Supabase 里（需要先运行一次 supabase-net.sql）：
+ *   对方不在线也能收到，打开 Meow 就自动拉取；不用 AI 接口，就是一个内部聊天室
+ * - 只走普通 HTTPS（不用 WebSocket），手机流量 / 各种网络都更容易连上
+ * - 角色接话才会用到主人自己的 AI；小游戏的状态也走同一条消息通道
  */
 (function () {
   const F = window.XXJ_FUN;
@@ -20,22 +19,37 @@
   const CODE_ABC = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const rid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-3);
   const newMid = () => Array.from({ length: 8 }, () => CODE_ABC[Math.floor(Math.random() * CODE_ABC.length)]).join("");
+  const newSecret = () => {
+    const a = new Uint8Array(24);
+    (window.crypto || {}).getRandomValues?.(a);
+    return [...a].map((b) => (b || Math.floor(Math.random() * 256)).toString(16).padStart(2, "0")).join("");
+  };
   const MAX_MSGS = 300;
 
-  /** @type {{ mid: string, nick: string, av: string, friends: Record<string, {mid:string,name:string,av:string,at:number}>, reqIn: any[], reqOut: Record<string, {mid:string,at:number}>, convs: Record<string, any>, outbox: any[], seen: string[] }} */
   let S;
   try {
     S = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
   } catch (_) {
     S = null;
   }
-  if (!S || typeof S !== "object" || !S.mid) S = { mid: newMid(), nick: "", av: "", friends: {}, reqIn: [], reqOut: {}, convs: {}, outbox: [], seen: [] };
+  if (!S || typeof S !== "object" || !S.mid) S = { mid: newMid() };
   S.friends ||= {};
   S.reqIn ||= [];
   S.reqOut ||= {};
   S.convs ||= {};
   S.outbox ||= [];
-  S.seen ||= [];
+  S.cur ||= { inbox: 0, msg: 0 };
+  if (!S.secret) S.secret = newSecret();
+  // 旧版（实时频道）留下的待发通知，换成新格式
+  S.outbox = S.outbox
+    .map((x) => (x && x.type ? x : x && x.to ? { id: x.id || rid(), type: "notify", to: x.to, kind: x.ev, data: x.data || {} } : null))
+    .filter(Boolean);
+  for (const c of Object.values(S.convs)) {
+    c.memberChars ||= {};
+    c.members ||= {};
+    c.msgs ||= [];
+    if (!c.joined) c.needJoin = true;
+  }
   let saveT = 0;
   function save(now) {
     clearTimeout(saveT);
@@ -43,7 +57,6 @@
       try {
         localStorage.setItem(STORE_KEY, JSON.stringify(S));
       } catch (_) {
-        // 存满了：每个会话少留一点
         for (const c of Object.values(S.convs)) c.msgs = c.msgs.slice(-120);
         try {
           localStorage.setItem(STORE_KEY, JSON.stringify(S));
@@ -68,7 +81,6 @@
   );
   const saveMute = () => localStorage.setItem(MUTE_KEY, JSON.stringify([...muted]));
 
-  /** 头像缩成小图再发（省流量） */
   function thumb(src) {
     return new Promise((ok) => {
       if (!src) return ok("");
@@ -78,9 +90,9 @@
       im.onload = () => {
         try {
           const c = document.createElement("canvas");
-          c.width = c.height = 72;
+          c.width = c.height = 64;
           const s = Math.min(im.width, im.height);
-          c.getContext("2d").drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s, 0, 0, 72, 72);
+          c.getContext("2d").drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s, 0, 0, 64, 64);
           ok(c.toDataURL("image/jpeg", 0.7));
         } catch (_) {
           ok("");
@@ -91,262 +103,237 @@
     });
   }
 
-  /* ───── Supabase Realtime（Phoenix 协议，一条 WebSocket 同时订阅多个频道） ───── */
-  function rtUrl() {
+  /* ───── 服务器（Supabase RPC，普通 HTTPS） ───── */
+  const cfg = () => {
     const c = window.MX_SHARE_CONFIG || {};
-    if (!c.url || !c.anonKey) return "";
-    return String(c.url).replace(/\/+$/, "").replace(/^http/, "ws") + "/realtime/v1/websocket?apikey=" + encodeURIComponent(c.anonKey) + "&vsn=1.0.0";
-  }
-  const Hub = {
-    ws: null,
-    ref: 0,
-    hb: 0,
-    tries: 0,
-    status: "",
-    started: false,
-    /** @type {Map<string, any>} */
-    topics: new Map(),
-    start() {
-      if (this.started) return;
-      if (!rtUrl()) {
-        this.status = "nocfg";
-        return;
-      }
-      this.started = true;
-      this.connect();
-    },
-    connect() {
-      const url = rtUrl();
-      this.setStatus("connecting");
-      let ws;
-      try {
-        ws = new WebSocket(url);
-      } catch (_) {
-        return this.retry();
-      }
-      this.ws = ws;
-      ws.onopen = () => {
-        this.tries = 0;
-        this.lastOpen = Date.now();
-        this.joinErr = "";
-        // 真正能收发要等自己的收件频道加入成功，这里先算「连接中」
-        this.setStatus(this.topics.has(inboxName(S.mid)) ? "connecting" : "online");
-        for (const t of this.topics.values()) this.rawJoin(t);
-        clearInterval(this.hb);
-        this.hb = setInterval(() => this.raw({ topic: "phoenix", event: "heartbeat", payload: {}, ref: String(++this.ref) }), 25000);
-      };
-      ws.onmessage = (ev) => {
-        let m;
-        try {
-          m = JSON.parse(ev.data);
-        } catch (_) {
-          return;
-        }
-        const t = this.topics.get(String(m.topic || "").replace(/^realtime:/, ""));
-        if (!t) return;
-        if (m.event === "phx_reply" && m.ref === t.joinRef) {
-          if (m.payload?.status !== "ok") {
-            const why = String(m.payload?.response?.reason || m.payload?.response?.message || JSON.stringify(m.payload?.response || {}) || "加入失败");
-            t.err = why;
-            if (t.name === inboxName(S.mid)) {
-              this.joinErr = why;
-              this.setStatus("error");
-            }
-            return;
-          }
-          if (m.payload?.status === "ok") {
-            t.err = "";
-            if (t.name === inboxName(S.mid)) this.setStatus("online");
-            t.joined = true;
-            if (t.meta) this.track(t.name, t.meta);
-            t.queue.splice(0).forEach(([e, p]) => this.send(t.name, e, p));
-            t.h.joined?.();
-          }
-          return;
-        }
-        if (m.event === "broadcast") return t.h.broadcast?.(m.payload?.event, m.payload?.payload || {});
-        if (m.event === "presence_state" || m.event === "presence_diff") {
-          const metasOf = (obj) => {
-            const out = [];
-            for (const [k, v] of Object.entries(obj || {})) for (const mm of v?.metas || []) out.push([k, mm]);
-            return out;
-          };
-          if (m.event === "presence_state") {
-            t.pres = new Map(metasOf(m.payload).map(([k, mm]) => [k, mm]));
-          } else {
-            for (const [k] of metasOf(m.payload?.leaves)) t.pres.delete(k);
-            for (const [k, mm] of metasOf(m.payload?.joins)) t.pres.set(k, mm);
-          }
-          t.h.presence?.();
-          return;
-        }
-        if (m.event === "phx_error" || m.event === "phx_close") {
-          t.joined = false;
-          setTimeout(() => this.topics.has(t.name) && this.ws?.readyState === 1 && this.rawJoin(t), 2000);
-        }
-      };
-      ws.onclose = (ev) => {
-        this.lastClose = { code: ev?.code || 0, reason: String(ev?.reason || ""), at: Date.now() };
-        clearInterval(this.hb);
-        for (const t of this.topics.values()) {
-          t.joined = false;
-          t.pres = new Map();
-        }
-        this.retry();
-      };
-      ws.onerror = () => {
-        /* onclose 会接着来 */
-      };
-    },
-    retry() {
-      this.setStatus("reconnecting");
-      const wait = Math.min(20000, 800 * 2 ** this.tries++);
-      clearTimeout(this.rt);
-      this.rt = setTimeout(() => this.connect(), wait);
-    },
-    /** 切回前台 / 网络恢复：别等退避，马上重连 */
-    kick() {
-      if (!this.started) return;
-      const st = this.ws ? this.ws.readyState : 3;
-      if (st === 0 || st === 1) return;
-      clearTimeout(this.rt);
-      this.tries = 0;
-      this.connect();
-    },
-    setStatus(s) {
-      this.status = s;
-      drawStatus();
-    },
-    raw(obj) {
-      if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(obj));
-    },
-    rawJoin(t) {
-      t.joinRef = String(++this.ref);
-      t.joined = false;
-      this.raw({
-        topic: "realtime:" + t.name,
-        event: "phx_join",
-        payload: { config: { broadcast: { self: false, ack: false }, presence: { key: t.key }, private: false } },
-        ref: t.joinRef,
-        join_ref: t.joinRef
-      });
-    },
-    join(name, h, meta) {
-      if (this.topics.has(name)) {
-        const t = this.topics.get(name);
-        t.h = h;
-        if (meta) this.track(name, meta);
-        return t;
-      }
-      const t = { name, key: S.mid, h, joinRef: "", joined: false, queue: [], meta: meta || null, pres: new Map() };
-      this.topics.set(name, t);
-      if (this.ws && this.ws.readyState === 1) this.rawJoin(t);
-      return t;
-    },
-    leave(name) {
-      const t = this.topics.get(name);
-      if (!t) return;
-      this.topics.delete(name);
-      this.raw({ topic: "realtime:" + name, event: "phx_leave", payload: {}, ref: String(++this.ref), join_ref: t.joinRef });
-    },
-    send(name, event, payload) {
-      const t = this.topics.get(name);
-      if (!t) return;
-      if (!t.joined) {
-        t.queue.push([event, payload]);
-        if (t.queue.length > 50) t.queue.shift();
-        return;
-      }
-      this.raw({ topic: "realtime:" + name, event: "broadcast", payload: { type: "broadcast", event, payload }, ref: String(++this.ref), join_ref: t.joinRef });
-    },
-    track(name, meta) {
-      const t = this.topics.get(name);
-      if (!t) return;
-      t.meta = meta;
-      if (!t.joined) return;
-      this.raw({ topic: "realtime:" + name, event: "presence", payload: { type: "presence", event: "track", payload: meta }, ref: String(++this.ref), join_ref: t.joinRef });
-    },
-    online(name) {
-      return this.topics.get(name)?.pres || new Map();
-    }
+    return c.url && c.anonKey ? { url: String(c.url).replace(/\/+$/, ""), key: c.anonKey } : null;
   };
-
-  document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && Hub.kick());
-  window.addEventListener("online", () => Hub.kick());
-  window.addEventListener("pageshow", () => Hub.kick());
-
-  const inboxName = (mid) => "meow-u-" + mid;
-  const groupName = (gid) => "meow-g-" + gid;
+  async function rpc(fn, args) {
+    const c = cfg();
+    if (!c) {
+      const e = new Error("nocfg");
+      e.kind = "nocfg";
+      throw e;
+    }
+    const ctl = new AbortController();
+    const tm = setTimeout(() => ctl.abort(), 15000);
+    try {
+      let res;
+      try {
+        res = await fetch(c.url + "/rest/v1/rpc/" + fn, {
+          method: "POST",
+          headers: { apikey: c.key, ...(/^eyJ/.test(c.key) ? { Authorization: "Bearer " + c.key } : {}), "Content-Type": "application/json" },
+          body: JSON.stringify(args || {}),
+          signal: ctl.signal
+        });
+      } catch (err) {
+        const e = new Error("网络连不上服务器");
+        e.kind = "offline";
+        throw e;
+      }
+      const t = await res.text();
+      let d = null;
+      try {
+        d = t ? JSON.parse(t) : null;
+      } catch (_) {
+        d = t;
+      }
+      if (!res.ok) {
+        const e = new Error((d && (d.message || d.hint)) || "HTTP " + res.status);
+        e.kind = res.status === 404 || (d && d.code === "PGRST202") ? "nosql" : "server";
+        throw e;
+      }
+      return d;
+    } finally {
+      clearTimeout(tm);
+    }
+  }
+  const auth = () => ({ p_mid: S.mid, p_secret: S.secret });
+  const Net = { status: "", online: new Set(), lastErr: "", regSig: "" };
   const me = () => ({ mid: S.mid, name: S.nick || "Meow 用户", av: S.av || "" });
 
-  /* ───── 送达箱：好友申请 / 同意 / 拉群，对方上线时自动送达 ───── */
-  function enqueue(to, ev, data) {
-    if (!to || to === S.mid) return;
-    S.outbox.push({ id: rid(), to, ev, data, at: Date.now() });
-    save();
-    watch(to);
-    flush(to);
+  async function ensureReg() {
+    const sig = me().name + "|" + (S.av || "").length;
+    if (S.regOk && Net.regSig === sig) return;
+    for (let i = 0; i < 3; i++) {
+      const r = await rpc("mx_net_register", { ...auth(), p_name: me().name, p_av: S.av || "" });
+      if (r === "new" || r === "ok") {
+        S.regOk = true;
+        Net.regSig = sig;
+        save();
+        return;
+      }
+      if (r === "taken") {
+        // 这个号被别的设备占了（极少见）：换一个
+        S.mid = newMid();
+        S.regOk = false;
+        continue;
+      }
+      throw Object.assign(new Error("注册失败：" + r), { kind: "server" });
+    }
   }
-  function watch(to) {
-    const name = inboxName(to);
-    if (Hub.topics.has(name) || to === S.mid) return;
-    Hub.join(name, {
-      joined: () => flush(to),
-      presence: () => flush(to),
-      broadcast: (ev, p) => {
-        if (ev === "here" && p.mid === to) flush(to);
-        if (ev === "ack" && p.to === S.mid) {
-          const ids = new Set(p.ids || []);
-          S.outbox = S.outbox.filter((x) => !(x.to === to && ids.has(x.id)));
-          save();
-          if (!S.outbox.some((x) => x.to === to)) setTimeout(() => !S.outbox.some((x) => x.to === to) && Hub.leave(name), 1500);
+
+  /* ───── 待发队列（网络不好时先存着，下次再发） ───── */
+  function queue(item) {
+    S.outbox.push({ id: rid(), ...item });
+    save();
+    void tick(true);
+  }
+  async function flushOut() {
+    while (S.outbox.length) {
+      const it = S.outbox[0];
+      try {
+        if (it.type === "notify") {
+          const r = await rpc("mx_net_notify", { ...auth(), p_to: it.to, p_kind: it.kind, p_data: it.data || {} });
+          if (r === "nouser") {
+            if (it.kind === "freq") {
+              delete S.reqOut[it.to];
+              toast(`没有找到 Meow 号 ${it.to}：对方要先打开一次新版「联机」`);
+            }
+          } else if (r === "auth") {
+            S.regOk = false;
+            throw Object.assign(new Error("auth"), { kind: "auth" });
+          } else if (r === "slow") throw Object.assign(new Error("发得太快了"), { kind: "server" });
+        } else if (it.type === "join") {
+          const r = await rpc("mx_net_join", { ...auth(), p_gid: it.gid });
+          if (r && r.error === "auth") {
+            S.regOk = false;
+            throw Object.assign(new Error("auth"), { kind: "auth" });
+          }
+          const c = S.convs[it.gid];
+          if (c && r && !r.error) {
+            c.joined = true;
+            c.needJoin = false;
+            for (const row of r.msgs || []) handleRow(row, false);
+          }
+        } else if (it.type === "leave") {
+          await rpc("mx_net_leave", { ...auth(), p_gid: it.gid });
+        } else if (it.type === "post") {
+          const c = S.convs[it.gid];
+          if (c && !c.joined) {
+            // 先进会话再发
+            const r = await rpc("mx_net_join", { ...auth(), p_gid: it.gid });
+            if (r && !r.error) {
+              c.joined = true;
+              c.needJoin = false;
+            }
+          }
+          const id = await rpc("mx_net_post", { ...auth(), p_gid: it.gid, p_body: it.body });
+          if (id === -1) {
+            S.regOk = false;
+            throw Object.assign(new Error("auth"), { kind: "auth" });
+          }
+          if (id === -4) throw Object.assign(new Error("发得太快了"), { kind: "server" });
+          if (id > 0 && it.body?.m?.id && c) {
+            const m = c.msgs.find((x) => x.id === it.body.m.id);
+            if (m) delete m.pending;
+          }
+        }
+        S.outbox.shift();
+        save();
+      } catch (e) {
+        if (e.kind === "auth") {
+          await ensureReg().catch(() => {});
+        }
+        throw e;
+      }
+    }
+  }
+
+  /* ───── 拉取循环 ───── */
+  let pulling = false;
+  let timer = 0;
+  let started = false;
+  let lastProfiles = 0;
+  const needProfiles = new Set();
+  async function tick(soon) {
+    if (soon) {
+      clearTimeout(timer);
+      timer = setTimeout(() => void tick(), 60);
+      return;
+    }
+    if (pulling) return;
+    pulling = true;
+    try {
+      await ensureReg();
+      for (const c of Object.values(S.convs)) if (c.needJoin && !S.outbox.some((x) => x.type === "join" && x.gid === c.gid)) S.outbox.push({ id: rid(), type: "join", gid: c.gid });
+      await flushOut();
+      const r = await rpc("mx_net_pull", { ...auth(), p_inbox: S.cur.inbox || 0, p_msg: S.cur.msg || 0 });
+      if (r && r.error === "auth") {
+        S.regOk = false;
+        throw Object.assign(new Error("auth"), { kind: "auth" });
+      }
+      const now = Date.parse(r?.now) || Date.now();
+      for (const it of r?.inbox || []) {
+        S.cur.inbox = Math.max(S.cur.inbox || 0, it.id);
+        handleItem({ mid: it.from_mid, name: it.from_name || "Meow 用户", av: it.from_av || "" }, it.kind, it.data || {});
+      }
+      for (const row of r?.msgs || []) {
+        S.cur.msg = Math.max(S.cur.msg || 0, row.id);
+        const fresh = now - (Date.parse(row.created_at) || 0) < 90 * 1000;
+        handleRow(row, fresh);
+      }
+      Net.online = new Set(r?.online || []);
+      Net.status = "ok";
+      Net.lastErr = "";
+      if (needProfiles.size || Date.now() - lastProfiles > 10 * 60 * 1000) await loadProfiles();
+      save();
+    } catch (e) {
+      Net.status = e.kind || "offline";
+      Net.lastErr = e.message || String(e);
+    } finally {
+      pulling = false;
+      drawStatus();
+      refreshView();
+      schedule();
+    }
+  }
+  function schedule() {
+    clearTimeout(timer);
+    if (!started) return;
+    const vis = document.visibilityState === "visible";
+    let ms = !vis ? 30000 : root && V.open ? 2000 : root ? 3000 : 8000;
+    if (Net.status && Net.status !== "ok") ms = Math.max(ms, Net.status === "nosql" ? 60000 : 6000);
+    timer = setTimeout(() => void tick(), ms);
+  }
+  function start() {
+    if (started) return;
+    if (!cfg()) {
+      Net.status = "nocfg";
+      return;
+    }
+    started = true;
+    void tick();
+  }
+  document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && started && tick(true));
+  window.addEventListener("online", () => started && tick(true));
+
+  async function loadProfiles() {
+    lastProfiles = Date.now();
+    const all = new Set(needProfiles);
+    needProfiles.clear();
+    if (all.size < 40) {
+      Object.keys(S.friends).forEach((m) => all.add(m));
+      for (const c of Object.values(S.convs)) Object.keys(c.members).forEach((m) => all.add(m));
+    }
+    all.delete(S.mid);
+    if (!all.size) return;
+    const rows = await rpc("mx_net_profiles", { p_mids: [...all].slice(0, 50) }).catch(() => []);
+    for (const p of rows || []) {
+      if (S.friends[p.mid]) {
+        S.friends[p.mid].name = p.name || S.friends[p.mid].name;
+        if (p.av) S.friends[p.mid].av = p.av;
+      }
+      for (const c of Object.values(S.convs)) {
+        if (c.members[p.mid]) {
+          c.members[p.mid].name = p.name || c.members[p.mid].name;
+          if (p.av) c.members[p.mid].av = p.av;
         }
       }
-    });
-  }
-  function flush(to) {
-    const name = inboxName(to);
-    const t = Hub.topics.get(name);
-    if (!t || !t.joined || !t.pres.has(to)) return;
-    const items = S.outbox.filter((x) => x.to === to);
-    if (!items.length) return;
-    Hub.send(name, "deliver", { to, from: me(), items: items.map(({ id, ev, data }) => ({ id, ev, data })) });
-  }
-  setInterval(() => {
-    const tos = new Set(S.outbox.map((x) => x.to));
-    for (const to of tos) {
-      watch(to);
-      flush(to);
     }
-  }, 20000);
-
-  function startInbox() {
-    Hub.start();
-    Hub.join(
-      inboxName(S.mid),
-      {
-        joined: () => Hub.send(inboxName(S.mid), "here", { mid: S.mid }),
-        broadcast: (ev, p) => {
-          if (ev !== "deliver" || p.to !== S.mid || !p.from?.mid) return;
-          const ids = [];
-          for (const it of p.items || []) {
-            ids.push(it.id);
-            if (S.seen.includes(it.id)) continue;
-            S.seen.push(it.id);
-            if (S.seen.length > 400) S.seen.splice(0, S.seen.length - 400);
-            handleItem(p.from, it.ev, it.data || {});
-          }
-          Hub.send(inboxName(S.mid), "ack", { to: p.from.mid, ids });
-          save();
-          render();
-        }
-      },
-      { mid: S.mid }
-    );
-    for (const to of new Set(S.outbox.map((x) => x.to))) watch(to);
-    for (const gid of Object.keys(S.convs)) joinConv(gid);
   }
 
+  /* ───── 好友 / 通知 ───── */
   function upsertFriend(p) {
     const old = S.friends[p.mid];
     S.friends[p.mid] = { mid: p.mid, name: p.name || old?.name || "Meow 用户", av: p.av || old?.av || "", at: old?.at || Date.now() };
@@ -356,10 +343,9 @@
     if (muted.has(from.mid) && ev === "freq") return;
     if (ev === "freq") {
       if (S.friends[from.mid] || S.reqOut[from.mid]) {
-        // 已经是好友 / 我也正好加了 TA：直接成为好友
         delete S.reqOut[from.mid];
         upsertFriend(from);
-        enqueue(from.mid, "facc", {});
+        queue({ type: "notify", to: from.mid, kind: "facc", data: {} });
         toast(`和 ${from.name} 成为好友啦`);
         return;
       }
@@ -367,36 +353,37 @@
       S.reqIn.unshift({ mid: from.mid, name: from.name, av: from.av, note: String(d.note || "").slice(0, 60), at: Date.now() });
       toast(`${from.name} 想加你为好友（联机 → 好友）`);
     } else if (ev === "facc") {
+      const was = !!S.friends[from.mid];
       delete S.reqOut[from.mid];
       S.reqIn = S.reqIn.filter((r) => r.mid !== from.mid);
       upsertFriend(from);
-      toast(`${from.name} 通过了你的好友申请`);
+      if (!was) toast(`${from.name} 通过了你的好友申请`);
     } else if (ev === "fdel") {
       delete S.friends[from.mid];
     } else if (ev === "ginv") {
       if (!d.gid) return;
       const fresh = !S.convs[d.gid];
       const c = (S.convs[d.gid] ||= newConv(d.gid, d.name || "群聊", null));
-      Object.assign(c.members, d.members || {});
-      c.members[from.mid] = { name: from.name, av: from.av };
-      c.members[S.mid] = { name: me().name, av: me().av };
+      for (const [k, v] of Object.entries(d.members || {})) if (!c.members[k]) c.members[k] = { name: v?.name || "", av: "" };
+      c.members[from.mid] = { name: from.name, av: from.av || c.members[from.mid]?.av || "" };
+      Object.keys(c.members).forEach((m) => needProfiles.add(m));
       if (fresh) {
         c.lastAt = Date.now();
-        pushLocal(c, { id: rid(), sys: true, at: Date.now(), text: `${from.name} 邀请你加入了群聊「${c.name}」` });
+        pushLocal(c, { id: rid(), sys: true, local: true, at: Date.now(), text: `${from.name} 邀请你加入了群聊「${c.name}」` });
         toast(`${from.name} 拉你进了群聊「${c.name}」`);
       }
       joinConv(d.gid);
     }
-    if (from.mid && S.friends[from.mid]) {
+    if (S.friends[from.mid]) {
       S.friends[from.mid].name = from.name || S.friends[from.mid].name;
       if (from.av) S.friends[from.mid].av = from.av;
     }
   }
 
-  /* ───── 会话（私聊 = 两个人的群） ───── */
+  /* ───── 会话 ───── */
   const dmGid = (a, b) => "d" + [a, b].sort().join("_").toLowerCase();
   function newConv(gid, name, dm) {
-    return { gid, name, dm, members: { [S.mid]: { name: me().name, av: me().av } }, msgs: [], unread: 0, lastAt: Date.now(), char: null, charAuto: true };
+    return { gid, name, dm, members: { [S.mid]: { name: me().name, av: "" } }, memberChars: {}, msgs: [], unread: 0, lastAt: Date.now(), char: null, charAuto: true, joined: false, needJoin: true };
   }
   function ensureDm(mid) {
     const gid = dmGid(S.mid, mid);
@@ -408,41 +395,23 @@
     joinConv(gid);
     return gid;
   }
-  const convTitle = (c) => (c.dm ? S.friends[c.dm]?.name || c.members[c.dm]?.name || "好友" : c.name || "群聊");
-  const convAv = (c) => (c.dm ? S.friends[c.dm]?.av || c.members[c.dm]?.av || "" : "");
-
-  /** 运行时状态：游戏、角色接话（不存） */
-  const RT = new Map();
-  const rt = (gid) => {
-    if (!RT.has(gid)) RT.set(gid, { game: null, charBusy: false, charLast: 0, joinedAt: Date.now() });
-    return RT.get(gid);
-  };
-  function myMeta(c) {
-    return { mid: S.mid, name: me().name, av: me().av, t: rt(c.gid).joinedAt, char: c.char ? { id: c.char.id, name: c.char.name, av: c.char.av } : null };
-  }
   function joinConv(gid) {
     const c = S.convs[gid];
-    if (!c || !Hub.started) return;
-    const name = groupName(gid);
-    Hub.join(
-      name,
-      {
-        joined: () => {
-          const since = Math.max(0, (c.msgs.filter((m) => !m.local).slice(-1)[0]?.at || 0) - 5 * 60 * 1000);
-          Hub.send(name, "hello", { from: me(), since, char: c.char ? { id: c.char.id, name: c.char.name, av: c.char.av } : null });
-        },
-        presence: () => onConvPresence(gid),
-        broadcast: (ev, p) => onConvBroadcast(gid, ev, p)
-      },
-      myMeta(c)
-    );
+    if (!c || c.joined) return;
+    c.needJoin = true;
+    if (!S.outbox.some((x) => x.type === "join" && x.gid === gid)) queue({ type: "join", gid });
   }
-  const onlineMetas = (gid) => [...Hub.online(groupName(gid)).values()].filter((m) => m && m.mid);
-  function hostMid(gid) {
-    const arr = onlineMetas(gid).sort((a, b) => (a.t || 0) - (b.t || 0) || String(a.mid).localeCompare(String(b.mid)));
-    return arr[0]?.mid || S.mid;
-  }
-  const amHost = (gid) => hostMid(gid) === S.mid;
+  const convTitle = (c) => (c.dm ? S.friends[c.dm]?.name || c.members[c.dm]?.name || "好友" : c.name || "群聊");
+  const avOf = (c, mid) => (mid === S.mid ? S.av : S.friends[mid]?.av || c?.members?.[mid]?.av || "");
+  const nameOf = (c, mid) => (mid === S.mid ? me().name : S.friends[mid]?.name || c?.members?.[mid]?.name || "Meow 用户");
+  const isOn = (mid) => mid === S.mid || Net.online.has(mid);
+  const onlineIn = (c) => Object.keys(c.members).filter(isOn);
+
+  const RT = new Map();
+  const rt = (gid) => {
+    if (!RT.has(gid)) RT.set(gid, { game: null, charBusy: false, charLast: 0 });
+    return RT.get(gid);
+  };
 
   function pushLocal(c, m) {
     if (!m || !m.id || c.msgs.some((x) => x.id === m.id)) return false;
@@ -458,7 +427,8 @@
     if (m.from && muted.has(m.from.mid)) return;
     if (!pushLocal(c, m)) return;
     const viewing = root && V.open === c.gid;
-    if (!viewing && !m.sys) {
+    const mine = m.from?.mid === S.mid;
+    if (!viewing && !m.sys && !mine) {
       c.unread = (c.unread || 0) + 1;
       if (live && Date.now() - lastNotify > 3000) {
         lastNotify = Date.now();
@@ -466,95 +436,60 @@
       }
     }
     if (viewing) drawMsgs();
-    else drawHome();
-    if (live) void maybeCharReply(c, m);
+    if (live && !mine) void maybeCharReply(c, m);
+  }
+  /** 服务器上的一条记录 */
+  function handleRow(row, live) {
+    const c = S.convs[row.gid];
+    if (!c) return;
+    const b = row.body || {};
+    const from = row.from_mid;
+    const mine = from === S.mid;
+    if (from && !c.members[from]) {
+      c.members[from] = { name: b.m?.from?.name || "", av: "" };
+      needProfiles.add(from);
+    }
+    if (b.t === "msg" && b.m && b.m.id) {
+      const m = { ...b.m, at: Date.parse(row.created_at) || b.m.at || Date.now() };
+      if (m.from) m.from = { ...m.from, mid: from };
+      if (m.from && !m.from.isChar && m.from.name && c.members[from]) c.members[from].name = m.from.name;
+      const old = c.msgs.find((x) => x.id === m.id);
+      if (old) {
+        delete old.pending;
+        return;
+      }
+      receiveMsg(c, m, live);
+    } else if (b.t === "char") {
+      if (b.char) c.memberChars[from] = b.char;
+      else delete c.memberChars[from];
+    } else if (b.t === "rename") {
+      if (!c.dm && b.name) c.name = String(b.name).slice(0, 20);
+    } else if (b.t === "members") {
+      for (const [k, v] of Object.entries(b.members || {})) if (!c.members[k]) c.members[k] = { name: v?.name || "", av: "" }, needProfiles.add(k);
+    } else if (b.t === "leave") {
+      if (from !== S.mid) delete c.members[from];
+    } else if (b.t === "game") {
+      if (live && !mine) {
+        rt(c.gid).game = b.game || null;
+        if (root && V.open === c.gid) drawGame();
+        void charGameTurn(c);
+      }
+    } else if (b.t === "act") {
+      if (live && !mine && rt(c.gid).game?.host === S.mid) hostAct(c, b.a);
+    }
+  }
+  function post(c, body) {
+    queue({ type: "post", gid: c.gid, body });
   }
   function sendMsg(c, m) {
+    m.pending = true;
     pushLocal(c, m);
-    Hub.send(groupName(c.gid), "msg", { m });
+    const { pending, ...clean } = m;
+    post(c, { t: "msg", m: clean });
     if (root && V.open === c.gid) drawMsgs();
   }
   function sysMsg(c, text, extra) {
-    const m = { id: rid(), sys: true, text, at: Date.now(), ...(extra || {}) };
-    sendMsg(c, m);
-    void maybeCharReply(c, m);
-  }
-
-  function onConvPresence(gid) {
-    const c = S.convs[gid];
-    if (!c) return;
-    for (const m of onlineMetas(gid)) {
-      if (m.mid === S.mid) continue;
-      c.members[m.mid] = { name: m.name, av: m.av || c.members[m.mid]?.av || "" };
-      if (S.friends[m.mid]) {
-        S.friends[m.mid].name = m.name;
-        if (m.av) S.friends[m.mid].av = m.av;
-      }
-    }
-    const R = rt(gid);
-    if (R.game && amHost(gid)) {
-      const on = new Set(onlineMetas(gid).map((m) => m.mid));
-      on.add(S.mid);
-      const alive = R.game.players.filter((pl) => on.has(pl.owner));
-      if (alive.length !== R.game.players.length) {
-        R.game.players = alive;
-        if (alive.length < 2) endGame(c, "人不够了，游戏结束");
-        else hostTick(c);
-      }
-    }
-    if (root && V.open === gid) drawHead();
-    else drawHome();
-  }
-
-  function onConvBroadcast(gid, ev, p) {
-    const c = S.convs[gid];
-    if (!c) return;
-    const name = groupName(gid);
-    const R = rt(gid);
-    if (ev === "msg") {
-      if (p.m) receiveMsg(c, p.m, true);
-    } else if (ev === "hello") {
-      const f = p.from;
-      if (!f?.mid || f.mid === S.mid) return;
-      c.members[f.mid] = { name: f.name, av: f.av || "" };
-      const since = Number(p.since) || 0;
-      // 房主把漏掉的消息全给 TA；其他人只补自己发的
-      const pool = amHost(gid) ? c.msgs : c.msgs.filter((m) => m.from?.mid === S.mid);
-      const msgs = pool.filter((m) => !m.local && (m.at || 0) > since).slice(-150);
-      Hub.send(name, "sync", { to: f.mid, msgs, members: c.members, name: c.dm ? "" : c.name, game: amHost(gid) ? R.game : null });
-      save();
-    } else if (ev === "sync") {
-      if (p.to !== S.mid) return;
-      let added = 0;
-      for (const m of p.msgs || []) {
-        if (m.from && muted.has(m.from.mid)) continue;
-        if (pushLocal(c, m)) added++;
-      }
-      if (p.members && typeof p.members === "object") for (const [k, v] of Object.entries(p.members)) if (!c.members[k]) c.members[k] = v;
-      if (p.name && !c.dm) c.name = p.name;
-      if (p.game && !R.game) R.game = p.game;
-      if (added && !(root && V.open === gid)) c.unread = (c.unread || 0) + added;
-      save();
-      render();
-    } else if (ev === "members") {
-      if (p.members) Object.assign(c.members, p.members);
-      save();
-      render();
-    } else if (ev === "rename") {
-      if (!c.dm && p.name) c.name = String(p.name).slice(0, 20);
-      save();
-      render();
-    } else if (ev === "leave") {
-      if (p.mid && p.mid !== S.mid) delete c.members[p.mid];
-      save();
-      render();
-    } else if (ev === "game") {
-      R.game = p.game || null;
-      if (root && V.open === gid) drawGame();
-      void charGameTurn(c);
-    } else if (ev === "act") {
-      if (amHost(gid)) hostAct(c, p);
-    }
+    sendMsg(c, { id: rid(), sys: true, text, at: Date.now(), ...(extra || {}) });
   }
 
   /* ───── 角色接话（用主人自己手机上的 AI） ───── */
@@ -572,8 +507,7 @@
     if (!ch) return;
     const t = F.cleanLine(text, 300, ch.name);
     if (!t) return;
-    const m = { id: rid(), at: Date.now(), text: t, from: { mid: S.mid, name: ch.name, av: ch.av, isChar: true, owner: me().name } };
-    sendMsg(c, m);
+    sendMsg(c, { id: rid(), at: Date.now(), text: t, from: { mid: S.mid, name: ch.name, isChar: true, owner: me().name } });
   }
   async function maybeCharReply(c, m) {
     const ch = c.char;
@@ -617,7 +551,7 @@
     }
   }
 
-  /* ───── 小游戏（房主 = 最早在线的人，状态广播给所有人） ───── */
+  /* ───── 小游戏（谁开的谁当主持人；状态走消息通道） ───── */
   const TRUTH = [
     "最近一次心动是什么时候？",
     "手机里最不想被看到的是什么？",
@@ -650,29 +584,24 @@
   };
   function allPlayers(c) {
     const out = [];
-    const metas = onlineMetas(c.gid);
-    if (!metas.some((m) => m.mid === S.mid)) metas.push(myMeta(c));
-    for (const m of metas) {
-      out.push({ pid: m.mid, name: m.name, av: m.av || "", owner: m.mid, isChar: false });
-      if (m.char) out.push({ pid: `c:${m.mid}:${m.char.id}`, name: m.char.name, av: m.char.av || "", owner: m.mid, isChar: true, ownerName: m.name });
+    for (const mid of onlineIn(c)) {
+      out.push({ pid: mid, name: nameOf(c, mid), owner: mid, isChar: false });
+      const ch = mid === S.mid ? c.char : c.memberChars[mid];
+      if (ch) out.push({ pid: `c:${mid}:${ch.id}`, name: ch.name, owner: mid, isChar: true, ownerName: nameOf(c, mid) });
     }
     return out;
   }
   function broadcastGame(c) {
-    Hub.send(groupName(c.gid), "game", { game: rt(c.gid).game });
+    post(c, { t: "game", game: rt(c.gid).game });
     if (root && V.open === c.gid) drawGame();
     void charGameTurn(c);
   }
   function startGame(c, kind) {
     const R = rt(c.gid);
-    if (!amHost(c.gid)) {
-      Hub.send(groupName(c.gid), "act", { type: "start", kind, from: S.mid });
-      toast("已经请主持人开始");
-      return;
-    }
+    if (R.game) return toast("正在玩别的游戏");
     const players = allPlayers(c);
     if (players.length < 2) return toast("至少要两个人（带上角色也算）才能玩，对方得在线哦");
-    const g = { id: rid(), kind, players, phase: "play", log: [] };
+    const g = { id: rid(), kind, host: S.mid, players, phase: "play", log: [] };
     if (kind === "dice") g.rolls = {};
     if (kind === "bomb") {
       g.secret = 1 + Math.floor(Math.random() * 100);
@@ -687,7 +616,7 @@
       g.q = "";
     }
     R.game = g;
-    sysMsg(c, `${GAMES[kind].icon} 开始玩「${GAMES[kind].name}」！参加的有：${players.map((p) => p.name).join("、")}`);
+    sysMsg(c, `${GAMES[kind].icon} ${me().name} 开了一局「${GAMES[kind].name}」！参加的有：${players.map((p) => p.name).join("、")}`);
     broadcastGame(c);
   }
   function endGame(c, text, extra) {
@@ -699,17 +628,13 @@
     const g = rt(c.gid).game;
     if (!g) return;
     const a = { type, value, pid: pid || S.mid, gid: g.id, from: S.mid };
-    if (amHost(c.gid)) hostAct(c, a);
-    else Hub.send(groupName(c.gid), "act", a);
+    if (g.host === S.mid) hostAct(c, a);
+    else post(c, { t: "act", a });
   }
   function hostAct(c, a) {
     const R = rt(c.gid);
-    if (a.type === "start") {
-      if (!R.game && GAMES[a.kind]) startGame(c, a.kind);
-      return;
-    }
     const g = R.game;
-    if (!g || a.gid !== g.id) return;
+    if (!g || !a || a.gid !== g.id) return;
     const pl = g.players.find((p) => p.pid === a.pid);
     if (!pl || pl.owner !== a.from) return;
     if (g.kind === "dice" && a.type === "roll" && g.phase === "play") {
@@ -722,7 +647,6 @@
       const n = Math.round(Number(a.value));
       if (!(n >= g.lo && n <= g.hi)) return;
       if (n === g.secret) {
-        g.phase = "over";
         endGame(c, `💥 ${pl.name} 猜了 ${n}，被炸弹炸到啦！惩罚：${Math.random() < 0.5 ? "真心话 · " + pick(TRUTH) : "大冒险 · " + pick(DARE)}`, { gameEnd: true, involves: [pl.name] });
         return;
       }
@@ -816,8 +740,27 @@
     const now = new Date();
     return d.toDateString() === now.toDateString() ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : `${d.getMonth() + 1}/${d.getDate()}`;
   };
-  const stText = () => ({ online: "在线", connecting: "连接中…", reconnecting: "重新连接中…", error: "连接被拒绝", nocfg: "没配置资源站" })[Hub.status] || "";
+  const ST = { ok: ["online", "已连接"], offline: ["reconnecting", "网络连不上"], nosql: ["error", "服务器还没建表"], server: ["error", "服务器出错"], auth: ["reconnecting", "登录中…"], nocfg: ["error", "没配置资源站"] };
+  const stCls = () => (ST[Net.status] || ["connecting", "连接中…"])[0];
+  const stText = () => (ST[Net.status] || ["connecting", "连接中…"])[1];
 
+  /** 拉取完只在内容真的变了时才重画，免得把正在输入的框冲掉 */
+  let lastSig = "";
+  function refreshView() {
+    if (!root) return;
+    const sig = [Net.status, [...Net.online].sort().join(","), S.reqIn.length, Object.keys(S.reqOut).length, S.outbox.length, Object.keys(S.friends).length, ...Object.values(S.convs).map((c) => c.gid + c.msgs.length + ":" + (c.unread || 0) + c.name + Object.keys(c.members).length)].join("|");
+    if (sig === lastSig) return;
+    lastSig = sig;
+    if (V.open) {
+      drawHead();
+      drawGame();
+      drawMsgs();
+      return;
+    }
+    const ae = document.activeElement;
+    if (ae && root.contains(ae) && ae.tagName === "INPUT") return;
+    drawHome();
+  }
   function render() {
     if (!root) return;
     if (V.open && S.convs[V.open]) drawConv();
@@ -828,7 +771,7 @@
   }
   function drawStatus() {
     root?.querySelectorAll("[data-st]").forEach((el) => {
-      el.className = "net-st " + Hub.status;
+      el.className = "net-st " + stCls();
       el.textContent = stText();
     });
   }
@@ -846,10 +789,10 @@
           convs
             .map((c) => {
               const last = c.msgs[c.msgs.length - 1];
-              const on = onlineMetas(c.gid).filter((m) => m.mid !== S.mid).length;
+              const on = onlineIn(c).filter((m) => m !== S.mid).length;
               const prev = last ? (last.sys ? last.text : `${c.dm && last.from?.mid === c.dm && !last.from?.isChar ? "" : (last.from?.name || "") + "："}${last.text}`) : "还没有消息";
-              const av = c.dm ? F.avHtml({ name: convTitle(c), avatar: convAv(c) }, "fun-av") : `<span class="fun-av net-gav">👥</span>`;
-              return `<button type="button" class="net-conv" data-open="${esc(c.gid)}">${av}<div><b>${esc(convTitle(c))}${c.dm ? "" : `<i>(${Object.keys(c.members).length})</i>`}</b><small>${esc(String(prev).slice(0, 40))}</small></div><span class="net-cmeta"><small>${fmtTime(c.lastAt)}</small>${on ? `<em class="net-on">${on} 在线</em>` : ""}${c.unread ? `<u>${c.unread > 99 ? "99+" : c.unread}</u>` : ""}</span></button>`;
+              const av = c.dm ? F.avHtml({ name: convTitle(c), avatar: avOf(c, c.dm) }, "fun-av") : `<span class="fun-av net-gav">👥</span>`;
+              return `<button type="button" class="net-conv" data-open="${esc(c.gid)}">${av}<div><b>${esc(convTitle(c))}${c.dm ? "" : `<i>(${Object.keys(c.members).length})</i>`}</b><small>${esc(String(prev).slice(0, 40))}</small></div><span class="net-cmeta"><small>${fmtTime(c.lastAt)}</small>${on ? `<em class="net-on">${c.dm ? "在线" : on + " 在线"}</em>` : ""}${c.unread ? `<u>${c.unread > 99 ? "99+" : c.unread}</u>` : ""}</span></button>`;
             })
             .join("") || `<p class="fun-note">还没有聊天。先去「好友」加几个 Meow 好友，就能私聊或者拉群啦。</p>`
         }</div>`;
@@ -868,7 +811,7 @@
         ${
           outs.length
             ? `<h4 class="net-h4">等待对方通过</h4>${outs
-                .map((r) => `<div class="net-frow"><span class="fun-av net-gav">⏳</span><div><b>${esc(r.mid)}</b><small>${S.outbox.some((x) => x.to === r.mid) ? "对方上线后会自动收到申请" : "已送达，等 TA 同意"}</small></div><button type="button" class="fun-btn ghost sm" data-cancel="${esc(r.mid)}">撤回</button></div>`)
+                .map((r) => `<div class="net-frow"><span class="fun-av net-gav">⏳</span><div><b>${esc(r.mid)}</b><small>${S.outbox.some((x) => x.to === r.mid) ? "网络恢复后会自动发出" : "已送达，等 TA 同意"}</small></div><button type="button" class="fun-btn ghost sm" data-cancel="${esc(r.mid)}">撤回</button></div>`)
                 .join("")}`
             : ""
         }
@@ -877,17 +820,17 @@
           friends
             .map((f) => {
               const gid = dmGid(S.mid, f.mid);
-              const on = Hub.online(groupName(gid)).has(f.mid);
-              return `<div class="net-frow" data-open="${esc(gid)}">${F.avHtml({ name: f.name, avatar: f.av }, "fun-av")}<div><b>${esc(f.name)}${on ? `<em class="net-on">在线</em>` : ""}</b><small>Meow 号 ${esc(f.mid)}</small></div><button type="button" class="fun-btn ghost sm" data-fmenu="${esc(f.mid)}">⋯</button></div>`;
+              return `<div class="net-frow" data-open="${esc(gid)}">${F.avHtml({ name: f.name, avatar: f.av }, "fun-av")}<div><b>${esc(f.name)}${isOn(f.mid) ? `<em class="net-on">在线</em>` : ""}</b><small>Meow 号 ${esc(f.mid)}</small></div><button type="button" class="fun-btn ghost sm" data-fmenu="${esc(f.mid)}">⋯</button></div>`;
             })
             .join("") || `<p class="fun-note">还没有好友。把你的 Meow 号发给朋友，或者输入 TA 的 Meow 号加 TA。</p>`
         }`;
     }
     root.innerHTML = `<div class="net-home">
-      <div class="net-me">${F.avHtml({ name: me().name, avatar: me().av }, "fun-av")}<div><b>${esc(me().name)} <button type="button" class="net-mini" data-a="nick">改名</button></b><small>Meow 号 <code>${esc(S.mid)}</code> <button type="button" class="net-mini" data-a="copyid">复制</button></small></div><span class="net-stbox"><span class="net-st ${Hub.status}" data-st>${stText()}</span><button type="button" class="net-mini" data-a="diag">检测</button></span></div>
+      <div class="net-me">${F.avHtml({ name: me().name, avatar: me().av }, "fun-av")}<div><b>${esc(me().name)} <button type="button" class="net-mini" data-a="nick">改名</button></b><small>Meow 号 <code>${esc(S.mid)}</code> <button type="button" class="net-mini" data-a="copyid">复制</button></small></div><span class="net-stbox"><span class="net-st ${stCls()}" data-st>${stText()}</span><button type="button" class="net-mini" data-a="diag">检测</button></span></div>
+      ${Net.status === "nosql" ? `<p class="net-warn">站长还没在 Supabase 里运行 <b>supabase-net.sql</b>，联机暂时用不了。（SQL Editor → 粘贴整段 → Run，一次就好）</p>` : ""}
       <div class="net-tabs"><button type="button" data-tab="msgs" class="${V.tab === "msgs" ? "is-on" : ""}">消息${unread ? `<u>${unread > 99 ? "99+" : unread}</u>` : ""}</button><button type="button" data-tab="friends" class="${V.tab === "friends" ? "is-on" : ""}">好友${S.reqIn.length ? `<u>${S.reqIn.length}</u>` : ""}</button></div>
       <div class="net-pane">${body}</div>
-      <p class="fun-note">通知类消息（好友申请、拉群）对方不在线时会先存在你手机上，等 TA 打开 Meow 自动送达。聊天记录只存在各自的手机里，不经过服务器保存；有人离线漏掉的消息，等大家同时在线时会自动补齐。角色说话用的是 TA 主人自己的 AI。</p>
+      <p class="fun-note">消息和好友申请会存到服务器上，对方不在线也能收到，打开 Meow 就会自动拉取。角色说话用的是 TA 主人自己的 AI，聊天本身不花 AI 额度。</p>
     </div>`;
   }
 
@@ -899,7 +842,7 @@
       <div class="net-head" id="net-head"></div>
       <div class="net-game" id="net-game" hidden></div>
       <div class="net-list" id="net-list"></div>
-      <form class="net-bar"><button type="button" class="net-ico" data-a="games" title="一起玩">🎲</button><input type="text" maxlength="500" placeholder="说点什么…（提到角色名字 TA 就会接话）" enterkeyhint="send" /><button type="submit" class="fun-btn solid sm">发送</button></form>
+      <form class="net-bar"><button type="button" class="net-ico" data-a="games" title="一起玩">🎲</button><input type="text" maxlength="500" placeholder="说点什么…" enterkeyhint="send" /><button type="submit" class="fun-btn solid sm">发送</button></form>
     </div>`;
     drawHead();
     drawGame();
@@ -909,7 +852,7 @@
       e.preventDefault();
       const t = String(inp.value || "").trim().slice(0, 500);
       if (!t) return;
-      const m = { id: rid(), at: Date.now(), text: t, from: { mid: S.mid, name: me().name, av: me().av } };
+      const m = { id: rid(), at: Date.now(), text: t, from: { mid: S.mid, name: me().name } };
       sendMsg(c, m);
       void maybeCharReply(c, m);
       inp.value = "";
@@ -919,20 +862,20 @@
     const h = root?.querySelector("#net-head");
     const c = S.convs[V.open];
     if (!h || !c) return;
-    const on = new Set(onlineMetas(c.gid).map((m) => m.mid));
-    on.add(S.mid);
-    const metaByMid = new Map(onlineMetas(c.gid).map((m) => [m.mid, m]));
-    const mids = Object.keys(c.members).sort((a, b) => Number(on.has(b)) - Number(on.has(a)));
-    h.innerHTML = `<div class="net-top"><button type="button" class="net-back" data-a="back">‹</button><div><strong>${esc(convTitle(c))}</strong><small class="net-st ${Hub.status}">${on.size} 人在线${amHost(c.gid) && on.size > 1 ? " · 你是主持人" : ""}</small></div>
+    const onl = onlineIn(c);
+    const mids = Object.keys(c.members).sort((a, b) => Number(isOn(b)) - Number(isOn(a)));
+    h.innerHTML = `<div class="net-top"><button type="button" class="net-back" data-a="back">‹</button><div><strong>${esc(convTitle(c))}</strong><small class="net-st ${stCls()}">${Net.status === "ok" ? (c.dm ? (isOn(c.dm) ? "对方在线" : "对方不在线 · 上线后会收到") : `${onl.length} 人在线`) : stText()}</small></div>
       ${c.dm ? "" : `<button type="button" class="fun-btn ghost sm" data-a="invite">邀请</button><button type="button" class="fun-btn ghost sm" data-a="gmenu">⋯</button>`}</div>
-      <div class="net-mems">${mids
-        .map((mid) => {
-          const m = c.members[mid] || {};
-          const live = metaByMid.get(mid);
-          const ch = mid === S.mid ? c.char : live?.char;
-          return `<span class="net-mem ${on.has(mid) ? "" : "is-off"}" data-mid="${esc(mid)}">${F.avHtml({ name: m.name, avatar: m.av }, "fun-av sm")}<b>${esc(mid === S.mid ? me().name : m.name || "")}${mid === hostMid(c.gid) && on.size > 1 ? " 👑" : ""}</b>${ch ? `<i>+ ${esc(ch.name)}</i>` : ""}</span>`;
-        })
-        .join("")}</div>
+      ${
+        c.dm
+          ? ""
+          : `<div class="net-mems">${mids
+              .map((mid) => {
+                const ch = mid === S.mid ? c.char : c.memberChars[mid];
+                return `<span class="net-mem ${isOn(mid) ? "" : "is-off"}" data-mid="${esc(mid)}">${F.avHtml({ name: nameOf(c, mid), avatar: avOf(c, mid) }, "fun-av sm")}<b>${esc(nameOf(c, mid))}</b>${ch ? `<i>+ ${esc(ch.name)}</i>` : ""}</span>`;
+              })
+              .join("")}</div>`
+      }
       <div class="net-charbar">${
         c.char
           ? `${F.avHtml({ name: c.char.name, avatar: c.char.av }, "fun-av sm")}<span>带着 <b>${esc(c.char.name)}</b>${F.hasApiKey() ? "" : "（没填 API Key，TA 只能玩游戏不能聊天）"}</span><label class="net-auto"><input type="checkbox" ${c.charAuto ? "checked" : ""} data-a="auto" />会主动接话</label><button type="button" data-a="char">换</button>`
@@ -951,7 +894,7 @@
     }
     box.hidden = false;
     const meP = g.players.find((p) => p.owner === S.mid && !p.isChar);
-    const host = amHost(c.gid);
+    const host = g.host === S.mid;
     let body = "";
     if (g.kind === "dice") {
       body = `<div class="net-dice">${g.players.map((p) => `<span class="${g.rolls[p.pid] ? "done" : ""}">${esc(p.name)}<b>${g.rolls[p.pid] ? g.rolls[p.pid].map((n) => "⚀⚁⚂⚃⚄⚅"[n - 1]).join("") : "…"}</b></span>`).join("")}</div>
@@ -968,7 +911,7 @@
         ${mineT && !g.choice ? `<div class="ww-row"><button type="button" class="fun-btn ghost sm" data-a="truth">真心话</button><button type="button" class="fun-btn solid sm" data-a="dare">大冒险</button></div>` : ""}
         ${g.phase === "answer" && host ? `<div class="ww-row"><button type="button" class="fun-btn ghost sm" data-a="tdagain">再转一次</button><button type="button" class="fun-btn ghost sm" data-a="tdend">结束游戏</button></div>` : ""}`;
     }
-    box.innerHTML = `<div class="net-gh"><strong>${GAMES[g.kind].icon} ${GAMES[g.kind].name}</strong>${host ? `<button type="button" data-a="gend">结束</button>` : ""}</div>${body}`;
+    box.innerHTML = `<div class="net-gh"><strong>${GAMES[g.kind].icon} ${GAMES[g.kind].name}</strong><button type="button" data-a="gend">结束</button></div>${body}`;
   }
   function drawMsgs() {
     const box = root?.querySelector("#net-list");
@@ -980,10 +923,13 @@
         .filter((m) => !(m.from && muted.has(m.from.mid)))
         .map((m) => {
           if (m.sys) return `<p class="net-sys">${esc(m.text).replace(/\n/g, "<br/>")}</p>`;
-          const mine = m.from?.mid === S.mid && !m.from?.isChar;
-          return `<div class="net-msg ${mine ? "me" : ""} ${m.from?.isChar ? "char" : ""}" data-mid="${esc(m.from?.mid || "")}">${F.avHtml({ name: m.from?.name, avatar: m.from?.av }, "fun-av sm")}<div><small>${esc(m.from?.name || "")}${m.from?.isChar ? `<em>${esc(m.from.owner || "")}的角色</em>` : ""}</small><p>${esc(m.text)}</p></div></div>`;
+          const mid = m.from?.mid || "";
+          const mine = mid === S.mid && !m.from?.isChar;
+          const ch = m.from?.isChar ? (mid === S.mid ? c.char : c.memberChars[mid]) : null;
+          const av = m.from?.isChar ? ch?.av || "" : avOf(c, mid);
+          return `<div class="net-msg ${mine ? "me" : ""} ${m.from?.isChar ? "char" : ""}" data-mid="${esc(mid)}">${F.avHtml({ name: m.from?.name, avatar: av }, "fun-av sm")}<div><small>${esc(m.from?.name || "")}${m.from?.isChar ? `<em>${esc(m.from.owner || "")}的角色</em>` : ""}</small><p>${esc(m.text)}</p>${m.pending ? `<i class="net-pend">发送中…</i>` : ""}</div></div>`;
         })
-        .join("") || `<p class="net-sys">还很安静，打个招呼吧～</p>`;
+        .join("") || `<p class="net-sys">还很安静，打个招呼吧～对方不在线也能收到</p>`;
     if (near || c.msgs.length < 3) box.scrollTop = box.scrollHeight;
   }
 
@@ -1004,11 +950,10 @@
     if (!/^[A-Z0-9]{8}$/.test(id)) return toast("Meow 号是 8 位字母或数字");
     if (id === S.mid) return toast("这是你自己的 Meow 号哦");
     if (S.friends[id]) return toast("已经是好友啦");
-    const inc = S.reqIn.find((r) => r.mid === id);
-    if (inc) return acceptReq(id);
+    if (S.reqIn.find((r) => r.mid === id)) return acceptReq(id);
     S.reqOut[id] = { mid: id, at: Date.now() };
-    enqueue(id, "freq", {});
-    toast("申请已发出，对方打开 Meow 就能收到");
+    queue({ type: "notify", to: id, kind: "freq", data: {} });
+    toast("申请已发出，对方打开 Meow 就能看到");
     drawHome();
   }
   function acceptReq(mid) {
@@ -1016,7 +961,7 @@
     if (!r) return;
     S.reqIn = S.reqIn.filter((x) => x.mid !== mid);
     upsertFriend(r);
-    enqueue(mid, "facc", {});
+    queue({ type: "notify", to: mid, kind: "facc", data: {} });
     save();
     toast(`和 ${r.name} 成为好友啦`);
     render();
@@ -1037,10 +982,10 @@
         render();
       } else if (x === "del") {
         if (!confirm(`删除好友 ${f.name}？和 TA 的私聊记录也会删掉。`)) return;
-        enqueue(mid, "fdel", {});
+        queue({ type: "notify", to: mid, kind: "fdel", data: {} });
         delete S.friends[mid];
         const gid = dmGid(S.mid, mid);
-        Hub.leave(groupName(gid));
+        queue({ type: "leave", gid });
         delete S.convs[gid];
         save();
         render();
@@ -1069,6 +1014,7 @@
       onDone(picked, nm);
     };
   }
+  const memberNames = (c) => Object.fromEntries(Object.keys(c.members).map((k) => [k, { name: nameOf(c, k) }]));
   function createGroup() {
     pickFriends(
       "发起群聊",
@@ -1079,8 +1025,8 @@
         const c = (S.convs[gid] = newConv(gid, nm || names.slice(0, 3).join("、").slice(0, 20) + (names.length > 3 ? "…" : ""), null));
         for (const m of picked) c.members[m] = { name: S.friends[m]?.name || "", av: S.friends[m]?.av || "" };
         joinConv(gid);
-        for (const m of picked) enqueue(m, "ginv", { gid, name: c.name, members: c.members });
-        pushLocal(c, { id: rid(), sys: true, at: Date.now(), text: `你创建了群聊「${c.name}」，邀请了 ${picked.map((m) => S.friends[m]?.name).join("、")}。对方上线后会自动进群。` });
+        sysMsg(c, `${me().name} 创建了群聊「${c.name}」，邀请了 ${picked.map((m) => S.friends[m]?.name).join("、")}`);
+        for (const m of picked) queue({ type: "notify", to: m, kind: "ginv", data: { gid, name: c.name, members: memberNames(c) } });
         V.open = gid;
         render();
       },
@@ -1090,8 +1036,8 @@
   function inviteToGroup(c) {
     pickFriends("邀请好友进群", new Set(Object.keys(c.members)), (picked) => {
       for (const m of picked) c.members[m] = { name: S.friends[m]?.name || "", av: S.friends[m]?.av || "" };
-      for (const m of picked) enqueue(m, "ginv", { gid: c.gid, name: c.name, members: c.members });
-      Hub.send(groupName(c.gid), "members", { members: c.members });
+      for (const m of picked) queue({ type: "notify", to: m, kind: "ginv", data: { gid: c.gid, name: c.name, members: memberNames(c) } });
+      post(c, { t: "members", members: memberNames(c) });
       sysMsg(c, `${me().name} 邀请了 ${picked.map((m) => S.friends[m]?.name).join("、")} 加入群聊`);
       save();
       drawHead();
@@ -1109,15 +1055,15 @@
         const v = String(sh.body.querySelector("#net-rn").value || "").trim().slice(0, 20);
         if (!v) return;
         c.name = v;
-        Hub.send(groupName(c.gid), "rename", { name: v });
+        post(c, { t: "rename", name: v });
         sysMsg(c, `${me().name} 把群名改成了「${v}」`);
         sh.close();
         drawHead();
       } else if (x === "quit") {
         if (!confirm(`退出群聊「${c.name}」？聊天记录也会删掉。`)) return;
         sysMsg(c, `${me().name} 退出了群聊`);
-        Hub.send(groupName(c.gid), "leave", { mid: S.mid });
-        setTimeout(() => Hub.leave(groupName(c.gid)), 500);
+        post(c, { t: "leave" });
+        queue({ type: "leave", gid: c.gid });
         delete S.convs[c.gid];
         save();
         sh.close();
@@ -1139,7 +1085,7 @@
       if (e.target.closest("[data-a2=nochar]")) {
         c.char = null;
         save();
-        Hub.track(groupName(c.gid), myMeta(c));
+        post(c, { t: "char", char: null });
         sh.close();
         drawHead();
         return;
@@ -1150,7 +1096,7 @@
       sh.close();
       c.char = { id: x.id, name: x.name, av: await thumb(x.avatar) };
       save();
-      Hub.track(groupName(c.gid), myMeta(c));
+      post(c, { t: "char", char: c.char });
       drawHead();
       sysMsg(c, `${me().name} 把 ${x.name} 带进来了`);
     });
@@ -1160,7 +1106,7 @@
     const sh = F.openSheet(
       `<div class="net-games">${Object.entries(GAMES)
         .map(([k, g]) => `<button type="button" data-g="${k}"><span>${g.icon}</span><strong>${g.name}</strong><small>${g.desc}</small></button>`)
-        .join("")}</div><p class="fun-note">${R.game ? "正在玩别的游戏，先结束才能开新的。" : amHost(c.gid) ? "你是主持人，点了就开始。" : "点了会请主持人开始。"}现在在线的人和大家带来的角色都会一起参加。</p>`,
+        .join("")}</div><p class="fun-note">${R.game ? "正在玩别的游戏，先结束才能开新的。" : "谁开局谁当主持人。"}现在在线的人和大家带来的角色都会一起参加。</p>`,
       { title: "一起玩" }
     );
     sh.body.addEventListener("click", (e) => {
@@ -1172,11 +1118,10 @@
   }
   function memberMenu(c, mid) {
     if (!mid || mid === S.mid) return;
-    const m = c.members[mid] || {};
     const isF = !!S.friends[mid];
     const sh = F.openSheet(
       `<p class="fun-note">Meow 号 ${esc(mid)}</p><div class="fun-sheet-actions" style="flex-direction:column">${isF ? `<button type="button" class="fun-btn solid" data-x="chat">私聊</button>` : `<button type="button" class="fun-btn solid" data-x="add">加为好友</button>`}<button type="button" class="fun-btn ghost" data-x="block">${muted.has(mid) ? "取消屏蔽" : "屏蔽 TA（看不到 TA 和 TA 的角色说话）"}</button></div>`,
-      { title: m.name || "TA" }
+      { title: nameOf(c, mid) }
     );
     sh.body.addEventListener("click", (e) => {
       const x = e.target.closest("[data-x]")?.dataset.x;
@@ -1195,7 +1140,7 @@
     });
   }
 
-  /** 连接检测：一步步看卡在哪 */
+  /** 连接检测 */
   async function diagnose() {
     const sh = F.openSheet(`<div class="net-diag" id="net-diag"><p>检测中…</p></div>`, { title: "联机连接检测" });
     const box = sh.body.querySelector("#net-diag");
@@ -1204,81 +1149,28 @@
       lines.push(`<p class="${ok === true ? "ok" : ok === false ? "bad" : ""}">${ok === true ? "✅" : ok === false ? "❌" : "…"} ${t}</p>`);
       box.innerHTML = lines.join("");
     };
-    const url = rtUrl();
-    if (!url) return put(false, "没有资源站（Supabase）配置，联机用不了");
+    if (!cfg()) return put(false, "没有资源站（Supabase）配置，联机用不了");
     put(true, "资源站配置已读到");
-    put(null, `当前状态：${stText() || Hub.status}${Hub.lastClose ? `（上次断开代码 ${Hub.lastClose.code}${Hub.lastClose.reason ? "：" + esc(Hub.lastClose.reason) : ""}）` : ""}`);
-    // 1) https 能不能到 Supabase
-    const base = String(window.MX_SHARE_CONFIG.url).replace(/\/+$/, "");
     const t0 = Date.now();
-    let httpsOk = false;
     try {
-      const ctl = new AbortController();
-      const tm = setTimeout(() => ctl.abort(), 8000);
-      await fetch(base + "/auth/v1/health", { headers: { apikey: window.MX_SHARE_CONFIG.anonKey }, signal: ctl.signal });
-      clearTimeout(tm);
-      httpsOk = true;
-      put(true, `能访问 Supabase 服务器（${Date.now() - t0}ms）`);
+      await rpc("mx_net_profiles", { p_mids: [] });
+      put(true, `服务器连得上，联机表已经建好（${Date.now() - t0}ms）`);
     } catch (e) {
-      put(false, "访问不到 Supabase 服务器：当前网络连不上 supabase.co（国内移动数据网络经常这样）");
+      if (e.kind === "nosql") put(false, "服务器连得上，但还没建联机的表：站长要在 Supabase 的 SQL Editor 里运行一次 supabase-net.sql");
+      else if (e.kind === "offline") put(false, "这台手机的网络连不上 Supabase（国内移动数据网络有时会这样），换 WiFi 或开关一下加速器再试");
+      else put(false, "服务器出错：" + esc(e.message));
+      return;
     }
-    // 2) WebSocket + 加入频道
-    const res = await new Promise((done) => {
-      let ws;
-      const tm = setTimeout(() => {
-        try {
-          ws.close();
-        } catch (_) {
-          /* ignore */
-        }
-        done({ step: "timeout" });
-      }, 10000);
-      try {
-        ws = new WebSocket(url);
-      } catch (e) {
-        clearTimeout(tm);
-        return done({ step: "ws", why: String(e?.message || e) });
-      }
-      ws.onopen = () => {
-        put(true, "实时连接（WebSocket）已打开");
-        ws.send(JSON.stringify({ topic: "realtime:meow-diag-" + S.mid, event: "phx_join", payload: { config: { broadcast: { self: true }, presence: { key: S.mid }, private: false } }, ref: "1", join_ref: "1" }));
-      };
-      ws.onmessage = (ev) => {
-        let m;
-        try {
-          m = JSON.parse(ev.data);
-        } catch (_) {
-          return;
-        }
-        if (m.event === "phx_reply" && m.ref === "1") {
-          clearTimeout(tm);
-          try {
-            ws.close();
-          } catch (_) {
-            /* ignore */
-          }
-          done(m.payload?.status === "ok" ? { step: "ok" } : { step: "join", why: JSON.stringify(m.payload?.response || {}) });
-        }
-      };
-      ws.onclose = (ev) => {
-        clearTimeout(tm);
-        done({ step: "closed", code: ev.code, why: ev.reason });
-      };
-    });
-    if (res.step === "ok") put(true, "频道加入成功，联机通道是好的");
-    else if (res.step === "join") put(false, `服务器拒绝加入频道：${esc(res.why)}。需要在 Supabase 后台 Realtime 设置里打开「允许公开频道」（关掉 Private only）。`);
-    else if (res.step === "timeout") put(false, "实时连接超时：网络能连但 WebSocket 一直连不上，换个网络（WiFi / 关掉或打开加速器）再试");
-    else put(false, `实时连接被断开（代码 ${res.code || "?"}${res.why ? "：" + esc(res.why) : ""}）${httpsOk ? "：网络能到服务器但 WebSocket 被拦了，换个网络试试" : ""}`);
-    if (res.step === "ok" && Hub.status !== "online") {
-      put(null, "检测通过，正在重新连接…");
-      try {
-        Hub.ws?.close();
-      } catch (_) {
-        /* ignore */
-      }
+    try {
+      await ensureReg();
+      put(true, `你的 Meow 号 ${esc(S.mid)} 已经登记好`);
+    } catch (e) {
+      put(false, "登记 Meow 号失败：" + esc(e.message));
+      return;
     }
-    lines.push(`<p class="fun-note">加好友要两边都显示「在线」。一边在线、一边一直「重新连接中」，就是那一边的网络连不上 Supabase。</p>`);
-    box.innerHTML = lines.join("");
+    if (S.outbox.length) put(null, `还有 ${S.outbox.length} 条在排队发送，正在补发…`);
+    await tick();
+    put(Net.status === "ok", Net.status === "ok" ? "收发正常" : "收发出错：" + esc(Net.lastErr));
   }
 
   function onClick(e) {
@@ -1298,7 +1190,7 @@
     const cancel = e.target.closest("[data-cancel]")?.dataset.cancel;
     if (cancel) {
       delete S.reqOut[cancel];
-      S.outbox = S.outbox.filter((x) => !(x.to === cancel && x.ev === "freq"));
+      S.outbox = S.outbox.filter((x) => !(x.to === cancel && x.kind === "freq"));
       save();
       return drawHome();
     }
@@ -1307,7 +1199,8 @@
     const open = e.target.closest("[data-open]")?.dataset.open;
     if (open && S.convs[open]) {
       V.open = open;
-      return render();
+      render();
+      return void tick(true);
     }
     const a = e.target.closest("[data-a]")?.dataset.a;
     const c = S.convs[V.open];
@@ -1318,18 +1211,15 @@
       );
       return;
     }
+    if (a === "diag") return void diagnose();
     if (a === "nick") {
       const v = prompt("在联机里显示的名字", me().name);
       if (v == null) return;
       S.nick = String(v).trim().slice(0, 16) || S.nick;
       save();
-      for (const cc of Object.values(S.convs)) {
-        cc.members[S.mid] = { name: me().name, av: me().av };
-        Hub.track(groupName(cc.gid), myMeta(cc));
-      }
+      void tick(true);
       return drawHome();
     }
-    if (a === "diag") return void diagnose();
     if (a === "addfriend") return addFriend(root.querySelector("#net-addid")?.value);
     if (a === "newgroup") return createGroup();
     if (a === "back") {
@@ -1346,7 +1236,7 @@
       return;
     }
     if (a === "games") return pickGame(c);
-    if (a === "gend") return endGame(c, "主持人结束了游戏");
+    if (a === "gend") return endGame(c, `${me().name} 结束了游戏`);
     if (a === "roll") return act(c, "roll");
     if (a === "guess") {
       const n = Number(root.querySelector("#net-gn")?.value);
@@ -1361,10 +1251,10 @@
     if (mu) memberMenu(c, mu.dataset.mid);
   }
 
-  /* 有好友 / 群 / 待送达的通知时，打开 Meow 就自动连上（这样别人发的消息和申请能及时收到） */
+  /* 用过联机（有好友 / 群 / 待发）就在打开 Meow 时自动开始拉取，好友申请和消息能及时收到 */
   function autoStart() {
-    if (Object.keys(S.friends).length || Object.keys(S.convs).length || S.outbox.length || Object.keys(S.reqOut).length) {
-      void refreshMe().then(startInbox);
+    if (Object.keys(S.friends).length || Object.keys(S.convs).length || S.outbox.length || Object.keys(S.reqOut).length || S.regOk) {
+      void refreshMe().then(start);
     }
   }
   setTimeout(autoStart, 2500);
@@ -1381,13 +1271,14 @@
         if (e.key === "Enter" && e.target.id === "net-addid") addFriend(e.target.value);
       });
       await refreshMe();
-      startInbox();
-      if (!rtUrl()) toast("还没配置资源站（Supabase），联机用不了");
       render();
+      start();
+      void tick(true);
     },
     unmount() {
       root = null;
+      schedule();
     }
   });
-  window.XXJ_NET = { state: S, hub: Hub, uid: () => S.mid, addFriend, enqueue };
+  window.XXJ_NET = { state: S, net: Net, uid: () => S.mid, addFriend, tick };
 })();

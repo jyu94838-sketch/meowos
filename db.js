@@ -1780,7 +1780,7 @@
     "fun-weibo.js?v=4",
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
-    "fun-widgets.js?v=6", "fun-icons.js?v=5", "mx-chatsearch.js?v=3", "fun-mimi.js?v=8", "mx-choose.js?v=3", "fun-yuzu.js?v=3", "fun-names.js?v=1", "fun-net.js?v=4", "fun-arcade.js?v=3", "fun-dress.js?v=4", "mx-import.js?v=2",
+    "fun-widgets.js?v=6", "fun-icons.js?v=5", "mx-chatsearch.js?v=3", "fun-mimi.js?v=8", "mx-choose.js?v=3", "fun-yuzu.js?v=3", "fun-names.js?v=1", "fun-net.js?v=5", "fun-arcade.js?v=3", "fun-dress.js?v=5", "mx-import.js?v=2",
     "changelog.js?v=36",
     "share-config.js?v=3", "st-gate.js?v=1",
     "fun-share.js?v=8"
