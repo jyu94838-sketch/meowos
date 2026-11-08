@@ -1120,6 +1120,112 @@
   }
 
   const isMine = (r) => !!myTokens()[r.id] || (!!r.owner_user && r.owner_user === acc()?.id);
+  /* ───── 帖子评论区（用资源站账号评论） ───── */
+  const NEED_CMT_SQL = "站长需要先在 Supabase 里运行一次 share-comments.sql，才能开评论区";
+  const cmtAgo = (s) => {
+    const t = (Date.now() - Date.parse(s)) / 1000;
+    if (t < 60) return "刚刚";
+    if (t < 3600) return Math.floor(t / 60) + " 分钟前";
+    if (t < 86400) return Math.floor(t / 3600) + " 小时前";
+    if (t < 86400 * 30) return Math.floor(t / 86400) + " 天前";
+    return new Date(s).toLocaleDateString();
+  };
+  async function drawComments(sh, r, scrollToEnd) {
+    const box = sh.body.querySelector("#sh-cmts");
+    if (!box) return;
+    let rows;
+    try {
+      rows = await api(`/rest/v1/mx_share_comments?select=id,created_at,user_id,body,reply_to&share_id=eq.${encodeURIComponent(r.id)}&order=created_at.asc&limit=300`);
+    } catch (err) {
+      box.innerHTML = `<p class="fun-note">${/mx_share_comments|does not exist|404|PGRST/i.test(err.message) ? "评论区还没开通。" + NEED_CMT_SQL : "评论加载失败：" + esc(err.message)}</p>`;
+      return;
+    }
+    if (!box.isConnected) return;
+    await loadProfiles(rows.map((x) => x.user_id));
+    const me = acc();
+    const nickOf = (uid0) => profCache.get(uid0)?.nick || "某位用户";
+    const byId = new Map(rows.map((x) => [x.id, x]));
+    const canDel = (c) => me && (c.user_id === me.id || r.owner_user === me.id);
+    box.innerHTML = `<p class="fun-kicker" style="margin:0 0 8px">评论 ${rows.length}</p>
+      <div class="sh-cmt-list" style="display:flex;flex-direction:column;gap:12px">${
+        rows
+          .map((c) => {
+            const pf = profCache.get(c.user_id);
+            const rp = c.reply_to ? byId.get(c.reply_to) : null;
+            const isAuthor = r.owner_user && c.user_id === r.owner_user;
+            return `<div class="sh-cmt" data-cid="${c.id}" style="display:flex;gap:10px;align-items:flex-start">${avHtmlS(pf?.avatar_path || "", nickOf(c.user_id), 32)}<div style="flex:1;min-width:0">
+              <div style="display:flex;gap:6px;align-items:baseline;flex-wrap:wrap"><b style="font-size:13px">${esc(nickOf(c.user_id))}</b>${isAuthor ? `<span style="font-size:10px;padding:0 6px;border-radius:99px;background:#ffe3a6;color:#7a5a12">作者</span>` : ""}<small style="color:var(--text-sub);font-size:11px">${cmtAgo(c.created_at)}</small></div>
+              <p style="margin:3px 0 4px;font-size:13.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word">${rp ? `<span style="color:var(--text-sub)">回复 @${esc(nickOf(rp.user_id))}：</span>` : ""}${esc(c.body)}</p>
+              <div style="display:flex;gap:14px;font-size:12px;color:var(--text-sub)"><button type="button" class="sh-link" data-cr="${c.id}" style="font-size:12px">回复</button>${canDel(c) ? `<button type="button" class="sh-link" data-cd="${c.id}" style="font-size:12px">删除</button>` : `<button type="button" class="sh-link" data-crep="${c.id}" style="font-size:12px">举报</button>`}</div>
+            </div></div>`;
+          })
+          .join("") || `<p class="fun-note" style="margin:0">还没有评论，来说说用起来怎么样吧～</p>`
+      }</div>
+      ${
+        me
+          ? `<form class="sh-cmt-bar" style="display:flex;gap:8px;align-items:center;margin-top:12px;position:sticky;bottom:0;padding:8px 0;background:var(--bg-card, #fff)">${avHtmlS(me.avatar_path, me.nick, 30)}<div style="flex:1;min-width:0"><small class="sh-cmt-to" style="display:none;color:var(--text-sub);font-size:11px"></small><input type="text" maxlength="500" placeholder="以「${esc(me.nick)}」评论…" enterkeyhint="send" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:99px;border:1px solid var(--line);background:var(--bg-card);color:var(--text-main);font:inherit;font-size:13.5px"/></div><button type="submit" class="fun-btn solid sm">发送</button></form>`
+          : `<div style="margin-top:12px;text-align:center"><button type="button" class="fun-btn ghost sm" data-cacc="1">建个资源站账号就能评论</button></div>`
+      }`;
+    if (scrollToEnd) box.querySelector(".sh-cmt-list")?.lastElementChild?.scrollIntoView({ block: "center" });
+    let replyTo = null;
+    const form = box.querySelector(".sh-cmt-bar");
+    const inp = form?.querySelector("input");
+    const toLbl = form?.querySelector(".sh-cmt-to");
+    box.onclick = async (e) => {
+      if (e.target.closest("[data-cacc]")) return accountSheet("new", () => drawComments(sh, r));
+      const cr = e.target.closest("[data-cr]");
+      if (cr) {
+        if (!me) return accountSheet("new", () => drawComments(sh, r));
+        const c = byId.get(Number(cr.dataset.cr));
+        replyTo = c ? c.id : null;
+        if (toLbl && c) {
+          toLbl.style.display = "block";
+          toLbl.innerHTML = `回复 @${esc(nickOf(c.user_id))} <button type="button" class="sh-link" data-cx="1" style="font-size:11px">取消</button>`;
+        }
+        inp?.focus();
+        return;
+      }
+      if (e.target.closest("[data-cx]")) {
+        replyTo = null;
+        if (toLbl) toLbl.style.display = "none";
+        return;
+      }
+      const cd = e.target.closest("[data-cd]");
+      if (cd) {
+        if (!(await confirmSheet("删除这条评论？"))) return;
+        try {
+          const ok = await rpc("mx_share_comment_del", { p_cid: Number(cd.dataset.cd), p_id: me.id, p_secret: me.secret });
+          if (!ok) throw new Error("删除失败");
+          toast("已删除");
+          void drawComments(sh, r);
+        } catch (err) {
+          toast(err.message);
+        }
+        return;
+      }
+      const crep = e.target.closest("[data-crep]");
+      if (crep) {
+        if (!(await confirmSheet("举报这条评论？被多人举报后会自动隐藏。"))) return;
+        rpc("mx_share_comment_report", { p_cid: Number(crep.dataset.crep) }).then(() => toast("已举报，谢谢你"), (er) => toast(er.message));
+      }
+    };
+    form?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const t = String(inp.value || "").trim();
+      if (!t) return;
+      inp.disabled = true;
+      try {
+        const id = await rpc("mx_share_comment_add", { p_share: r.id, p_id: me.id, p_secret: me.secret, p_body: t, p_reply: replyTo });
+        if (id === -2) throw new Error("评论太快啦，歇一会儿再发");
+        if (!(Number(id) > 0)) throw new Error("评论失败");
+        void drawComments(sh, r, true);
+      } catch (err) {
+        toast(missingFn(err) ? NEED_CMT_SQL : /logged/i.test(err.message) ? "账号验证没通过，去「我的」里重新登录一下" : err.message);
+        inp.disabled = false;
+      }
+    });
+  }
+
   function openDetail(r, grid) {
     const mine = isMine(r);
     const ownedByAcc = !!r.owner_user && r.owner_user === acc()?.id;
@@ -1138,10 +1244,12 @@
         </div>
         ${unlocked() ? "" : `<p class="fun-note sh-like-tip">先点个赞支持一下作者，才能下载和导入哦</p>`}
         <div class="sh-detail-foot">${mine ? `<button type="button" class="sh-link" data-a="edit">编辑</button>　<button type="button" class="sh-link" data-a="del">删除我的上传</button>` : `<button type="button" class="sh-link" data-a="report">举报</button>`}</div>
+        <div class="sh-cmts" id="sh-cmts" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px"><p class="fun-note">评论加载中…</p></div>
       </div>`,
       { title: r.title }
     );
     sh.el.classList.add("fun-sheet--tall");
+    void drawComments(sh, r);
     // 作者头像
     if (r.owner_user) {
       void loadProfiles([r.owner_user]).then(() => {

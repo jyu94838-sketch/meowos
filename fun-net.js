@@ -1315,16 +1315,150 @@
     </div>`;
   }
 
+  /* ───── 联机聊天页美化：跟随聊天页美化 / 自己写 CSS ───── */
+  const NET_STYLE_KEY = "meowos_net_style"; // default | chat | custom
+  const NET_CSS_KEY = "meowos_net_css";
+  const lsg = (k, d) => {
+    try {
+      return localStorage.getItem(k) ?? d;
+    } catch (_) {
+      return d;
+    }
+  };
+  const netStyleMode = () => {
+    const v = lsg(NET_STYLE_KEY, "chat");
+    return v === "default" || v === "custom" ? v : "chat";
+  };
+  /** 把写给聊天页（#chat-screen）的 CSS 换成联机聊天页对应的元素 */
+  function mapChatCssToNet(css) {
+    const NO = ".mx-nomatch";
+    return String(css || "")
+      .replace(/#chat-list-screen(?:#chat-list-screen)*/g, "#mx-nomatch")
+      .replace(/#chat-offline-screen(?:#chat-offline-screen)*/g, "#mx-nomatch")
+      .replace(/#chat-screen/g, "#mx-net-room")
+      .replace(/\.chat-msg--user\b/g, ".mx-net-me")
+      .replace(/\.chat-msg--assistant\b/g, ".mx-net-them")
+      .replace(/\.chat-msg-bubble-stack\b/g, ".mx-net-stack")
+      .replace(/\.chat-msg-bubble(?:--[\w-]+|-[\w-]+)/g, NO)
+      .replace(/\.chat-msg-bubble\b/g, ".mx-net-bubble")
+      .replace(/\.chat-msg-avatar\b/g, ".mx-net-av")
+      .replace(/\.chat-msg-group-speaker\b/g, ".mx-net-name")
+      .replace(/\.chat-msg--[\w-]+/g, NO)
+      .replace(/\.chat-msg-[\w-]+/g, NO)
+      .replace(/\.chat-msg\b/g, ".mx-net-msg")
+      .replace(/\.mx-av-rep\b/g, NO)
+      .replace(/\.chat-(?:messages|scroll)\b/g, ".mx-net-list")
+      .replace(/\.(?:chat-main|chat-body-stack|settings-inner)\b/g, ".mx-net-bg")
+      .replace(/\.chat-screen-topbar\b/g, ".mx-net-top")
+      .replace(/\.mx-chat-title\b/g, ".mx-net-title")
+      .replace(/#chat-meta-label\b/g, ".mx-net-title")
+      .replace(/#chat-close\b/g, ".mx-net-back")
+      .replace(/\.chat-time-divider-label\b/g, ".mx-net-sys")
+      .replace(/\.chat-composer\b/g, ".mx-net-bar")
+      .replace(/\.chat-(?:input-ruled|input)\b/g, ".mx-net-input")
+      .replace(/\.chat-send-fab\b/g, ".mx-net-send")
+      .replace(/\.chat-more-btn\b/g, ".mx-net-more")
+      .replace(/\.chat-[\w-]+/g, NO)
+      .replace(/#chat-[\w-]+/g, "#mx-nomatch");
+  }
+  function netChatSourceCss() {
+    let skin = "";
+    try {
+      skin = document.getElementById("mx-skin-css")?.textContent || "";
+    } catch (_) {
+      skin = "";
+    }
+    let chat = "";
+    try {
+      if (typeof readGlobalChatSurfaceBundleFromKv === "function") chat = String(readGlobalChatSurfaceBundleFromKv().classicCss || "");
+    } catch (_) {
+      chat = "";
+    }
+    return skin + "\n" + chat;
+  }
+  function applyNetStyle() {
+    const mode = netStyleMode();
+    let el = document.getElementById("mx-net-style");
+    const css = mode === "chat" ? netChatSourceCss() : mode === "custom" ? lsg(NET_CSS_KEY, "") : "";
+    if (!css.trim()) {
+      el?.remove();
+      return;
+    }
+    if (!el) {
+      el = document.createElement("style");
+      el.id = "mx-net-style";
+    }
+    el.textContent = mapChatCssToNet(css);
+    document.head.appendChild(el);
+  }
+  function netStyleSheet() {
+    const mode = netStyleMode();
+    const sh = F.openSheet(
+      `<div class="net-style" style="display:flex;flex-direction:column;gap:10px">
+        <div class="net-style-opts" style="display:flex;flex-direction:column;gap:8px">
+          ${[
+            ["chat", "跟随聊天美化", "和你跟角色聊天的页面一样（风格包 + 装扮里的聊天界面 CSS）"],
+            ["custom", "自己写美化", "单独给联机聊天写一份 CSS"],
+            ["default", "不美化", "用联机原本的样子"]
+          ]
+            .map(
+              ([v, t, d]) =>
+                `<label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:var(--bg-card)"><input type="radio" name="nst" value="${v}" ${mode === v ? "checked" : ""} style="margin-top:3px"/><span><b>${t}</b><small style="display:block;color:var(--text-sub);font-size:12px">${d}</small></span></label>`
+            )
+            .join("")}
+        </div>
+        <div class="net-style-custom">
+          <textarea id="nst-css" rows="8" spellcheck="false" placeholder="可以直接粘贴给聊天页写的美化 CSS（#chat-screen …），会自动套到联机聊天上。&#10;也可以直接写：#mx-net-room（整页）.mx-net-bubble（气泡）.mx-net-me / .mx-net-them（我 / 对方）.mx-net-av（头像）.mx-net-bar（输入栏）" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:12px;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--bg-card);color:var(--text-main)">${esc(lsg(NET_CSS_KEY, ""))}</textarea>
+          <div style="display:flex;gap:8px;margin-top:6px"><button type="button" class="fun-btn ghost sm" data-x="copy">把聊天页的美化复制过来改</button></div>
+        </div>
+        <div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-x="ok">保存</button></div>
+      </div>`,
+      { title: "联机聊天美化" }
+    );
+    const sync = () => {
+      const v = sh.body.querySelector("[name=nst]:checked")?.value;
+      sh.body.querySelector(".net-style-custom").style.display = v === "custom" ? "" : "none";
+    };
+    sync();
+    sh.body.addEventListener("change", sync);
+    sh.body.addEventListener("click", (e) => {
+      const x = e.target.closest("[data-x]")?.dataset.x;
+      if (x === "copy") {
+        let chat = "";
+        try {
+          chat = String(readGlobalChatSurfaceBundleFromKv().classicCss || "");
+        } catch (_) {
+          chat = "";
+        }
+        if (!chat.trim()) return toast("聊天页还没写过美化 CSS");
+        sh.body.querySelector("#nst-css").value = chat;
+        return;
+      }
+      if (x !== "ok") return;
+      const v = sh.body.querySelector("[name=nst]:checked")?.value || "chat";
+      try {
+        localStorage.setItem(NET_STYLE_KEY, v);
+        localStorage.setItem(NET_CSS_KEY, sh.body.querySelector("#nst-css").value);
+      } catch (_) {
+        return toast("保存失败：存储空间不够");
+      }
+      applyNetStyle();
+      sh.close();
+      toast(v === "chat" ? "联机聊天跟随聊天美化啦" : v === "custom" ? "已套用你的美化" : "已换回原样");
+    });
+  }
+
   function drawConv() {
     const c = S.convs[V.open];
     c.unread = 0;
     save();
-    root.innerHTML = `<div class="net-room">
+    root.innerHTML = `<div class="net-room mx-net-bg" id="mx-net-room">
       <div class="net-head" id="net-head"></div>
       <div class="net-game" id="net-game" hidden></div>
-      <div class="net-list" id="net-list"></div>
-      <form class="net-bar"><button type="button" class="net-ico" data-a="games" title="一起玩">🎲</button><input type="text" maxlength="500" placeholder="说点什么…" enterkeyhint="send" /><button type="submit" class="fun-btn solid sm">发送</button></form>
+      <div class="net-list mx-net-list" id="net-list"></div>
+      <form class="net-bar mx-net-bar"><button type="button" class="net-ico mx-net-more" data-a="games" title="一起玩">🎲</button><input type="text" class="mx-net-input" maxlength="500" placeholder="说点什么…" enterkeyhint="send" /><button type="submit" class="fun-btn solid sm mx-net-send">发送</button></form>
     </div>`;
+    applyNetStyle();
     drawHead();
     drawGame();
     drawMsgs();
@@ -1345,8 +1479,8 @@
     if (!h || !c) return;
     const onl = onlineIn(c);
     const mids = Object.keys(c.members).sort((a, b) => Number(isOn(b)) - Number(isOn(a)));
-    h.innerHTML = `<div class="net-top"><button type="button" class="net-back" data-a="back">‹</button><div><strong>${esc(convTitle(c))}</strong><small class="net-st ${stCls()}">${Net.status === "ok" ? (c.dm ? (isOn(c.dm) ? "对方在线" : "对方不在线 · 上线后会收到") : `${onl.length} 人在线`) : stText()}</small></div>
-      ${c.dm ? "" : `<button type="button" class="fun-btn ghost sm" data-a="invite">邀请</button><button type="button" class="fun-btn ghost sm" data-a="gmenu">⋯</button>`}</div>
+    h.innerHTML = `<div class="net-top mx-net-top"><button type="button" class="net-back mx-net-back" data-a="back">‹</button><div><strong class="mx-net-title">${esc(convTitle(c))}</strong><small class="net-st ${stCls()}">${Net.status === "ok" ? (c.dm ? (isOn(c.dm) ? "对方在线" : "对方不在线 · 上线后会收到") : `${onl.length} 人在线`) : stText()}</small></div>
+      <button type="button" class="fun-btn ghost sm mx-net-style-btn" data-a="netstyle" title="聊天美化">🎨</button>${c.dm ? "" : `<button type="button" class="fun-btn ghost sm" data-a="invite">邀请</button><button type="button" class="fun-btn ghost sm" data-a="gmenu">⋯</button>`}</div>
       ${
         c.dm
           ? ""
@@ -1533,12 +1667,12 @@
       c.msgs
         .filter((m) => !(m.from && muted.has(m.from.mid)))
         .map((m) => {
-          if (m.sys) return `<p class="net-sys">${esc(m.text).replace(/\n/g, "<br/>")}</p>`;
+          if (m.sys) return `<p class="net-sys mx-net-sys">${esc(m.text).replace(/\n/g, "<br/>")}</p>`;
           const mid = m.from?.mid || "";
           const mine = mid === S.mid && !m.from?.isChar;
           const ch = m.from?.isChar ? (mid === S.mid ? c.char : c.memberChars[mid]) : null;
           const av = m.from?.isChar ? ch?.av || "" : avOf(c, mid);
-          return `<div class="net-msg ${mine ? "me" : ""} ${m.from?.isChar ? "char" : ""}" data-mid="${esc(mid)}">${F.avHtml({ name: m.from?.name, avatar: av }, "fun-av sm")}<div><small>${esc(m.from?.name || "")}${m.from?.isChar ? `<em>${esc(m.from.owner || "")}的角色</em>` : ""}</small>${m.dress && window.XXJ_DRESS ? `<div class="net-dress">${window.XXJ_DRESS.doll(m.dress)}</div>` : ""}<p>${esc(m.text)}</p>${m.pending ? `<i class="net-pend">发送中…</i>` : ""}</div></div>`;
+          return `<div class="net-msg mx-net-msg ${mine ? "me mx-net-me" : "mx-net-them"} ${m.from?.isChar ? "char" : ""}" data-mid="${esc(mid)}">${F.avHtml({ name: m.from?.name, avatar: av }, "fun-av sm mx-net-av")}<div class="mx-net-stack"><small class="mx-net-name">${esc(m.from?.name || "")}${m.from?.isChar ? `<em>${esc(m.from.owner || "")}的角色</em>` : ""}</small>${m.dress && window.XXJ_DRESS ? `<div class="net-dress">${window.XXJ_DRESS.doll(m.dress)}</div>` : ""}<p class="mx-net-bubble">${esc(m.text)}</p>${m.pending ? `<i class="net-pend">发送中…</i>` : ""}</div></div>`;
         })
         .join("") || `<p class="net-sys">还很安静，打个招呼吧～对方不在线也能收到</p>`;
     if (near || c.msgs.length < 3) box.scrollTop = box.scrollHeight;
@@ -1855,6 +1989,7 @@
       return render();
     }
     if (!c) return;
+    if (a === "netstyle") return netStyleSheet();
     if (a === "invite") return inviteToGroup(c);
     if (a === "gmenu") return groupMenu(c);
     if (a === "char") return void pickChar(c);
