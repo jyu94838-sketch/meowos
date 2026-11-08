@@ -28438,15 +28438,14 @@ function buildMomentsPostCaption(body, mm) {
   const displayName = getMomentDisplayLabel(mm);
   const text = getMomentPostDisplayText(mm);
   if (!text) return false;
+  // 文案前面不再带名字（头像旁边已经有名字了）
+  void displayName;
   const cap = document.createElement("p");
   cap.className = "moments-post-caption";
-  const user = document.createElement("span");
-  user.className = "moments-post-caption-user";
-  user.textContent = displayName + " ";
   const txt = document.createElement("span");
   txt.className = "moments-post-caption-text";
   txt.textContent = text;
-  cap.append(user, txt);
+  cap.append(txt);
   body.appendChild(cap);
   return true;
 }

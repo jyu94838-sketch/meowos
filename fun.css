@@ -8643,3 +8643,5 @@ html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-a
 .fm-share-char span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fm-share-char:disabled { opacity: .5; }
 .moments-video img { width: 100% !important; max-width: none !important; height: 100% !important; object-fit: cover; }
+/* 朋友圈文案前不显示名字 */
+.moments-post-caption-user { display: none !important; }
