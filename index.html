@@ -96,6 +96,15 @@
         location.hostname === "localhost" ||
         location.hostname === "127.0.0.1";
       if (ok) navigator.serviceWorker.register("./sw.js", { scope: "./", updateViaCache: "none" }).catch(function () {});
+      // 新版本装好后：还停在开屏就自动刷新一次，免得手机继续显示旧版开屏
+      if (ok && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.addEventListener("controllerchange", function () {
+          var sp = document.getElementById("boot-splash");
+          if (window.__mxSwReloaded || !sp || !sp.isConnected) return;
+          window.__mxSwReloaded = true;
+          location.reload();
+        });
+      }
     })();
   </script>
   <link rel="icon" href="icons/icon-192.png?v=8" type="image/png" sizes="192x192">

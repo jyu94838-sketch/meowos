@@ -180,15 +180,29 @@
     void tick(true);
   }
   async function flushOut() {
+    const later = [];
     while (S.outbox.length) {
       const it = S.outbox[0];
+      // 对方还没打开过新版联机：先放一边，过一会儿再试（最多等 7 天）
+      if (it.retryAt && it.retryAt > Date.now()) {
+        later.push(S.outbox.shift());
+        continue;
+      }
       try {
         if (it.type === "notify") {
           const r = await rpc("mx_net_notify", { ...auth(), p_to: it.to, p_kind: it.kind, p_data: it.data || {} });
           if (r === "nouser") {
+            it.firstTry ||= Date.now();
+            if (Date.now() - it.firstTry < 7 * 24 * 3600 * 1000) {
+              it.retryAt = Date.now() + 45 * 1000;
+              it.waiting = true;
+              later.push(S.outbox.shift());
+              save();
+              continue;
+            }
             if (it.kind === "freq") {
               delete S.reqOut[it.to];
-              toast(`没有找到 Meow 号 ${it.to}：对方要先打开一次新版「联机」`);
+              toast(`Meow 号 ${it.to} 一直没有上线，好友申请已取消`);
             }
           } else if (r === "auth") {
             S.regOk = false;
@@ -205,6 +219,19 @@
             c.joined = true;
             c.needJoin = false;
             for (const row of r.msgs || []) handleRow(row, false);
+            // 旧版（点对点）时自己发的消息没存到服务器：第一次进会话时补传，对方之前没收到的也能收到
+            if (!c.legacyUp) {
+              c.legacyUp = true;
+              const onServer = new Set((r.msgs || []).map((x) => x.body?.m?.id).filter(Boolean));
+              for (const m of c.msgs) {
+                if (m.local || onServer.has(m.id) || m.pending) continue;
+                if (m.from?.mid !== S.mid && !(m.sys && !m.from)) continue;
+                if (m.sys && !/创建了群聊|邀请了|带进|改成了/.test(m.text || "")) continue;
+                const { pending, ...clean } = m;
+                if (clean.from) clean.from = { mid: clean.from.mid, name: clean.from.name, isChar: clean.from.isChar, owner: clean.from.owner };
+                S.outbox.push({ id: rid(), type: "post", gid: c.gid, body: { t: "msg", m: clean, old: true } });
+              }
+            }
           }
         } else if (it.type === "leave") {
           await rpc("mx_net_leave", { ...auth(), p_gid: it.gid });
@@ -232,12 +259,15 @@
         S.outbox.shift();
         save();
       } catch (e) {
+        S.outbox.push(...later);
+        later.length = 0;
         if (e.kind === "auth") {
           await ensureReg().catch(() => {});
         }
         throw e;
       }
     }
+    S.outbox.push(...later);
   }
 
   /* ───── 拉取循环 ───── */
@@ -270,7 +300,7 @@
       }
       for (const row of r?.msgs || []) {
         S.cur.msg = Math.max(S.cur.msg || 0, row.id);
-        const fresh = now - (Date.parse(row.created_at) || 0) < 90 * 1000;
+        const fresh = !row.body?.old && now - (Date.parse(row.created_at) || 0) < 90 * 1000;
         handleRow(row, fresh);
       }
       Net.online = new Set(r?.online || []);
@@ -383,7 +413,7 @@
   /* ───── 会话 ───── */
   const dmGid = (a, b) => "d" + [a, b].sort().join("_").toLowerCase();
   function newConv(gid, name, dm) {
-    return { gid, name, dm, members: { [S.mid]: { name: me().name, av: "" } }, memberChars: {}, msgs: [], unread: 0, lastAt: Date.now(), char: null, charAuto: true, joined: false, needJoin: true };
+    return { gid, name, dm, members: { [S.mid]: { name: me().name, av: "" } }, memberChars: {}, msgs: [], unread: 0, lastAt: Date.now(), char: null, charAuto: true, joined: false, needJoin: true, legacyUp: true };
   }
   function ensureDm(mid) {
     const gid = dmGid(S.mid, mid);
@@ -450,7 +480,7 @@
       needProfiles.add(from);
     }
     if (b.t === "msg" && b.m && b.m.id) {
-      const m = { ...b.m, at: Date.parse(row.created_at) || b.m.at || Date.now() };
+      const m = { ...b.m, at: (b.old && b.m.at) || Date.parse(row.created_at) || b.m.at || Date.now() };
       if (m.from) m.from = { ...m.from, mid: from };
       if (m.from && !m.from.isChar && m.from.name && c.members[from]) c.members[from].name = m.from.name;
       const old = c.msgs.find((x) => x.id === m.id);
@@ -811,7 +841,7 @@
         ${
           outs.length
             ? `<h4 class="net-h4">等待对方通过</h4>${outs
-                .map((r) => `<div class="net-frow"><span class="fun-av net-gav">⏳</span><div><b>${esc(r.mid)}</b><small>${S.outbox.some((x) => x.to === r.mid) ? "网络恢复后会自动发出" : "已送达，等 TA 同意"}</small></div><button type="button" class="fun-btn ghost sm" data-cancel="${esc(r.mid)}">撤回</button></div>`)
+                .map((r) => `<div class="net-frow"><span class="fun-av net-gav">⏳</span><div><b>${esc(r.mid)}</b><small>${S.outbox.some((x) => x.to === r.mid && x.waiting) ? "对方还没打开新版联机，打开后会自动收到" : S.outbox.some((x) => x.to === r.mid) ? "正在发送…" : "已送达，等 TA 同意"}</small></div><button type="button" class="fun-btn ghost sm" data-cancel="${esc(r.mid)}">撤回</button></div>`)
                 .join("")}`
             : ""
         }
