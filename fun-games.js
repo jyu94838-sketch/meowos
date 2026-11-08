@@ -274,8 +274,8 @@
         min: 1,
         max: 1,
         def: 1,
-        note: "选一位角色。<b>我画 TA 猜</b>：需要你的模型能看图（如 GPT-4o、Claude、Gemini 等）；<b>TA 出题我来猜</b>：任何模型都行。",
-        extra: `<label class="fun-field"><span>玩法</span><select id="dg-mode"><option value="draw">我画 TA 猜</option><option value="guess">TA 出题我来猜</option></select></label>`
+        note: "选一位角色。<b>我画 TA 猜</b>：需要你的模型能看图（如 GPT-4o、Claude、Gemini 等）；<b>TA 画我来猜</b>：TA 会一笔一笔画出来让你猜，画不好时还有文字提示。",
+        extra: `<label class="fun-field"><span>玩法</span><select id="dg-mode"><option value="draw">我画 TA 猜</option><option value="guess">TA 画我来猜</option></select></label>`
       });
       if (!root) return;
       const mode = root.querySelector("#dg-mode").value;
@@ -408,50 +408,160 @@
       root.querySelector("[data-send]").onclick = guessOnce;
     }
 
+    /* ───── TA 画我来猜：角色用简笔画（SVG）一笔一笔画出来 ───── */
+    const SVG_TAGS = new Set(["svg", "g", "path", "circle", "ellipse", "line", "polyline", "polygon", "rect"]);
+    const SVG_ATTRS = new Set(["d", "cx", "cy", "r", "rx", "ry", "x", "y", "x1", "y1", "x2", "y2", "width", "height", "points", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "transform", "opacity", "fill-opacity", "stroke-opacity", "viewBox"]);
+    /** 只留画图用的元素和属性（不许写字、不许脚本、不许外链） */
+    function cleanSvg(raw) {
+      const m = String(raw || "").match(/<svg[\s\S]*<\/svg>/i);
+      if (!m) return null;
+      let doc;
+      try {
+        doc = new DOMParser().parseFromString(m[0], "image/svg+xml");
+      } catch (_) {
+        return null;
+      }
+      const src = doc.documentElement;
+      if (!src || src.nodeName.toLowerCase() !== "svg" || doc.querySelector("parsererror")) return null;
+      const NS = "http://www.w3.org/2000/svg";
+      let shapes = 0;
+      const copy = (node) => {
+        const tag = node.nodeName.toLowerCase();
+        if (!SVG_TAGS.has(tag)) return null;
+        const el = document.createElementNS(NS, tag);
+        for (const a of [...node.attributes]) {
+          const n = a.name.toLowerCase() === "viewbox" ? "viewBox" : a.name.toLowerCase();
+          const v = String(a.value);
+          if (!SVG_ATTRS.has(n) || /url\(|javascript:|expression/i.test(v)) continue;
+          el.setAttribute(n, v.slice(0, 4000));
+        }
+        if (tag !== "svg" && tag !== "g") shapes++;
+        for (const ch of [...node.children]) {
+          const c = copy(ch);
+          if (c) el.appendChild(c);
+        }
+        return el;
+      };
+      const out = copy(src);
+      if (!out || shapes < 2) return null;
+      if (!out.getAttribute("viewBox")) out.setAttribute("viewBox", "0 0 200 200");
+      out.removeAttribute("width");
+      out.removeAttribute("height");
+      out.setAttribute("class", "dg-ai-svg");
+      out.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      return out;
+    }
+    /** 一笔一笔画出来：先描线，再慢慢上色 */
+    function animateSvg(svg, onDone) {
+      const parts = [...svg.querySelectorAll("path,circle,ellipse,line,polyline,polygon,rect")];
+      const per = Math.max(260, Math.min(700, 5200 / Math.max(1, parts.length)));
+      let t = 0;
+      for (const el of parts) {
+        const fill = el.getAttribute("fill");
+        const stroke = el.getAttribute("stroke");
+        const hasFill = fill && fill !== "none" && fill !== "transparent";
+        if (!stroke || stroke === "none") el.setAttribute("stroke", hasFill ? fill : "#222");
+        if (!el.getAttribute("stroke-width")) el.setAttribute("stroke-width", "3");
+        el.setAttribute("stroke-linecap", el.getAttribute("stroke-linecap") || "round");
+        el.setAttribute("stroke-linejoin", el.getAttribute("stroke-linejoin") || "round");
+        let len = 400;
+        try {
+          len = Math.ceil(el.getTotalLength()) + 2 || 400;
+        } catch (_) {
+          len = 400;
+        }
+        el.style.strokeDasharray = `${len}`;
+        // 用 Web Animations（不受页面全局「关掉过渡动画」的样式影响）
+        if (typeof el.animate === "function") {
+          el.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], { duration: per, delay: t, easing: "ease-in-out", fill: "both" });
+          el.animate([{ fillOpacity: 0 }, { fillOpacity: 1 }], { duration: 400, delay: t + per * 0.7, easing: "ease", fill: "backwards" });
+        }
+        t += per * 0.85;
+      }
+      setTimeout(() => onDone?.(), t + 500);
+    }
+
     async function guessRound() {
       score.rounds++;
-      root.innerHTML = `<div class="dg">${header()}<div class="dg-bubble" id="dg-bubble"><span class="is-typing"><i></i><i></i><i></i></span> ${esc(buddy.name)} 正在想题目…</div><div class="ww-act" id="dg-act"></div></div>`;
+      root.innerHTML = `<div class="dg">${header()}
+        <div class="dg-ai-board" id="dg-board" style="position:relative;width:100%;max-width:420px;aspect-ratio:1;margin:8px auto;border-radius:18px;border:1px solid var(--line);background:#fff;overflow:hidden;display:grid;place-items:center"><p class="fun-note" style="margin:0"><span class="is-typing"><i></i><i></i><i></i></span> ${esc(buddy.name)} 正在想画什么…</p></div>
+        <div class="dg-bubble" id="dg-bubble"></div><div class="ww-act" id="dg-act"></div></div>`;
       bindEnd();
       let o;
       try {
         const txt = await F.aiText(
           [
-            { role: "system", content: `你是「${buddy.name}」。${persona(buddy)}\n你在和对方玩猜词游戏：你心里想一个常见的具体名词，然后给出 4 条由难到易的提示（不能出现这个词本身），提示要带你的性格和说话方式。只输出 JSON：{"word":"词","hints":["提示1","提示2","提示3","提示4"]}` },
-            { role: "user", content: `出题吧，别出${pick(WORDS)}这种太简单的。随机种子：${rnd(99999)}` }
+            {
+              role: "system",
+              content: `你是「${buddy.name}」。${persona(buddy)}
+你在和对方玩你画我猜：你心里想一个常见、好画的具体东西，然后亲手画一幅简笔画让对方猜。
+画画要求：
+- 用 SVG 画，<svg viewBox="0 0 200 200">，白底，画面居中、占满大部分画布；
+- 只能用 path / circle / ellipse / line / polyline / polygon / rect / g，8～30 个图形；
+- 像随手画的简笔画：黑色或深色线条 stroke-width 3～5，可以少量填色，抓住这个东西最有辨识度的特征；
+- 绝对不能写字、字母、数字，也不能用 <text>。
+再给 3 条由难到易的文字提示（不能出现这个词本身），带你的性格；再说一句画完时的话（20 字以内，带你的语气）。
+只输出 JSON：{"word":"词","say":"你说的话","hints":["提示1","提示2","提示3"],"svg":"<svg ...>...</svg>"}`
+            },
+            { role: "user", content: `画吧，别画${pick(WORDS)}，换一个。随机种子：${rnd(99999)}` }
           ],
-          { maxTokens: 600, temperature: 1 }
+          { maxTokens: 3000, temperature: 0.9 }
         );
         o = F.parseJsonLoose(txt);
-        if (!o || !o.word || !Array.isArray(o.hints)) throw new Error("题目格式不对");
+        if ((!o || !o.svg) && /<svg/i.test(txt)) o = Object.assign(o || {}, { svg: txt });
+        if (!o || !o.word) throw new Error("题目格式不对");
+        if (!Array.isArray(o.hints)) o.hints = [];
       } catch (err) {
-        root.querySelector("#dg-bubble").innerHTML = `<p class="fun-note warn">出题失败：${esc(err.message)}</p>`;
+        root.querySelector("#dg-board").innerHTML = `<p class="fun-note warn" style="padding:12px">出题失败：${esc(err.message)}</p>`;
         root.querySelector("#dg-act").innerHTML = `<button type="button" class="fun-btn solid wide">重试</button>`;
         root.querySelector("#dg-act button").onclick = () => (score.rounds--, guessRound());
         return;
       }
+      if (!root) return;
       const word = String(o.word).trim();
-      let shown = 1;
+      const board = root.querySelector("#dg-board");
+      const svg = cleanSvg(o.svg);
+      let shown = 0;
+      const bubbleEl = root.querySelector("#dg-bubble");
       const draw = (msg) => {
-        root.querySelector("#dg-bubble").innerHTML = o.hints
-          .slice(0, shown)
-          .map((h, i) => `<p><b>提示 ${i + 1}：</b>${esc(h)}</p>`)
-          .join("") + (msg ? `<p class="dg-guess">${msg}</p>` : "");
+        bubbleEl.innerHTML =
+          (o.say ? `<p><b>${esc(buddy.name)}：</b>${esc(o.say)}</p>` : "") +
+          o.hints
+            .slice(0, shown)
+            .map((h, i) => `<p><b>提示 ${i + 1}：</b>${esc(h)}</p>`)
+            .join("") +
+          (msg ? `<p class="dg-guess">${msg}</p>` : "");
       };
+      if (svg) {
+        board.innerHTML = "";
+        svg.style.cssText = "width:100%;height:100%;display:block";
+        board.appendChild(svg);
+        animateSvg(svg);
+      } else {
+        // 模型没画出能用的画：退回文字提示玩法
+        shown = 1;
+        board.innerHTML = `<p class="fun-note" style="padding:12px;text-align:center">${esc(buddy.name)} 这次画不出来，改成文字提示啦～<br/>（换个聪明点的模型，TA 会画得更好）</p>`;
+        board.style.aspectRatio = "auto";
+      }
       draw();
       const actEl = root.querySelector("#dg-act");
-      actEl.innerHTML = `<div class="ww-input"><textarea rows="1" placeholder="你猜是…"></textarea><div class="ww-row"><button type="button" class="fun-btn ghost" data-more>再给个提示</button><button type="button" class="fun-btn solid" data-try>猜</button></div></div>`;
+      actEl.innerHTML = `<div class="ww-input"><textarea rows="1" placeholder="你猜是…"></textarea><div class="ww-row"><button type="button" class="fun-btn ghost" data-more>${o.hints.length ? "给个提示" : "不猜了，看答案"}</button><button type="button" class="fun-btn solid" data-try>猜</button></div></div>`;
       const ta = actEl.querySelector("textarea");
+      const moreBtn = actEl.querySelector("[data-more]");
       const finish = (hit) => {
         if (hit) score.hit = (score.hit || 0) + 1;
         shown = o.hints.length;
         draw(hit ? `🎉 猜对了！就是「${esc(word)}」` : `答案是「${esc(word)}」`);
         actEl.innerHTML = `<button type="button" class="fun-btn solid wide">下一题</button>`;
         actEl.querySelector("button").onclick = guessRound;
+        root.querySelector(".dg-score").textContent = `回合 ${score.rounds} · 猜中 ${score.hit || 0}`;
       };
-      actEl.querySelector("[data-more]").onclick = () => {
+      moreBtn.onclick = () => {
         if (shown < o.hints.length) {
           shown++;
           draw();
+          if (shown >= o.hints.length) moreBtn.textContent = "不猜了，看答案";
+          else moreBtn.textContent = "再给个提示";
         } else finish(false);
       };
       actEl.querySelector("[data-try]").onclick = () => {
