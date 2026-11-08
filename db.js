@@ -1781,7 +1781,7 @@
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
     "fun-widgets.js?v=6", "fun-icons.js?v=5", "mx-chatsearch.js?v=3", "fun-mimi.js?v=9", "mx-choose.js?v=3", "fun-yuzu.js?v=4", "fun-names.js?v=1", "fun-net.js?v=6", "fun-arcade.js?v=3", "fun-dress.js?v=5", "mx-import.js?v=2", "fun-weather.js?v=1",
-    "changelog.js?v=36",
+    "changelog.js?v=37",
     "share-config.js?v=3", "st-gate.js?v=1",
     "fun-share.js?v=8"
   ];
