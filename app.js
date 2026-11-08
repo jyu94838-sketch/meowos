@@ -71754,6 +71754,45 @@ document.getElementById("ward-chat-css-import-file")?.addEventListener("change",
   if (!f) return;
   const lower = f.name.toLowerCase();
   const isJson = lower.endsWith(".json") || f.type === "application/json";
+  if (lower.endsWith(".png") || f.type === "image/png") {
+    void (async () => {
+      const card = window.XXJ_MXCARD;
+      if (!card?.extractPayload) {
+        showToast("资源卡模块还没加载，稍后再试");
+        return;
+      }
+      let payload = null;
+      try {
+        payload = await card.extractPayload(f);
+      } catch {
+        payload = null;
+      }
+      const D0 = window.XXJ_DB;
+      const b = payload?.kind === "look" && D0 ? payload.data?.kv?.[D0.K.GLOBAL_CHAT_SURFACE_CSS] : null;
+      if (!b || typeof b !== "object") {
+        showToast("这张图里没有聊天样式（可能不是 Meow 美化卡，或被压缩过）");
+        return;
+      }
+      if (!window.confirm("将把卡片里的聊天样式填入上方样式框，填入后请检查并点「保存并应用」。是否继续？")) return;
+      const r = applyWardrobeChatCssSnippetFromParsed({
+        format: WARDROBE_CHAT_CSS_SNIPPET_FORMAT,
+        version: 2,
+        activeKind: b.activeKind,
+        classicCss: String(b.classicCss || ""),
+        glassCss: String(b.glassCss || "")
+      });
+      if (r.ok && payload.data.skinChat) {
+        try {
+          localStorage.setItem("meowos_skin_chat", String(payload.data.skinChat));
+          window.XXJ_SKINS?.apply?.();
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      showToast(r.ok ? `已填入样式框${payload.data.skinChat ? "，风格包也切好了" : ""}；记得点「保存并应用」` : r.err);
+    })();
+    return;
+  }
   const isDocx =
     lower.endsWith(".docx") ||
     f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";

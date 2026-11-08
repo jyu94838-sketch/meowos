@@ -707,7 +707,20 @@
       if (typeof importWardrobeLookFromParsed !== "function") throw new Error("装扮模块未加载");
       const ok = await importWardrobeLookFromParsed(data);
       if (!ok) throw new Error("装扮导入失败");
-      return "美化已应用";
+      if (data.skinChat) {
+        try {
+          localStorage.setItem("meowos_skin_chat", String(data.skinChat));
+          window.XXJ_SKINS?.apply?.();
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      try {
+        if (data.chatCssOnly && typeof wardrobeChatCssBundleDraft !== "undefined") wardrobeChatCssBundleDraft = null;
+      } catch (_) {
+        /* ignore */
+      }
+      return data.chatCssOnly ? `聊天样式已应用${data.skinChat ? "（风格包也切过去了）" : ""}` : "美化已应用";
     }
     if (payload.kind === "worldbook") {
       importVolumes(data.volumes);
@@ -1086,7 +1099,7 @@
           btn.textContent = "导入中…";
           const payload = await extractPayload(await fetchBlob());
           if (!payload) throw new Error("这不是 Meow 资源卡");
-          if (payload.kind === "look" && !(await confirmSheet("导入美化会覆盖你现在的装扮（壁纸、图标、字体、聊天样式等），继续吗？"))) {
+          if (payload.kind === "look" && !(await confirmSheet(payload.data?.chatCssOnly ? "导入会覆盖你现在的聊天界面样式，继续吗？" : "导入美化会覆盖你现在的装扮（壁纸、图标、字体、聊天样式等），继续吗？"))) {
             btn.disabled = false;
             btn.textContent = "导入";
             return;
@@ -1420,7 +1433,7 @@
           ${payload.desc ? `<p class="fun-note">${esc(payload.desc)}</p>` : ""}
           <button type="button" class="fun-btn solid" id="sh-do-import">导入到本机</button></div></div>`;
         info.querySelector("#sh-do-import").onclick = async (e) => {
-          if (payload.kind === "look" && !(await confirmSheet("导入美化会覆盖你现在的装扮，继续吗？"))) return;
+          if (payload.kind === "look" && !(await confirmSheet(payload.data?.chatCssOnly ? "导入会覆盖你现在的聊天界面样式，继续吗？" : "导入美化会覆盖你现在的装扮，继续吗？"))) return;
           e.target.disabled = true;
           try {
             toast(await applyImport(payload));
@@ -1492,7 +1505,7 @@
       if (payload.kind !== want) {
         if (!(await confirmSheet(`这是一张「${m.name || "资源"}」卡，不是${KIND_WANT_NAME[want]}。还要导入吗？`))) return;
       }
-      if (payload.kind === "look" && !(await confirmSheet(`导入「${payload.title || "美化"}」会覆盖你现在的装扮（壁纸、图标、字体、聊天样式等），继续吗？`))) return;
+      if (payload.kind === "look" && !(await confirmSheet(payload.data?.chatCssOnly ? `导入「${payload.title || "聊天样式"}」会覆盖你现在的聊天界面样式，继续吗？` : `导入「${payload.title || "美化"}」会覆盖你现在的装扮（壁纸、图标、字体、聊天样式等），继续吗？`))) return;
       toast(await applyImport(payload));
       try {
         if (payload.kind === "worldbook" || payload.kind === "char") {
@@ -1608,5 +1621,114 @@
     void importPngFor(b.dataset.mxpng);
   });
 
-  window.XXJ_MXCARD = { embedPayload, extractPayload, drawCard, applyImport, makeCard, importPngFor };
+
+  /* ───── 装扮 → 聊天界面样式 CSS：导出为 PNG 资源卡（只含聊天样式，可以上传资源站） ───── */
+  async function exportChatCssPng() {
+    const d = D();
+    if (!d) return toast("数据库还没准备好");
+    let bundle = null;
+    try {
+      bundle = typeof readWardrobeChatCssBundleDraft === "function" ? { ...readWardrobeChatCssBundleDraft() } : null;
+    } catch (_) {
+      bundle = null;
+    }
+    if (!bundle) bundle = { ...(d.getKv(d.K.GLOBAL_CHAT_SURFACE_CSS) || {}) };
+    // 编辑框里还没保存的内容也一起带上（只在框里有字时）
+    try {
+      const ta = document.getElementById("ward-chat-css-input");
+      const val = ta ? String(ta.value || "") : "";
+      if (val.trim() && typeof getWardrobeChatCssEditKind === "function") {
+        if (getWardrobeChatCssEditKind() === "glass") bundle.glassCss = val;
+        else bundle.classicCss = val;
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    const classic = String(bundle?.classicCss || "");
+    const glass = String(bundle?.glassCss || "");
+    if (!classic.trim() && !glass.trim()) return toast("样式框是空的，先写好聊天样式再导出");
+    let skin = "default";
+    try {
+      skin = localStorage.getItem("meowos_skin_chat") || "default";
+    } catch (_) {
+      /* ignore */
+    }
+    const user = await F.loadUser();
+    const SKIN_NAME = { default: "默认", wechat: "微信", qq: "QQ" };
+    const sh = F.openSheet(
+      `<div class="sh-exp">
+        <p class="fun-note">只打包「聊天界面样式」这一块（经典 ${classic.trim() ? "✓" : "—"} / 玻璃 ${glass.trim() ? "✓" : "—"}），不会带上你的壁纸、图标、字体。生成的 PNG 可以直接在「资源站 → 上传」里分享到「美化」分类。</p>
+        ${skin !== "default" ? `<label class="fun-switch"><input type="checkbox" class="sh-exp-skin" checked /><span>附带风格包「${esc(SKIN_NAME[skin] || skin)}」（别人导入时自动切过去）</span></label>` : ""}
+        <label class="fun-field"><span>卡片标题</span><input class="sh-exp-title" maxlength="40" value="${esc(user.name + "的聊天样式")}" /></label>
+        <label class="fun-field"><span>作者署名</span><input class="sh-exp-author" maxlength="20" value="${esc(localStorage.getItem("mx_share_author") || user.name)}" /></label>
+        <label class="fun-field"><span>一句话介绍（可不填）</span><input class="sh-exp-desc" maxlength="60" placeholder="比如：Y2K 像素窗口，记得先选微信风格包" /></label>
+        <button type="button" class="fun-btn solid sh-exp-go">生成并保存 PNG</button>
+      </div>`,
+      { title: "聊天样式 · 导出为 PNG" }
+    );
+    sh.body.querySelector(".sh-exp-go").onclick = async (ev) => {
+      const btn = ev.currentTarget;
+      const meta = {
+        title: sh.body.querySelector(".sh-exp-title").value.trim() || "聊天样式",
+        author: sh.body.querySelector(".sh-exp-author").value.trim() || "匿名",
+        desc: sh.body.querySelector(".sh-exp-desc").value.trim()
+      };
+      try {
+        localStorage.setItem("mx_share_author", meta.author);
+      } catch (_) {
+        /* ignore */
+      }
+      btn.disabled = true;
+      btn.textContent = "生成中…";
+      try {
+        const withSkin = skin !== "default" && !!sh.body.querySelector(".sh-exp-skin")?.checked;
+        const data = {
+          format: "xxj-wardrobe-look",
+          version: 1,
+          kv: { [d.K.GLOBAL_CHAT_SURFACE_CSS]: { v: 2, activeKind: bundle?.activeKind || (classic.trim() ? "classic" : "glass"), classicCss: classic, glassCss: glass } },
+          chatCssOnly: true,
+          ...(withSkin ? { skinChat: skin } : {})
+        };
+        const payload = { kind: "look", v: 1, title: meta.title, author: meta.author, desc: meta.desc, createdAt: Date.now(), data };
+        const sub = `聊天样式 · ${[classic.trim() && "经典", glass.trim() && "玻璃"].filter(Boolean).join(" + ")}${withSkin ? " · " + (SKIN_NAME[skin] || skin) + "风格包" : ""}`;
+        const png = await drawCard({ kind: "look", title: meta.title, author: meta.author, desc: meta.desc, cover: "", sub });
+        const blob = await embedPayload(png, payload);
+        downloadBlob(blob, `${safeName(meta.title)}.mxj.png`);
+        sh.close();
+        toast("已生成，可以去资源站上传了（别发到会压缩图片的地方）");
+      } catch (err) {
+        toast("导出失败：" + err.message);
+        btn.disabled = false;
+        btn.textContent = "生成并保存 PNG";
+      }
+    };
+  }
+  /** 在「导出」按钮旁边插一个「导出 PNG」（JS 插入，兼容旧缓存的页面） */
+  function injectChatCssPngBtn() {
+    const exp = document.getElementById("ward-chat-css-export");
+    if (!exp) return false;
+    if (document.getElementById("ward-chat-css-export-png")) return true;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.id = "ward-chat-css-export-png";
+    b.className = exp.className;
+    b.innerHTML = `<i class="ph ph-image" aria-hidden="true"></i> 导出 PNG`;
+    b.title = "导出为 Meow 资源卡，可以上传资源站";
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      void exportChatCssPng();
+    });
+    exp.insertAdjacentElement("afterend", b);
+    const inp = document.getElementById("ward-chat-css-import-file");
+    if (inp && !/image\/png/.test(inp.accept)) inp.accept += ",.png,image/png";
+    return true;
+  }
+  if (!injectChatCssPngBtn()) {
+    let n2 = 0;
+    const t2 = setInterval(() => {
+      if (injectChatCssPngBtn() || ++n2 > 60) clearInterval(t2);
+    }, 500);
+  }
+
+  window.XXJ_MXCARD = { embedPayload, extractPayload, drawCard, applyImport, makeCard, importPngFor, exportChatCssPng };
 })();
