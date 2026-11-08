@@ -8335,3 +8335,29 @@ body.dark .gh-net { background: linear-gradient(135deg, #24304a, #33284a); color
 .mx-about-body .settings-row { display: flex; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--line, #eee); font-size: 0.86rem; }
 .mx-about-body .settings-row-r { color: var(--text-sub, #888); }
 .mx-about-body .settings-row { border-bottom: 0 !important; }
+
+/* ───── 贪吃蛇 ───── */
+.sn-root { padding: 6px 2px 16px; }
+.sn-menu { display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
+.sn-modes { display: flex; flex-direction: column; gap: 8px; }
+.sn-modes button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; border-radius: 16px; border: 1.5px solid var(--line); background: var(--bg-card); color: var(--text-main); font: inherit; text-align: left; cursor: pointer; position: relative; }
+.sn-modes button.is-on { border-color: #f2a65a; background: #fff7ec; }
+body.dark .sn-modes button.is-on { background: #3a2e24; }
+.sn-modes b { font-size: 0.98rem; }
+.sn-modes small { font-size: 0.76rem; color: var(--text-sub); }
+.sn-modes em { position: absolute; right: 12px; top: 12px; font-style: normal; font-size: 0.7rem; color: #c4664a; }
+.sn-picked { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sn-picked .fun-chip i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+.sn-net { margin: 0; }
+.sn-game { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.sn-top { display: flex; align-items: center; gap: 8px; width: 100%; }
+.sn-hud { flex: 1; min-width: 0; font-size: 0.78rem; text-align: center; line-height: 1.5; }
+.sn-cv { width: calc(100% - 8px); max-width: 520px; aspect-ratio: 1; border-radius: 18px; box-shadow: 0 6px 20px rgba(185,133,82,.18); touch-action: none; }
+.sn-pad { display: grid; grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(2, 52px); gap: 6px; }
+.sn-pad button { border: 0; border-radius: 16px; background: #fff3e2; color: #b0703e; font-size: 1.2rem; cursor: pointer; box-shadow: 0 2px 6px rgba(185,133,82,.18); }
+body.dark .sn-pad button { background: #3a2e24; color: #f0c08a; }
+.sn-pad [data-d=up] { grid-column: 2; grid-row: 1; }
+.sn-pad [data-d=left] { grid-column: 1; grid-row: 2; }
+.sn-pad [data-d=down] { grid-column: 2; grid-row: 2; }
+.sn-pad [data-d=right] { grid-column: 3; grid-row: 2; }
+.sn-rank p { margin: 4px 0; font-size: 0.9rem; }

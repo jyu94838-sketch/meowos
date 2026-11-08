@@ -629,6 +629,8 @@
     td: { name: "真心话大冒险", icon: "🍾", desc: "转盘随机选一个人，选真心话或大冒险" },
     mlm: { name: "喵了个喵 · 比分", icon: "🐱", desc: "每人玩一局，比谁玩得好，垫底的受罚" },
     piano: { name: "猫爪琴键 · 比分", icon: "🐾", desc: "每人弹一局，比谁弹得多，垫底的受罚" },
+    snake: { name: "贪吃蛇 · 比分", icon: "🐍", desc: "每人玩一局贪吃蛇，比谁吃得多，垫底的受罚" },
+    snaket: { name: "贪吃蛇 · 组队", icon: "🐍", desc: "大家（和角色）的分数加起来，达到目标就一起过关，没达到全员受罚" },
     dice: { name: "掷骰子比大小", icon: "🎲", desc: "每人掷两颗骰子，点数最小的人接惩罚" },
     bomb: { name: "数字炸弹", icon: "🧨", desc: "1~100 里藏着一个炸弹数字，轮流猜，猜中的人被炸" }
   };
@@ -674,7 +676,8 @@
   };
   const mCount = (g, i) => mNeighbors(i).filter((j) => g.mines.includes(j)).length;
   const pun = () => (Math.random() < 0.5 ? "真心话 · " + pick(TRUTH) : "大冒险 · " + pick(DARE));
-  const CHAL = { mlm: "喵了个喵", piano: "猫爪琴键" };
+  const CHAL = { mlm: "喵了个喵", piano: "猫爪琴键", snake: "贪吃蛇", snaket: "贪吃蛇" };
+  const isChal = (k) => k === "mlm" || k === "piano" || k === "snake" || k === "snaket";
   function allPlayers(c) {
     const out = [];
     for (const mid of onlineIn(c)) {
@@ -756,9 +759,10 @@
       g.turn = 0;
       g.players = shuffle(g.players);
     }
-    if (kind === "mlm" || kind === "piano") {
+    if (isChal(kind)) {
       g.scores = {};
       g.labels = {};
+      if (kind === "snaket") g.goal = 25 * g.players.length;
     }
     R.game = g;
     sysMsg(c, `${GAMES[kind].icon} ${me().name} 开了一局「${GAMES[kind].name}」！参加的有：${players.map((p) => p.name).join("、")}`);
@@ -952,7 +956,7 @@
       }
       g.turn++;
       broadcastGame(c);
-    } else if (g.kind === "mlm" || g.kind === "piano") {
+    } else if (isChal(g.kind)) {
       if (a.type !== "score" || g.scores[pl.pid] != null) return;
       g.scores[pl.pid] = Number(a.value?.n) || 0;
       g.labels[pl.pid] = String(a.value?.label || g.scores[pl.pid]).slice(0, 30);
@@ -983,6 +987,11 @@
     const done = g.players.filter((p) => g.scores[p.pid] != null);
     if (!done.length) return endGame(c, "挑战取消了");
     const rank = done.sort((x, y) => g.scores[y.pid] - g.scores[x.pid]);
+    if (g.kind === "snaket") {
+      const total = done.reduce((n, p) => n + g.scores[p.pid], 0);
+      const ok = total >= g.goal;
+      return endGame(c, `🐍 贪吃蛇组队：${rank.map((p) => `${p.name} ${g.scores[p.pid]}`).join(" + ")} = ${total} 分（目标 ${g.goal}）\n${ok ? "过关啦，大家都好棒 🎉" : `差一点点！全员惩罚：${pun()}`}`, { gameEnd: true, involves: ok ? [] : rank.map((p) => p.name) });
+    }
     const last = rank[rank.length - 1];
     endGame(c, `🏆 「${CHAL[g.kind]}」挑战结果：${rank.map((p, i) => `${i + 1}. ${p.name}（${g.labels[p.pid]}）`).join("　")}${rank.length > 1 ? `\n垫底的 ${last.name}，惩罚：${pun()}` : ""}`, { gameEnd: true, involves: [last.name] });
   }
@@ -1154,7 +1163,7 @@
         setTimeout(() => act(c, "dig", pick(safeish.length ? safeish : closed), cur.pid), 1500 + Math.random() * 1500);
       }
     }
-    if (g.kind === "mlm" || g.kind === "piano") {
+    if (isChal(g.kind)) {
       for (const me2 of g.players.filter((p) => p.isChar && p.owner === S.mid)) {
         if (g.scores[me2.pid] != null || answered.has(k2("s" + me2.pid))) continue;
         answered.add(k2("s" + me2.pid));
@@ -1163,6 +1172,9 @@
         if (g.kind === "piano") {
           n = 15 + Math.floor(Math.random() * 120);
           label = `${n} 块`;
+        } else if (g.kind === "snake" || g.kind === "snaket") {
+          n = 8 + Math.floor(Math.random() * 45);
+          label = `${n} 分`;
         } else if (Math.random() < 0.35) {
           const sec = 60 + Math.floor(Math.random() * 120);
           n = 1000 - sec;
@@ -1400,9 +1412,9 @@
             return `<button type="button" class="nm-c${o ? " is-o" : ""}${myTurn && !o ? " can" : ""}" data-dig="${i}">${o ? (g.mines.includes(i) ? "💥" : n || "") : ""}</button>`;
           })
           .join("")}</div>`;
-    } else if (g.kind === "mlm" || g.kind === "piano") {
+    } else if (isChal(g.kind)) {
       const mineDone = meP && g.scores[meP.pid] != null;
-      body = `<small>每个人在自己手机上玩一局「${CHAL[g.kind]}」，成绩自动交上来，最后一名受罚</small>
+      body = `<small>${g.kind === "snaket" ? `每个人在自己手机上玩一局贪吃蛇，大家的分数加起来要到 ${g.goal} 分才算过关（现在 ${Object.values(g.scores).reduce((n, v) => n + v, 0)} 分）` : `每个人在自己手机上玩一局「${CHAL[g.kind]}」，成绩自动交上来，最后一名受罚`}</small>
         <div class="net-spy-seats">${g.players.map((p) => `<span class="${g.scores[p.pid] != null ? "is-cur" : ""}">${esc(p.name)}：${g.scores[p.pid] != null ? esc(g.labels[p.pid]) : "还在玩…"}</span>`).join("")}</div>
         ${meP && !mineDone ? `<button type="button" class="fun-btn solid" data-a="chalgo">🎮 去玩「${CHAL[g.kind]}」</button>` : ""}
         ${g.host === S.mid ? `<button type="button" class="fun-btn ghost sm" data-a="chalend">不等了，现在公布成绩</button>` : ""}`;
