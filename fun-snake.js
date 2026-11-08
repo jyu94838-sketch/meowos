@@ -1,21 +1,28 @@
 "use strict";
 
 /**
- * 贪吃蛇
- * - 单人：经典玩法
- * - 组队：你和选中的角色在同一块地图上一起吃，分数加在一起；队友之间可以穿过去，撞墙或咬到自己才算挂
- * - 对战：每条蛇各吃各的，撞到别人也会挂，最后比谁吃得多（角色由电脑控制，也会犯小错）
- * - 和联机好友一起玩：在「联机」里开「贪吃蛇 · 比分 / 组队」，每人在自己手机上玩一局，成绩自动交回群里
+ * 小馋猫（原贪吃蛇）
+ * - 几只小猫在一块地板上抢吃的，限时 60 秒，看谁抢得多
+ * - 单人：自己抢，刷新纪录
+ * - 组队：和角色一起抢，分数加在一起
+ * - 对战：和角色比谁抢得多（角色由电脑控制，会偶尔走神）
+ * - 撞到别的猫会被挤开、愣一下；抢到 🐟 加 1，🍤 加 2，偶尔出现的金色 🍗 加 5（一会儿就消失）
+ * - 和联机好友一起玩：在「联机」里开「小馋猫 · 比分 / 组队」，每人在自己手机上玩一局，成绩自动交回群里
  */
 (function () {
   const F = window.XXJ_FUN;
   if (!F) return;
   const { esc, toast } = F;
-  const N = 20; // 格子数
+  const N = 13; // 格子数
+  const ROUND = 60; // 秒
   const BEST_KEY = "meowos_snake_best";
   const COLORS = ["#f2a65a", "#8fc5f2", "#c9a7f2", "#7fd1a8", "#f4a7b9"];
   const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-  const OPP = { up: "down", down: "up", left: "right", right: "left" };
+  const FOODS = [
+    { e: "🐟", v: 1, w: 70 },
+    { e: "🍤", v: 2, w: 25 },
+    { e: "🍗", v: 5, w: 0, gold: true }
+  ];
 
   let root = null;
   let G = null;
@@ -36,201 +43,251 @@
     }
   };
   const MODES = {
-    solo: { name: "单人", desc: "经典贪吃蛇，越吃越长越快" },
-    team: { name: "组队", desc: "和角色一起吃，分数加在一起；队友之间可以穿过" },
-    versus: { name: "对战", desc: "和角色比谁吃得多，撞到别人也会挂" }
+    solo: { name: "单人", desc: `${ROUND} 秒里能抢到多少吃的` },
+    team: { name: "组队", desc: "和角色一起抢，分数加在一起" },
+    versus: { name: "对战", desc: "和角色比谁抢得多，撞到会被挤开" }
   };
 
   /* ───── 游戏逻辑 ───── */
   const key = (x, y) => y * N + x;
-  function newSnake(id, name, color, x, y, dir, ai) {
-    const [dx, dy] = DIRS[dir];
-    return { id, name, color, body: [{ x, y }, { x: x - dx, y: y - dy }, { x: x - 2 * dx, y: y - 2 * dy }], dir, next: dir, alive: true, score: 0, ai, grow: 0 };
+  const inside = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
+  function newCat(id, name, color, x, y, dir, ai) {
+    return { id, name, color, x, y, px: x, py: y, dir, next: dir, moving: !ai, score: 0, ai, stun: 0, eat: 0, lazy: 0 };
   }
   function build(user) {
     const starts = [
-      [5, 10, "right"],
-      [14, 9, "left"],
-      [10, 4, "down"],
-      [9, 15, "up"]
+      [2, 6, "right"],
+      [10, 6, "left"],
+      [6, 2, "down"],
+      [6, 10, "up"]
     ];
-    const snakes = [newSnake("me", user.name || "我", COLORS[0], ...starts[0], false)];
-    if (mode !== "solo") picked.slice(0, 3).forEach((c, i) => snakes.push(newSnake(c.id, c.name, COLORS[i + 1], ...starts[i + 1], true)));
-    const g = { snakes, food: [], tick: 0, over: false, paused: false, startAt: Date.now() };
-    const nf = 1 + Math.floor(snakes.length / 2);
+    const cats = [newCat("me", user.name || "我", COLORS[0], ...starts[0], false)];
+    if (mode !== "solo") picked.slice(0, 3).forEach((c, i) => cats.push(newCat(c.id, c.name, COLORS[i + 1], ...starts[i + 1], true)));
+    const g = { cats, food: [], tick: 0, over: false, paused: false, left: ROUND * 1000, last: 0, pops: [] };
+    const nf = 3 + cats.length;
     for (let i = 0; i < nf; i++) addFood(g);
     return g;
   }
-  function occupied(g) {
-    const s = new Set();
-    for (const sn of g.snakes) if (sn.alive) sn.body.forEach((p) => s.add(key(p.x, p.y)));
-    g.food.forEach((f) => s.add(key(f.x, f.y)));
-    return s;
-  }
-  function addFood(g) {
-    const occ = occupied(g);
-    for (let t = 0; t < 400; t++) {
+  function addFood(g, gold) {
+    const occ = new Set();
+    g.cats.forEach((c) => occ.add(key(c.x, c.y)));
+    g.food.forEach((f) => occ.add(key(f.x, f.y)));
+    const total = FOODS.reduce((n, f) => n + f.w, 0);
+    let r = Math.random() * total;
+    let kind = FOODS[0];
+    if (gold) kind = FOODS[2];
+    else
+      for (const f of FOODS) {
+        if (r < f.w) {
+          kind = f;
+          break;
+        }
+        r -= f.w;
+      }
+    for (let t = 0; t < 300; t++) {
       const x = Math.floor(Math.random() * N);
       const y = Math.floor(Math.random() * N);
       if (!occ.has(key(x, y))) {
-        g.food.push({ x, y, v: Math.random() < 0.12 ? 3 : 1 });
+        g.food.push({ x, y, e: kind.e, v: kind.v, gold: !!kind.gold, ttl: kind.gold ? 28 : 0 });
         return;
       }
     }
   }
-  const inside = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
-  /** 这条蛇眼里的障碍（组队时队友不算障碍） */
-  function blocked(g, me) {
-    const s = new Set();
-    for (const sn of g.snakes) {
-      if (!sn.alive) continue;
-      if (mode === "team" && sn !== me) continue;
-      sn.body.forEach((p, i) => {
-        if (i === sn.body.length - 1 && !sn.grow) return; // 尾巴下一步会挪开
-        s.add(key(p.x, p.y));
-      });
-    }
-    return s;
-  }
-  function floodSize(start, block, limit) {
-    const seen = new Set([key(start.x, start.y)]);
-    const q = [start];
-    while (q.length && seen.size < limit) {
-      const p = q.shift();
-      for (const [dx, dy] of Object.values(DIRS)) {
-        const x = p.x + dx;
-        const y = p.y + dy;
-        const k = key(x, y);
-        if (!inside(x, y) || block.has(k) || seen.has(k)) continue;
-        seen.add(k);
-        q.push({ x, y });
+  /** 电脑控制的小猫：去离自己最近、而且别人没自己近的吃的 */
+  function aiThink(g, c) {
+    if (!g.food.length) return;
+    const dist = (a, f) => Math.abs(a.x - f.x) + Math.abs(a.y - f.y);
+    let bestF = null;
+    let bestS = Infinity;
+    for (const f of g.food) {
+      const d = dist(c, f);
+      const rival = Math.min(...g.cats.filter((o) => o !== c && (mode !== "team" || !o.ai)).map((o) => dist(o, f)), 99);
+      // 金鸡腿很香；别人明显更近的就不去抢了
+      const s = d - f.v * 1.6 + (rival < d ? 4 : 0);
+      if (s < bestS) {
+        bestS = s;
+        bestF = f;
       }
     }
-    return seen.size;
-  }
-  /** 电脑控制的蛇：找最近的食物，路上避开障碍；偶尔犯迷糊 */
-  function aiThink(g, sn) {
-    const head = sn.body[0];
-    const block = blocked(g, sn);
-    const opts = Object.keys(DIRS).filter((d) => d !== OPP[sn.dir]);
-    const safe = opts.filter((d) => {
-      const [dx, dy] = DIRS[d];
-      const x = head.x + dx;
-      const y = head.y + dy;
-      return inside(x, y) && !block.has(key(x, y));
-    });
-    if (!safe.length) return;
-    const prev = new Map();
-    const start = key(head.x, head.y);
-    prev.set(start, null);
-    const q = [head];
-    const foods = new Set(g.food.map((f) => key(f.x, f.y)));
-    let goal = null;
-    while (q.length) {
-      const p = q.shift();
-      const k = key(p.x, p.y);
-      if (foods.has(k) && k !== start) {
-        goal = k;
-        break;
-      }
-      for (const [dx, dy] of Object.values(DIRS)) {
-        const x = p.x + dx;
-        const y = p.y + dy;
-        const nk = key(x, y);
-        if (!inside(x, y) || block.has(nk) || prev.has(nk)) continue;
-        prev.set(nk, k);
-        q.push({ x, y });
-      }
-    }
-    let choice = null;
-    if (goal != null) {
-      let k = goal;
-      while (prev.get(k) !== start && prev.get(k) != null) k = prev.get(k);
-      const nx = k % N;
-      const ny = Math.floor(k / N);
-      choice = Object.keys(DIRS).find((d) => DIRS[d][0] === nx - head.x && DIRS[d][1] === ny - head.y);
-    }
-    const room = (d) => {
-      const [dx, dy] = DIRS[d];
-      return floodSize({ x: head.x + dx, y: head.y + dy }, block, sn.body.length + 8);
-    };
-    if (!choice || !safe.includes(choice) || room(choice) < sn.body.length) {
-      choice = safe.slice().sort((a, b) => room(b) - room(a))[0];
-    }
-    if (Math.random() < 0.07 && safe.length > 1) choice = safe[Math.floor(Math.random() * safe.length)];
-    sn.next = choice;
+    const dx = bestF.x - c.x;
+    const dy = bestF.y - c.y;
+    let d;
+    if (dx && dy) d = Math.random() < Math.abs(dx) / (Math.abs(dx) + Math.abs(dy)) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
+    else if (dx) d = dx > 0 ? "right" : "left";
+    else d = dy > 0 ? "down" : "up";
+    if (Math.random() < 0.08) d = Object.keys(DIRS)[Math.floor(Math.random() * 4)];
+    c.next = d;
+    c.moving = true;
   }
   function step() {
     const g = G;
     if (!g || g.over || g.paused) return;
+    const now = performance.now();
+    if (g.last) g.left -= now - g.last;
+    g.last = now;
+    if (g.left <= 0) {
+      g.left = 0;
+      return finish();
+    }
     g.tick++;
-    for (const sn of g.snakes) if (sn.alive && sn.ai) aiThink(g, sn);
-    const heads = new Map();
-    for (const sn of g.snakes) {
-      if (!sn.alive) continue;
-      if (sn.next !== OPP[sn.dir]) sn.dir = sn.next;
-      const [dx, dy] = DIRS[sn.dir];
-      heads.set(sn, { x: sn.body[0].x + dx, y: sn.body[0].y + dy });
+    for (const c of g.cats) {
+      c.px = c.x;
+      c.py = c.y;
+      if (c.eat) c.eat--;
     }
-    for (const [sn, h] of heads) {
-      sn.body.unshift(h);
-      const fi = g.food.findIndex((f) => f.x === h.x && f.y === h.y);
-      if (fi >= 0) {
-        const f = g.food.splice(fi, 1)[0];
-        sn.score += f.v;
-        sn.grow += f.v;
-        addFood(g);
-        if (sn.id === "me") navigator.vibrate?.(15);
-      }
-      if (sn.grow > 0) sn.grow--;
-      else sn.body.pop();
-    }
-    const dead = [];
-    for (const [sn, h] of heads) {
-      if (!inside(h.x, h.y)) {
-        dead.push([sn, "撞墙了"]);
+    for (const c of g.cats) if (c.ai) aiThink(g, c);
+    // 先算每只猫想去哪
+    const want = new Map();
+    for (const c of g.cats) {
+      if (c.stun > 0) {
+        c.stun--;
         continue;
       }
-      if (sn.body.slice(1).some((p) => p.x === h.x && p.y === h.y)) {
-        dead.push([sn, "咬到自己了"]);
+      if (c.ai && Math.random() < 0.3) continue; // 偶尔走神，给你留点机会
+      c.dir = c.next;
+      if (!c.moving) continue;
+      const [dx, dy] = DIRS[c.dir];
+      const x = c.x + dx;
+      const y = c.y + dy;
+      if (!inside(x, y)) continue; // 撞墙就停在边上
+      want.set(c, { x, y });
+    }
+    // 两只猫抢同一个格子 / 撞到别的猫：随机一只挤过去，另一只被挤开愣一下
+    for (const [c, p] of want) {
+      const rivals = [...want].filter(([o, q]) => o !== c && q.x === p.x && q.y === p.y).map(([o]) => o);
+      if (rivals.length) {
+        const all = [c, ...rivals];
+        const win = all[Math.floor(Math.random() * all.length)];
+        for (const o of all) if (o !== win) want.delete(o), (o.stun = mode === "team" ? 0 : 2);
+      }
+    }
+    for (const [c, p] of want) {
+      const sitter = g.cats.find((o) => o !== c && o.x === p.x && o.y === p.y && !want.has(o));
+      if (sitter) {
+        if (mode !== "team") c.stun = 1;
         continue;
       }
-      if (mode === "versus") {
-        for (const o of g.snakes) {
-          if (o === sn || !o.alive) continue;
-          const hitIdx = o.body.findIndex((p) => p.x === h.x && p.y === h.y);
-          if (hitIdx >= 0) {
-            dead.push([sn, hitIdx === 0 ? `和${o.name}撞头了` : `撞到了${o.name}`]);
-            break;
-          }
-        }
-      }
+      c.x = p.x;
+      c.y = p.y;
     }
-    for (const [sn, why] of dead) {
-      sn.alive = false;
-      sn.why = why;
-      if (mode === "versus") for (const p of sn.body.slice(1)) if (Math.random() < 0.3 && inside(p.x, p.y)) g.food.push({ x: p.x, y: p.y, v: 1 });
+    // 吃
+    for (const c of g.cats) {
+      const fi = g.food.findIndex((f) => f.x === c.x && f.y === c.y);
+      if (fi < 0) continue;
+      const f = g.food.splice(fi, 1)[0];
+      c.score += f.v;
+      c.eat = 3;
+      g.pops.push({ x: f.x, y: f.y, t: `+${f.v}`, color: c.color, life: 6 });
+      if (c.id === "me") navigator.vibrate?.(f.gold ? 40 : 15);
+      if (!f.gold) addFood(g);
     }
-    const me = g.snakes[0];
-    const aliveAi = g.snakes.filter((s) => s.ai && s.alive).length;
-    if (!me.alive && (mode !== "team" || !aliveAi)) return finish();
-    if (mode === "versus" && me.alive && !aliveAi && g.snakes.length > 1 && !g.soloOn) {
-      g.soloOn = true;
-      toast("角色们都挂了，你继续吃，吃到不想吃就点暂停结束");
+    // 金鸡腿会过期
+    g.food = g.food.filter((f) => !f.gold || --f.ttl > 0);
+    if (!g.food.some((f) => f.gold) && Math.random() < 0.025) {
+      addFood(g, true);
+      if (g.cats.length > 1 || Math.random() < 0.5) toast("🍗 金鸡腿出现啦！+5");
     }
+    g.pops = g.pops.filter((p) => --p.life > 0);
     draw();
     schedule();
   }
-  function speed() {
-    const len = G ? G.snakes[0].body.length : 3;
-    return Math.max(75, 150 - len * 2.5);
-  }
+  const SPEED = 165;
   function schedule() {
     clearTimeout(timer);
-    if (G && !G.over && !G.paused) timer = setTimeout(step, speed());
+    if (G && !G.over && !G.paused) timer = setTimeout(step, SPEED);
   }
 
   /* ───── 画面 ───── */
+  function drawCat(ctx, cat, cx, cy, r) {
+    const [dx] = DIRS[cat.dir];
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (cat.stun > 0) ctx.rotate(Math.sin(G.tick * 2) * 0.25);
+    // 尾巴
+    ctx.strokeStyle = cat.color;
+    ctx.lineWidth = r * 0.28;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    const tx = dx > 0 ? -1 : 1;
+    ctx.moveTo(tx * r * 0.6, r * 0.45);
+    ctx.quadraticCurveTo(tx * r * 1.25, r * 0.3, tx * r * 1.05, -r * 0.35 + Math.sin(G.tick * 0.8) * r * 0.12);
+    ctx.stroke();
+    // 身体 + 头
+    ctx.fillStyle = cat.color;
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.38, r * 0.72, r * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.12, r * 0.62, 0, Math.PI * 2);
+    ctx.fill();
+    // 耳朵
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(s * r * 0.58, -r * 0.3);
+      ctx.lineTo(s * r * 0.52, -r * 0.98);
+      ctx.lineTo(s * r * 0.12, -r * 0.66);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,190,190,.8)";
+      ctx.beginPath();
+      ctx.moveTo(s * r * 0.48, -r * 0.42);
+      ctx.lineTo(s * r * 0.46, -r * 0.82);
+      ctx.lineTo(s * r * 0.22, -r * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = cat.color;
+    }
+    // 脸：吃到东西时眯眼笑，被挤开时晕
+    const ey = -r * 0.16;
+    const ex = r * 0.24;
+    const lookX = dx * r * 0.06;
+    ctx.strokeStyle = "#3a2a2a";
+    ctx.fillStyle = "#3a2a2a";
+    ctx.lineWidth = Math.max(1.2, r * 0.07);
+    for (const s of [-1, 1]) {
+      const x = s * ex + lookX;
+      if (cat.eat) {
+        ctx.beginPath();
+        ctx.arc(x, ey + r * 0.04, r * 0.09, Math.PI * 1.1, Math.PI * 1.9);
+        ctx.stroke();
+      } else if (cat.stun > 0) {
+        ctx.beginPath();
+        ctx.moveTo(x - r * 0.08, ey - r * 0.08);
+        ctx.lineTo(x + r * 0.08, ey + r * 0.08);
+        ctx.moveTo(x + r * 0.08, ey - r * 0.08);
+        ctx.lineTo(x - r * 0.08, ey + r * 0.08);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(x, ey, r * 0.085, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(x + r * 0.03, ey - r * 0.03, r * 0.03, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#3a2a2a";
+      }
+    }
+    // 鼻子嘴巴
+    ctx.fillStyle = "#e88a8a";
+    ctx.beginPath();
+    ctx.arc(lookX, ey + r * 0.17, r * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#3a2a2a";
+    ctx.lineWidth = Math.max(1, r * 0.05);
+    ctx.beginPath();
+    ctx.arc(lookX - r * 0.07, ey + r * 0.22, r * 0.07, 0, Math.PI * (cat.eat ? 1 : 0.8));
+    ctx.arc(lookX + r * 0.07, ey + r * 0.22, r * 0.07, Math.PI * (cat.eat ? 0 : 0.2), Math.PI);
+    ctx.stroke();
+    // 腮红
+    ctx.fillStyle = "rgba(255,140,140,.35)";
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(s * r * 0.36 + lookX, ey + r * 0.2, r * 0.1, r * 0.06, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
   function draw() {
     const cv = root?.querySelector("#sn-cv");
     if (!cv || !G) return;
@@ -241,68 +298,42 @@
     ctx.fillRect(0, 0, W, W);
     ctx.fillStyle = "#fbefdc";
     for (let y = 0; y < N; y++) for (let x = y % 2; x < N; x += 2) ctx.fillRect(x * c, y * c, c, c);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     for (const f of G.food) {
-      ctx.font = `${c * 0.85}px system-ui, "Apple Color Emoji", sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(f.v > 1 ? "🐟" : "🍓", f.x * c + c / 2, f.y * c + c / 2 + 1);
+      if (f.gold) {
+        ctx.fillStyle = `rgba(255,214,90,${0.35 + 0.25 * Math.sin(G.tick)})`;
+        ctx.beginPath();
+        ctx.arc(f.x * c + c / 2, f.y * c + c / 2, c * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.font = `${c * 0.72}px system-ui, "Apple Color Emoji", sans-serif`;
+      ctx.fillText(f.e, f.x * c + c / 2, f.y * c + c / 2 + 1);
     }
-    for (const sn of G.snakes) {
-      ctx.globalAlpha = sn.alive ? (mode === "team" && sn.ai ? 0.85 : 1) : 0.25;
-      ctx.strokeStyle = sn.color;
-      ctx.lineWidth = c * 0.78;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.beginPath();
-      sn.body.forEach((p, i) => (i ? ctx.lineTo(p.x * c + c / 2, p.y * c + c / 2) : ctx.moveTo(p.x * c + c / 2, p.y * c + c / 2)));
-      ctx.stroke();
-      // 身上的奶油色小斑点
-      ctx.fillStyle = "rgba(255,255,255,.35)";
-      sn.body.forEach((p, i) => {
-        if (i && i % 3 === 0) {
-          ctx.beginPath();
-          ctx.arc(p.x * c + c / 2, p.y * c + c / 2, c * 0.13, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      });
-      ctx.fillStyle = sn.color;
-      ctx.beginPath();
-      ctx.arc(sn.body[0].x * c + c / 2, sn.body[0].y * c + c / 2, c * 0.5, 0, Math.PI * 2);
-      ctx.fill();
-      // 眼睛
-      const h = sn.body[0];
-      const [dx, dy] = DIRS[sn.dir];
-      const ex = h.x * c + c / 2;
-      const ey = h.y * c + c / 2;
-      const px = -dy * c * 0.2;
-      const py = dx * c * 0.2;
-      for (const s of [1, -1]) {
-        ctx.fillStyle = "#fff";
-        ctx.beginPath();
-        ctx.arc(ex + px * s + dx * c * 0.12, ey + py * s + dy * c * 0.12, c * 0.14, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#3a2a2a";
-        ctx.beginPath();
-        ctx.arc(ex + px * s + dx * c * 0.17, ey + py * s + dy * c * 0.17, c * 0.07, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // 名字
-      if (G.snakes.length > 1) {
-        ctx.globalAlpha = sn.alive ? 0.9 : 0.3;
-        ctx.font = `600 ${Math.max(10, c * 0.5)}px system-ui, sans-serif`;
+    for (const cat of G.cats) {
+      drawCat(ctx, cat, cat.x * c + c / 2, cat.y * c + c / 2 + c * 0.05, c * 0.48);
+      if (G.cats.length > 1) {
+        ctx.font = `600 ${Math.max(10, c * 0.32)}px system-ui, sans-serif`;
         ctx.fillStyle = "#5a4636";
-        ctx.textAlign = "center";
-        ctx.fillText(sn.name.slice(0, 6), ex, ey - c * 0.85);
+        ctx.fillText(cat.name.slice(0, 6), cat.x * c + c / 2, cat.y * c - c * 0.12 < 6 ? cat.y * c + c * 1.05 : cat.y * c - c * 0.12);
       }
+    }
+    for (const p of G.pops) {
+      ctx.globalAlpha = Math.min(1, p.life / 4);
+      ctx.font = `800 ${c * 0.42}px system-ui, sans-serif`;
+      ctx.fillStyle = p.color;
+      ctx.fillText(p.t, p.x * c + c / 2, p.y * c - (6 - p.life) * c * 0.08);
       ctx.globalAlpha = 1;
     }
     const hud = root.querySelector("#sn-hud");
     if (hud) {
-      const team = G.snakes.reduce((n, s) => n + s.score, 0);
+      const sec = Math.ceil(G.left / 1000);
+      const team = G.cats.reduce((n, s) => n + s.score, 0);
       hud.innerHTML =
-        mode === "team"
-          ? `<b>队伍 ${team}</b>${G.snakes.map((s) => `<span style="color:${s.color}">●</span>${esc(s.name)} ${s.score}${s.alive ? "" : "💤"}`).join(" ")}`
-          : G.snakes.map((s) => `<span style="color:${s.color}">●</span><b>${esc(s.name)}</b> ${s.score}${s.alive ? "" : "💤"}`).join("　");
+        `<b style="margin-right:6px;color:${sec <= 10 ? "#e0533d" : "inherit"}">⏱ ${sec}s</b>` +
+        (mode === "team"
+          ? `<b>队伍 ${team}</b>${G.cats.map((s) => `<span style="color:${s.color}">●</span>${esc(s.name)} ${s.score}`).join(" ")}`
+          : G.cats.map((s) => `<span style="color:${s.color}">●</span><b>${esc(s.name)}</b> ${s.score}`).join("　"));
     }
   }
 
@@ -311,16 +342,17 @@
     G = null;
     if (!root) return;
     root.innerHTML = `<div class="sn-menu">
-      <div class="mlm-logo">🐍<span>贪吃蛇</span></div>
+      <div class="mlm-logo">😼<span>小馋猫</span></div>
+      <p class="fun-note" style="text-align:center;margin:-4px 0 4px">小猫们抢吃的，${ROUND} 秒后看谁抢得多</p>
       <div class="sn-modes">${Object.entries(MODES).map(([k, m]) => `<button type="button" class="${mode === k ? "is-on" : ""}" data-mode="${k}"><b>${m.name}</b><small>${m.desc}</small>${best[k] ? `<em>最高 ${best[k]}</em>` : ""}</button>`).join("")}</div>
       ${
         mode === "solo"
           ? ""
           : `<div class="sn-picked">${picked.length ? picked.map((c, i) => `<span class="fun-chip"><i style="background:${COLORS[i + 1]}"></i>${esc(c.name)}</span>`).join("") : `<p class="fun-note">还没选角色</p>`}<button type="button" class="fun-btn ghost sm" data-a="pick">选角色（最多 3 位）</button></div>`
       }
-      <button type="button" class="fun-btn solid wide" data-a="go">开始</button>
-      <button type="button" class="gh-net sn-net" data-a="net"><span>🌐</span><div><b>和联机好友一起玩</b><small>在联机聊天里点 🎲 选「贪吃蛇 · 比分」各自比分，或「贪吃蛇 · 组队」大家的分数加起来过关；好友带来的角色也会一起</small></div><i>›</i></button>
-      <p class="fun-note">滑动屏幕、点方向键或者用键盘方向键 / WASD 控制。🍓 加 1 分，🐟 加 3 分。</p>
+      <button type="button" class="fun-btn solid wide" data-a="go">开抢</button>
+      <button type="button" class="gh-net sn-net" data-a="net"><span>🌐</span><div><b>和联机好友一起玩</b><small>在联机聊天里点 🎲 选「小馋猫 · 比分」各自比谁抢得多，或「小馋猫 · 组队」大家的分数加起来过关；好友带来的角色也会一起</small></div><i>›</i></button>
+      <p class="fun-note">滑动屏幕、点方向键或者用键盘方向键 / WASD 控制小猫跑。🐟 +1，🍤 +2，金色 🍗 +5（一会儿就不见）。撞到别的猫会被挤开晕一下。</p>
     </div>`;
   }
   async function start() {
@@ -366,6 +398,7 @@
     draw();
     if (n <= 0) {
       G.paused = false;
+      G.last = performance.now();
       return schedule();
     }
     const ctx = cv.getContext("2d");
@@ -380,9 +413,9 @@
   }
   function turn(d) {
     if (!G || G.over) return;
-    const me = G.snakes[0];
-    if (!me.alive || d === OPP[me.dir]) return;
+    const me = G.cats[0];
     me.next = d;
+    me.moving = true;
   }
   function finish() {
     const g = G;
@@ -390,33 +423,31 @@
     g.over = true;
     clearTimeout(timer);
     draw();
-    const me = g.snakes[0];
-    const team = g.snakes.reduce((n, s) => n + s.score, 0);
+    const me = g.cats[0];
+    const team = g.cats.reduce((n, s) => n + s.score, 0);
     const mine = mode === "team" ? team : me.score;
-    const rec = mine > (best[mode] || 0);
+    const rec = !g.quit && mine > (best[mode] || 0);
     if (rec) {
       best[mode] = mine;
       saveBest();
     }
     // 联机比分挑战：把成绩交回去
     try {
-      window.XXJ_NET?.reportScore?.("贪吃蛇", me.score, `${me.score} 分`);
+      window.XXJ_NET?.reportScore?.("小馋猫", me.score, `抢到 ${me.score} 分`);
     } catch (_) {
       /* ignore */
     }
-    // 分数高的排前面；同分时活到最后的排前面
-    const rank = g.snakes.slice().sort((a, b) => b.score - a.score || Number(b.alive) - Number(a.alive));
-    const topScore = rank[0].score;
-    const tie = rank.filter((x) => x.score === topScore).length > 1 && !rank.some((x) => x.alive && x.score === topScore && !rank.some((y) => y !== x && y.score === topScore && y.alive));
+    const rank = g.cats.slice().sort((a, b) => b.score - a.score);
+    const tie = rank.length > 1 && rank[0].score === rank[1].score;
     const iWin = rank[0] === me && !tie;
     const title =
-      mode === "team" ? `队伍一共 ${team} 分` : mode === "versus" ? (tie ? "平局！" : iWin ? "你赢啦 🎉" : `${rank[0].name} 赢了`) : `${me.score} 分`;
+      mode === "team" ? `队伍一共抢到 ${team} 分` : mode === "versus" ? (tie ? "平局！" : iWin ? "你抢得最多 🎉" : `${rank[0].name} 抢得最多`) : `抢到 ${me.score} 分`;
     const sh = F.openSheet(
-      `<div class="mlm-end">${mode === "versus" ? (iWin ? "🏆" : tie ? "🤝" : "😿") : rec ? "🏆" : "🐍"}<h3>${esc(title)}</h3><p>${esc(me.why || "")}${rec ? " · 新纪录！" : best[mode] ? ` · 最高 ${best[mode]}` : ""}</p></div>
-       ${g.snakes.length > 1 ? `<div class="sn-rank">${rank.map((s, i) => `<p><span style="color:${s.color}">●</span> ${i + 1}. ${esc(s.name)} <b>${s.score}</b></p>`).join("")}</div>` : ""}
+      `<div class="mlm-end">${mode === "versus" ? (iWin ? "🏆" : tie ? "🤝" : "😿") : rec ? "🏆" : "😸"}<h3>${esc(title)}</h3><p>${g.quit ? "提前结束" : "时间到"}${rec ? " · 新纪录！" : best[mode] ? ` · 最高 ${best[mode]}` : ""}</p></div>
+       ${g.cats.length > 1 ? `<div class="sn-rank">${rank.map((s, i) => `<p><span style="color:${s.color}">●</span> ${i + 1}. ${esc(s.name)} <b>${s.score}</b></p>`).join("")}</div>` : ""}
        <div class="sn-say" id="sn-say"></div>
        <div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-e="retry">再来</button><button type="button" class="fun-btn ghost" data-e="menu">换模式</button></div>`,
-      { title: "贪吃蛇" }
+      { title: "小馋猫" }
     );
     sh.body.addEventListener("click", (e) => {
       const a = e.target.closest("[data-e]")?.dataset.e;
@@ -431,10 +462,10 @@
     if (mode !== "solo" && ch && F.hasApiKey()) {
       const box = sh.body.querySelector("#sn-say");
       box.innerHTML = `<p class="fun-note">${esc(ch.name)} 在想说什么…</p>`;
-      const res = g.snakes.map((s) => `${s.name} ${s.score} 分${s.alive ? "" : "（" + s.why + "）"}`).join("，");
+      const res = g.cats.map((s) => `${s.name} ${s.score} 分`).join("，");
       F.aiText(
         [
-          { role: "system", content: `你是「${ch.name}」。${ch.persona ? "人设：\n" + ch.persona + "\n" : ""}你刚和对方${mode === "team" ? "组队" : "对战"}玩了一局贪吃蛇。按人设说一两句真实的反应（可以得意、撒娇、不服气、夸对方），口语，不要加名字前缀。` },
+          { role: "system", content: `你是「${ch.name}」。${ch.persona ? "人设：\n" + ch.persona + "\n" : ""}你们刚${mode === "team" ? "组队" : "比赛"}玩了一局「小馋猫」：大家各自扮成小猫在地板上抢吃的，看谁抢得多。按人设说一两句真实的反应（可以得意、撒娇、不服气、夸对方），口语，不要加名字前缀。` },
           { role: "user", content: `结果：${res}。${mode === "team" ? `队伍一共 ${team} 分。` : ""}` }
         ],
         { maxTokens: 200, temperature: 0.95 }
@@ -451,7 +482,7 @@
   async function pickChars() {
     const cast = await F.loadCast();
     if (!cast.length) return toast("角色库里还没有角色");
-    const r = await F.pickCast(cast, { min: 1, max: 3, preselect: picked.map((p) => p.id), title: "和谁一起玩？（最多 3 位）" });
+    const r = await F.pickCast(cast, { min: 1, max: 3, preselect: picked.map((p) => p.id), title: "和谁一起抢？（最多 3 位）" });
     if (r) {
       picked = r;
       drawMenu();
@@ -472,28 +503,25 @@
     if (a === "net") return F.open("联机");
     if (a === "menu") return drawMenu();
     if (a === "pause" && G && !G.over) {
-      G.paused = !G.paused;
-      e.target.closest("[data-a]").textContent = G.paused ? "▶" : "⏸";
-      if (!G.paused) schedule();
-      else {
-        const sh = F.openSheet(`<div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-p="go">继续</button><button type="button" class="fun-btn ghost" data-p="end">结束这局</button></div>`, { title: "暂停中" });
-        sh.body.addEventListener("click", (ev) => {
-          const p = ev.target.closest("[data-p]")?.dataset.p;
-          if (!p) return;
-          sh.close();
-          if (!G) return;
-          if (p === "go") {
-            G.paused = false;
-            const pb = root?.querySelector("[data-a=pause]");
-            if (pb) pb.textContent = "⏸";
-            schedule();
-          } else {
-            G.snakes[0].alive = false;
-            G.snakes[0].why = "主动结束";
-            finish();
-          }
-        });
-      }
+      G.paused = true;
+      e.target.closest("[data-a]").textContent = "▶";
+      const sh = F.openSheet(`<div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-p="go">继续</button><button type="button" class="fun-btn ghost" data-p="end">结束这局</button></div>`, { title: "暂停中" });
+      sh.body.addEventListener("click", (ev) => {
+        const p = ev.target.closest("[data-p]")?.dataset.p;
+        if (!p) return;
+        sh.close();
+        if (!G) return;
+        if (p === "go") {
+          G.paused = false;
+          G.last = performance.now();
+          const pb = root?.querySelector("[data-a=pause]");
+          if (pb) pb.textContent = "⏸";
+          schedule();
+        } else {
+          G.quit = true;
+          finish();
+        }
+      });
     }
   }
   function onKey(e) {
@@ -505,9 +533,9 @@
     }
   }
 
-  F.register("贪吃蛇", {
-    title: "贪吃蛇",
-    kicker: "SNAKE",
+  const app = {
+    title: "小馋猫",
+    kicker: "GREEDY KITTY",
     async mount(body) {
       root = document.createElement("div");
       root.className = "sn-root";
@@ -522,5 +550,8 @@
       G = null;
       root = null;
     }
-  });
+  };
+  F.register("小馋猫", app);
+  // 旧入口（桌面图标 / 旧链接）也能打开
+  F.register("贪吃蛇", app);
 })();

@@ -33,6 +33,8 @@
     S = null;
   }
   if (!S || typeof S !== "object" || !S.mid) S = { mid: newMid() };
+  normStore();
+  function normStore() {
   S.friends ||= {};
   S.reqIn ||= [];
   S.reqOut ||= {};
@@ -49,6 +51,26 @@
     c.members ||= {};
     c.msgs ||= [];
     if (!c.joined) c.needJoin = true;
+  }
+  }
+  /** 从备份恢复后：把 localStorage 里的联机数据重新读进来（保持同一个 S 对象） */
+  function reloadFromStorage() {
+    let d = null;
+    try {
+      d = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+    } catch (_) {
+      d = null;
+    }
+    if (!d || typeof d !== "object" || !d.mid) return false;
+    for (const k of Object.keys(S)) delete S[k];
+    Object.assign(S, d);
+    normStore();
+    try {
+      tick();
+    } catch (_) {
+      /* ignore */
+    }
+    return true;
   }
   let saveT = 0;
   function save(now) {
@@ -631,8 +653,8 @@
     td: { name: "真心话大冒险", icon: "🍾", desc: "转盘随机选一个人，选真心话或大冒险" },
     mlm: { name: "喵了个喵 · 比分", icon: "🐱", desc: "每人玩一局，比谁玩得好，垫底的受罚" },
     piano: { name: "猫爪琴键 · 比分", icon: "🐾", desc: "每人弹一局，比谁弹得多，垫底的受罚" },
-    snake: { name: "贪吃蛇 · 比分", icon: "🐍", desc: "每人玩一局贪吃蛇，比谁吃得多，垫底的受罚" },
-    snaket: { name: "贪吃蛇 · 组队", icon: "🐍", desc: "大家（和角色）的分数加起来，达到目标就一起过关，没达到全员受罚" },
+    snake: { name: "小馋猫 · 比分", icon: "😼", desc: "每人玩一局小馋猫，比谁抢的吃的多，垫底的受罚" },
+    snaket: { name: "小馋猫 · 组队", icon: "😼", desc: "大家（和角色）的分数加起来，达到目标就一起过关，没达到全员受罚" },
     dice: { name: "掷骰子比大小", icon: "🎲", desc: "每人掷两颗骰子，点数最小的人接惩罚" },
     bomb: { name: "数字炸弹", icon: "🧨", desc: "1~100 里藏着一个炸弹数字，轮流猜，猜中的人被炸" }
   };
@@ -678,7 +700,7 @@
   };
   const mCount = (g, i) => mNeighbors(i).filter((j) => g.mines.includes(j)).length;
   const pun = () => (Math.random() < 0.5 ? "真心话 · " + pick(TRUTH) : "大冒险 · " + pick(DARE));
-  const CHAL = { mlm: "喵了个喵", piano: "猫爪琴键", snake: "贪吃蛇", snaket: "贪吃蛇" };
+  const CHAL = { mlm: "喵了个喵", piano: "猫爪琴键", snake: "小馋猫", snaket: "小馋猫" };
   const isChal = (k) => k === "mlm" || k === "piano" || k === "snake" || k === "snaket";
   function allPlayers(c) {
     const out = [];
@@ -764,7 +786,7 @@
     if (isChal(kind)) {
       g.scores = {};
       g.labels = {};
-      if (kind === "snaket") g.goal = 25 * g.players.length;
+      if (kind === "snaket") g.goal = 30 * g.players.length;
     }
     R.game = g;
     sysMsg(c, `${GAMES[kind].icon} ${me().name} 开了一局「${GAMES[kind].name}」！参加的有：${players.map((p) => p.name).join("、")}`);
@@ -992,7 +1014,7 @@
     if (g.kind === "snaket") {
       const total = done.reduce((n, p) => n + g.scores[p.pid], 0);
       const ok = total >= g.goal;
-      return endGame(c, `🐍 贪吃蛇组队：${rank.map((p) => `${p.name} ${g.scores[p.pid]}`).join(" + ")} = ${total} 分（目标 ${g.goal}）\n${ok ? "过关啦，大家都好棒 🎉" : `差一点点！全员惩罚：${pun()}`}`, { gameEnd: true, involves: ok ? [] : rank.map((p) => p.name) });
+      return endGame(c, `😼 小馋猫组队：${rank.map((p) => `${p.name} ${g.scores[p.pid]}`).join(" + ")} = ${total} 分（目标 ${g.goal}）\n${ok ? "过关啦，大家都好棒 🎉" : `差一点点！全员惩罚：${pun()}`}`, { gameEnd: true, involves: ok ? [] : rank.map((p) => p.name) });
     }
     const last = rank[rank.length - 1];
     endGame(c, `🏆 「${CHAL[g.kind]}」挑战结果：${rank.map((p, i) => `${i + 1}. ${p.name}（${g.labels[p.pid]}）`).join("　")}${rank.length > 1 ? `\n垫底的 ${last.name}，惩罚：${pun()}` : ""}`, { gameEnd: true, involves: [last.name] });
@@ -1175,8 +1197,8 @@
           n = 15 + Math.floor(Math.random() * 120);
           label = `${n} 块`;
         } else if (g.kind === "snake" || g.kind === "snaket") {
-          n = 8 + Math.floor(Math.random() * 45);
-          label = `${n} 分`;
+          n = 15 + Math.floor(Math.random() * 35);
+          label = `抢到 ${n} 分`;
         } else if (Math.random() < 0.35) {
           const sec = 60 + Math.floor(Math.random() * 120);
           n = 1000 - sec;
@@ -1416,7 +1438,7 @@
           .join("")}</div>`;
     } else if (isChal(g.kind)) {
       const mineDone = meP && g.scores[meP.pid] != null;
-      body = `<small>${g.kind === "snaket" ? `每个人在自己手机上玩一局贪吃蛇，大家的分数加起来要到 ${g.goal} 分才算过关（现在 ${Object.values(g.scores).reduce((n, v) => n + v, 0)} 分）` : `每个人在自己手机上玩一局「${CHAL[g.kind]}」，成绩自动交上来，最后一名受罚`}</small>
+      body = `<small>${g.kind === "snaket" ? `每个人在自己手机上玩一局小馋猫，大家的分数加起来要到 ${g.goal} 分才算过关（现在 ${Object.values(g.scores).reduce((n, v) => n + v, 0)} 分）` : `每个人在自己手机上玩一局「${CHAL[g.kind]}」，成绩自动交上来，最后一名受罚`}</small>
         <div class="net-spy-seats">${g.players.map((p) => `<span class="${g.scores[p.pid] != null ? "is-cur" : ""}">${esc(p.name)}：${g.scores[p.pid] != null ? esc(g.labels[p.pid]) : "还在玩…"}</span>`).join("")}</div>
         ${meP && !mineDone ? `<button type="button" class="fun-btn solid" data-a="chalgo">🎮 去玩「${CHAL[g.kind]}」</button>` : ""}
         ${g.host === S.mid ? `<button type="button" class="fun-btn ghost sm" data-a="chalend">不等了，现在公布成绩</button>` : ""}`;
@@ -1954,5 +1976,5 @@
       schedule();
     }
   });
-  window.XXJ_NET = { state: S, net: Net, uid: () => S.mid, addFriend, tick, reportScore };
+  window.XXJ_NET = { state: S, net: Net, uid: () => S.mid, addFriend, tick, reportScore, reloadFromStorage, storeKey: STORE_KEY, flush: () => save(true) };
 })();

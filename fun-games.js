@@ -21,7 +21,7 @@
     { key: "你画我猜", icon: "🎨", name: "你画我猜", desc: "画给 TA 猜 / 猜 TA 的词" },
     { key: "喵了个喵", icon: "🐱", name: "喵了个喵", desc: "叠叠乐消除，凑 3 张就消" },
     { key: "猫爪琴键", icon: "🐾", name: "猫爪琴键", desc: "只点黑键，越弹越快" },
-    { key: "贪吃蛇", icon: "🐍", name: "贪吃蛇", desc: "单人 / 和角色组队 / 对战" },
+    { key: "小馋猫", icon: "😼", name: "小馋猫", desc: "小猫抢吃的，看谁抢得多" },
     { key: "换装小屋", icon: "👗", name: "换装小屋", desc: "给自己和 TA 的小人换装" }
   ];
 
@@ -78,7 +78,7 @@
     kicker: "GAME CENTER",
     async mount(body) {
       body.innerHTML = `<div class="gh">
-        <button type="button" class="gh-net" data-net="1"><span>🌐</span><div><b>和联机好友一起玩</b><small>UNO、谁是卧底、你画我猜、扫雷对战、贪吃蛇、真心话大冒险、比分挑战……好友和 TA 们带来的角色都能一起玩</small></div><i>›</i></button>
+        <button type="button" class="gh-net" data-net="1"><span>🌐</span><div><b>和联机好友一起玩</b><small>UNO、谁是卧底、你画我猜、扫雷对战、小馋猫、真心话大冒险、比分挑战……好友和 TA 们带来的角色都能一起玩</small></div><i>›</i></button>
         <div class="gh-grid">${GAMES.map((g) => `<button type="button" class="gh-card" data-g="${g.key}"><span class="gh-ico">${g.icon}</span><strong>${g.name}</strong><small>${g.desc}</small></button>`).join("")}</div>
       </div>`;
       body.querySelectorAll("[data-g]").forEach((b) => (b.onclick = () => F.open(b.dataset.g)));

@@ -13229,7 +13229,13 @@ function getBackupZipModuleDefs() {
         K.CHAT_LOG,
         K.CHAT_THREAD_UI_CSS_PRESETS,
         K.CHAT_OFFLINE_THREAD_UI_CSS_PRESETS,
-        K.CHAT_OFFLINE_DM_PROSE_PRESETS
+        K.CHAT_OFFLINE_DM_PROSE_PRESETS,
+        // 联机（好友 / 群聊 / 消息）和柚子社区身份：存在 localStorage，跟着聊天备份一起走
+        "ls:meowos_net_v2",
+        "ls:meowos_net_mute",
+        "ls:meowos_yz_token",
+        "ls:meowos_yz_nick",
+        "ls:meowos_yz_liked"
       ]
     },
     { id: "worldbooks", label: "世界书", keys: [K.WORLD_BOOK_STORE] },
@@ -13274,7 +13280,8 @@ function getBackupZipModuleDefs() {
         K.GLOBAL_THINKING_CHAIN_IM,
         K.GLOBAL_THINKING_CHAIN_OFFLINE,
         K.GLOBAL_THINKING_CHAIN_GROUP,
-        K.GLOBAL_PROMPT_PACK
+        K.GLOBAL_PROMPT_PACK,
+        "ls:meowos_mimi_api"
       ]
     },
     {
@@ -13297,7 +13304,8 @@ function getBackupZipModuleDefs() {
         K.DESKTOP_APP_TILE_BGS,
         K.DESKTOP_APP_TOWER_BG,
         K.DESKTOP_DOCK_BG,
-        K.DESKTOP_HERO_CARD_BG
+        K.DESKTOP_HERO_CARD_BG,
+        "ls:meowos_mimi_css"
       ]
     }
   ];
@@ -13479,6 +13487,20 @@ function formatBackupModuleSizeLine(bytes, hint) {
 async function readKvForBackup(key) {
   const D = window.XXJ_DB;
   if (!D || !key) return undefined;
+  if (String(key).startsWith("ls:")) {
+    const lk = String(key).slice(3);
+    try {
+      if (lk === "meowos_net_v2") window.XXJ_NET?.flush?.();
+    } catch (_) {
+      /* ignore */
+    }
+    try {
+      const raw = localStorage.getItem(lk);
+      return raw == null ? undefined : { __ls: raw };
+    } catch (_) {
+      return undefined;
+    }
+  }
   await D.ready;
   if (key === D.K.CHAT_INBOX_STORE && typeof D.ensureInboxHydrated === "function") {
     try {
@@ -14069,6 +14091,19 @@ async function applyBackupZipImport(zip, manifest, onStatus) {
       for (const [k, v] of Object.entries(payload.kv)) {
         if (k === D.K.CHAT_INBOX_STORE) {
           importedInboxPayload = v;
+          continue;
+        }
+        if (String(k).startsWith("ls:")) {
+          const raw = v && typeof v === "object" ? v.__ls : null;
+          if (typeof raw === "string") {
+            try {
+              localStorage.setItem(String(k).slice(3), raw);
+              if (k === "ls:meowos_net_v2") window.XXJ_NET?.reloadFromStorage?.();
+              if (k === "ls:meowos_mimi_css") window.XXJ_MIMI?.applyCss?.();
+            } catch (err) {
+              console.warn("[backup] ls restore failed", k, err);
+            }
+          }
           continue;
         }
         D.setMemKv(k, migratePlotDecorKvValue(k, v));
