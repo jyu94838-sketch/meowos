@@ -45044,7 +45044,9 @@ function iterAssistantJsonImageContainers(o) {
 
 /** lines 里直接写「【图片】…」等与用户侧协议对齐时，从气泡正文抽出描述式发图（不进 charImage 对象也能显示卡片）。 */
 const INLINE_IMAGE_PROTOCOL_HEAD =
-  /(?:【图片】|【发图】|【配图】|【照】|［图片］|\[图片\]|\[配图\]|\[照\]|📷|🖼)/u;
+  /(?:【图片】|【发图】|【配图】|【照】|［图片］|\[图片\]|\[配图\]|\[照\]|📷|🖼|[【［\[](?:图片|照片|配图|发图|自拍|照)\s*[:：])/u;
+/** 模型常写成「【图片：描述】」「[图片: 描述]」——冒号写在括号里，也当发图 */
+const IMAGE_PROTOCOL_COLON_RE = /^[【［\[]\s*(?:图片|照片|配图|发图|自拍|照)\s*[:：]\s*([\s\S]*?)\s*[】］\]]?\s*$/u;
 
 function findInlineImageProtocolStart(s) {
   const text = String(s || "");
@@ -45058,11 +45060,14 @@ function isAssistantImageProtocolLine(s) {
   if (/^(?:【图片】|【发图】|【配图】|【照】|［图片］)/u.test(t)) return true;
   if (/^(?:\[图片\]|\[配图\]|\[照\])/u.test(t)) return true;
   if (/^(?:📷|🖼)/u.test(t)) return true;
+  if (IMAGE_PROTOCOL_COLON_RE.test(t)) return true;
   return false;
 }
 
 function extractAssistantImageCaptionFromProtocolLine(s) {
   const t = String(s || "").trim();
+  const mc = IMAGE_PROTOCOL_COLON_RE.exec(t);
+  if (mc) return String(mc[1] || "").trim();
   let m = /^(?:【图片】|【发图】|【配图】|【照】|［图片］)\s*([\s\S]*)$/u.exec(t);
   if (m) return String(m[1] || "").trim();
   m = /^(?:\[图片\]|\[配图\]|\[照\])\s*([\s\S]*)$/u.exec(t);

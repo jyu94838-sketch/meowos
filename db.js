@@ -1752,7 +1752,7 @@
 
 /** 开屏 + 注入 app.js（原 boot.js，合并进 db.js 以减少请求） */
 (function () {
-  const ASSET_V = "375";
+  const ASSET_V = "376";
   const MAIN_APP = "app.js?v=" + ASSET_V;
   const INLINE_HTML_MODULE = "inline-html.js?v=" + ASSET_V;
   const GROUP_MODULE = "group.js?v=" + ASSET_V;
