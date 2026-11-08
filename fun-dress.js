@@ -28,81 +28,328 @@
   // 坐标：头在 (100,100) 附近，身体 158~214，腿 214~262，鞋 262~276
   const ol = (c) => shade(c, 0.72); // 描边色
   const stk = (c, w) => `stroke="${ol(c)}" stroke-width="${w || 1.6}" stroke-linejoin="round"`;
-  const FACE = "M50 96 Q50 40 100 40 Q150 40 150 96 Q150 134 120 150 Q100 160 80 150 Q50 134 50 96Z";
-  const BANG_PTS = "M48 100 Q44 40 100 34 Q156 40 152 100 L146 82 L136 96 L128 70 L116 90 L104 64 L92 90 L80 68 L70 94 L58 80Z";
-  const bangs = (c) => `<path d="${BANG_PTS}" fill="${c}" ${stk(c)}/><path d="M66 56 Q100 40 134 56" stroke="#fff" stroke-width="5" opacity=".28" fill="none" stroke-linecap="round"/>`;
-  const sideLocks = (c) => `<path d="M50 90 Q44 128 58 152 Q62 124 62 98Z" fill="${c}" ${stk(c, 1.2)}/><path d="M150 90 Q156 128 142 152 Q138 124 138 98Z" fill="${c}" ${stk(c, 1.2)}/>`;
-  const sweep = (c) => `<path d="M46 102 Q40 34 104 32 Q160 38 154 100 Q148 74 128 66 Q120 84 100 80 Q74 76 64 72 Q52 84 46 102Z" fill="${c}" ${stk(c)}/><path d="M70 52 Q104 38 138 54" stroke="#fff" stroke-width="5" opacity=".28" fill="none" stroke-linecap="round"/>`;
+  const FACE_F = "M50 94 Q50 40 100 40 Q150 40 150 94 Q150 122 134 140 Q116 157 100 158 Q84 157 66 140 Q50 122 50 94Z";
+  const FACE_M = "M51 94 Q51 40 100 40 Q149 40 149 94 Q149 120 136 140 Q118 159 100 161 Q82 159 64 140 Q51 120 51 94Z";
+  /* ───── 画头发的小工具：一缕一缕的尖发束 + 渐变 + 高光 ───── */
+  const r1 = (n) => Math.round(n * 10) / 10;
+  const mixW = (hex, k) => {
+    const n = parseInt(hex.slice(1), 16);
+    const m = (v) => Math.round(v + (255 - v) * k);
+    return "#" + ((m(n >> 16) << 16) | (m((n >> 8) & 255) << 8) | m(n & 255)).toString(16).padStart(6, "0");
+  };
+  /** 一缕头发：发根中心 (x0,y0) → 发梢 (x1,y1)，w 发根宽度，b 弯曲 */
+  function lock(x0, y0, x1, y1, w, b) {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const L = Math.hypot(dx, dy) || 1;
+    const nx = -dy / L;
+    const ny = dx / L;
+    const bb = b || 0;
+    const ax = x0 + (nx * w) / 2;
+    const ay = y0 + (ny * w) / 2;
+    const bx = x0 - (nx * w) / 2;
+    const by = y0 - (ny * w) / 2;
+    const mx = (x0 + x1) / 2 + nx * bb;
+    const my = (y0 + y1) / 2 + ny * bb;
+    return `M${r1(ax)} ${r1(ay)}Q${r1(mx + nx * w * 0.32)} ${r1(my + ny * w * 0.32)} ${r1(x1)} ${r1(y1)}Q${r1(mx - nx * w * 0.32)} ${r1(my - ny * w * 0.32)} ${r1(bx)} ${r1(by)}Z`;
+  }
+  const mir = (a) => [200 - a[0], a[1], 200 - a[2], a[3], a[4], -(a[5] || 0)];
+  const sym = (arr) => arr.concat(arr.map(mir));
+  /** 发束中间的细发丝线 */
+  const strand = (x0, y0, x1, y1, b) => {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const L = Math.hypot(dx, dy) || 1;
+    return `M${r1(x0)} ${r1(y0)}Q${r1((x0 + x1) / 2 + (-dy / L) * (b || 0))} ${r1((y0 + y1) / 2 + (dx / L) * (b || 0))} ${r1(x1)} ${r1(y1)}`;
+  };
+  /** g：{ id, c } —— 一组发片（同一个渐变 + 描边） */
+  /** 发片先收集起来，画的时候先整体描一圈外轮廓、再填色——这样发束之间不会有乱七八糟的内线 */
+  const hp = (g, d) => {
+    g.list.push(d);
+    return "";
+  };
+  const circ = (cx, cy, rx, ry) => `M${cx - rx} ${cy}A${rx} ${ry || rx} 0 1 0 ${cx + rx} ${cy}A${rx} ${ry || rx} 0 1 0 ${cx - rx} ${cy}Z`;
+  function paintHair(fn, g) {
+    g.list = [];
+    const extra = fn(g) || "";
+    const ps = g.list.flatMap((d) => d.split(/(?=M)/)).filter((d) => d.trim());
+    if (!ps.length) return extra;
+    const line = shade(g.c, 0.5);
+    const paths = ps.map((d) => `<path d="${d}"/>`).join("");
+    return `<g fill="${line}" stroke="${line}" stroke-width="2.6" stroke-linejoin="round">${paths}</g><g fill="url(#${g.id})">${paths}</g>${extra}`;
+  }
+  const hl = (g, arr) => `<path d="${arr.map((a) => strand(...a)).join("")}" stroke="${shade(g.c, 0.6)}" stroke-width=".9" fill="none" opacity=".55" stroke-linecap="round"/>`;
+  /** 天使环高光 */
+  const ring = (g, y, w) => {
+    const ww = w || 34;
+    return `<path d="M${100 - ww} ${y + 8} Q100 ${y - 8} ${100 + ww} ${y + 8}" stroke="${mixW(g.c, 0.62)}" stroke-width="4.5" fill="none" opacity=".75" stroke-linecap="round" stroke-dasharray="12 5 7 4 16 6 9 5"/>`;
+  };
+  const shine = (g, d) => `<path d="${d}" stroke="${mixW(g.c, 0.55)}" stroke-width="2.2" fill="none" opacity=".7" stroke-linecap="round"/>`;
+  const locksD = (arr) => arr.map((a) => lock(...a)).join("");
+  /** 后脑勺的发量（挡在脸后面） */
+  const CAP = "M38 114 Q28 18 100 14 Q172 18 162 114 Q160 126 150 130 L50 130 Q40 126 38 114Z";
+  /** 头顶前面的发片（盖住额头上半部，留给刘海） */
+  const CAP_M = "M40 110 Q28 16 100 12 Q172 16 160 110 Q158 118 152 120 L48 120 Q42 118 40 110Z";
+  const TOPMASS = "M42 104 Q32 20 100 16 Q168 20 158 104 Q150 62 124 50 Q100 42 76 50 Q50 62 42 104Z";
+  /** 下摆尖尖的长发 */
+  const zigBottom = (x0, x1, y, amp, n) => {
+    let d = "";
+    for (let i = 0; i <= n; i++) {
+      const x = x0 + ((x1 - x0) * i) / n;
+      d += ` L${r1(x)} ${r1(i % 2 ? y - amp : y + (i % 4 === 0 ? amp * 0.4 : 0))}`;
+    }
+    return d;
+  };
+
+  /** 一排刘海：n 缕，从 x0 到 x1，发根 rootY，发梢 tipY（中间长两边短），spread 往外散开 */
+  const fringe = (n, x0, x1, rootY, tipY, w, spread, wob) => {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const x = x0 + ((x1 - x0) * i) / (n - 1);
+      const off = (x - 100) / 50; // -1..1
+      const ty = tipY - Math.abs(off) * 6 + (i % 2 ? 5 : 0) + (wob ? (i % 3) * wob : 0);
+      out.push([x, rootY + Math.abs(off) * 10, x + off * (spread || 6), ty, w, off * 4]);
+    }
+    return out;
+  };
   const HAIR = {
-    short: { name: "短发", back: (c) => `<path d="M42 104 Q38 30 100 28 Q162 30 158 104 Q160 132 148 148 L52 148 Q40 132 42 104Z" fill="${c}" ${stk(c)}/>`, front: (c) => bangs(c) },
+    /* ── 女生款 ── */
+    short: {
+      name: "齐耳短发",
+      g: "f",
+      back: (g) => hp(g, `M38 104 Q28 18 100 14 Q172 18 162 104 Q166 134 156 156${zigBottom(156, 44, 156, 7, 8)} Q34 134 38 104Z`),
+      front: (g) =>
+        hp(g, TOPMASS + locksD(fringe(8, 56, 144, 34, 98, 22, 6)) + locksD(sym([[50, 76, 46, 146, 18, -4], [58, 84, 60, 132, 10, -2]]))) +
+        hl(g, [[74, 48, 72, 90, -1], [100, 42, 100, 92, 0], [126, 48, 128, 90, 1]]) +
+        ring(g, 44)
+    },
     long: {
-      name: "长直发",
-      back: (c) => `<path d="M40 100 Q36 26 100 26 Q164 26 160 100 L166 222 Q100 236 34 222Z" fill="${c}" ${stk(c)}/><path d="M60 150 L58 216 M140 150 L142 216" stroke="${ol(c)}" stroke-width="1.2" opacity=".5"/>`,
-      front: (c) => bangs(c) + sideLocks(c)
+      name: "黑长直",
+      g: "f",
+      back: (g) => hp(g, `M36 100 Q26 16 100 14 Q174 16 164 100 L170 214 Q172 230 166 240${zigBottom(166, 34, 240, 10, 12)} Q28 230 30 214Z`) + hl(g, [[56, 140, 52, 230, 2], [144, 140, 148, 230, -2], [68, 150, 68, 228, 0], [132, 150, 132, 228, 0]]),
+      front: (g) => hp(g, TOPMASS + locksD(fringe(8, 56, 144, 34, 100, 21, 4)) + locksD(sym([[50, 74, 44, 186, 18, -5], [60, 86, 60, 166, 10, -2]]))) + ring(g, 44)
+    },
+    hime: {
+      name: "公主切",
+      g: "f",
+      back: (g) => hp(g, `M36 100 Q26 16 100 14 Q174 16 164 100 L168 232${zigBottom(168, 32, 236, 5, 16)} Z`),
+      front: (g) =>
+        hp(g, TOPMASS + "M46 98 Q42 34 100 30 Q158 34 154 98 L148 93 L141 99 L134 93 L127 99 L120 93 L113 99 L106 93 L99 99 L92 93 L85 99 L78 93 L71 99 L64 93 L57 99 L51 93Z" + "M46 86 L44 152 L50 158 L56 152 L61 158 L64 100Z M154 86 L156 152 L150 158 L144 152 L139 158 L136 100Z") +
+        hl(g, [[70, 46, 68, 90, 0], [100, 38, 100, 90, 0], [130, 46, 132, 90, 0]]) +
+        ring(g, 44)
     },
     twin: {
       name: "双马尾",
-      back: (c) =>
-        `<path d="M42 104 Q38 30 100 28 Q162 30 158 104 L150 140 L50 140Z" fill="${c}" ${stk(c)}/><path d="M48 70 Q8 96 18 160 Q22 196 40 206 Q34 170 48 136 Q56 108 56 84Z" fill="${c}" ${stk(c)}/><path d="M152 70 Q192 96 182 160 Q178 196 160 206 Q166 170 152 136 Q144 108 144 84Z" fill="${c}" ${stk(c)}/>`,
-      front: (c) => bangs(c) + `<circle cx="50" cy="72" r="7" fill="#ff7a93" stroke="#d9506c" stroke-width="1.4"/><circle cx="150" cy="72" r="7" fill="#ff7a93" stroke="#d9506c" stroke-width="1.4"/>`
+      g: "f",
+      back: (g) => hp(g, CAP + locksD([[42, 66, 14, 214, 44, -20], [158, 66, 186, 214, 44, 20], [40, 74, 30, 196, 26, -6], [160, 74, 170, 196, 26, 6]])) + hl(g, [[38, 90, 20, 196, -10], [162, 90, 180, 196, 10], [34, 100, 30, 180, -4], [166, 100, 170, 180, 4]]),
+      front: (g) =>
+        hp(g, TOPMASS + locksD(fringe(8, 56, 144, 34, 98, 21, 6)) + locksD(sym([[50, 78, 48, 148, 15, -3]]))) +
+        `<g fill="#ff7a93" stroke="#d9506c" stroke-width="1.2"><path d="M38 66 l-11 -9 v18z M38 66 l11 -9 v18z"/><path d="M162 66 l-11 -9 v18z M162 66 l11 -9 v18z"/><circle cx="38" cy="66" r="3.8"/><circle cx="162" cy="66" r="3.8"/></g>` +
+        ring(g, 44)
+    },
+    ponyhi: {
+      name: "高马尾",
+      g: "f",
+      back: (g) => hp(g, CAP + locksD([[118, 22, 170, 204, 38, 26], [124, 26, 158, 186, 22, 12], [114, 22, 150, 170, 18, 18]])) + hl(g, [[128, 40, 166, 190, 18], [122, 40, 152, 172, 14]]),
+      front: (g) =>
+        hp(g, TOPMASS + locksD(fringe(7, 58, 142, 34, 96, 22, 7)) + locksD(sym([[50, 78, 52, 152, 14, -4]]))) +
+        `<rect x="114" y="14" width="14" height="10" rx="3" fill="#ff7a93" stroke="#d9506c" stroke-width="1.1" transform="rotate(28 121 19)"/>` +
+        ring(g, 44)
     },
     bun: {
       name: "丸子头",
-      back: (c) => `<circle cx="100" cy="24" r="22" fill="${c}" ${stk(c)}/><path d="M42 104 Q38 30 100 28 Q162 30 158 104 Q160 132 148 146 L52 146 Q40 132 42 104Z" fill="${c}" ${stk(c)}/>`,
-      front: (c) => bangs(c) + `<path d="M84 16 Q100 8 116 16" stroke="#fff" stroke-width="3" opacity=".3" fill="none" stroke-linecap="round"/>`
+      g: "f",
+      back: (g) => hp(g, circ(100, 20, 20) + CAP) + hl(g, [[86, 12, 112, 28, 6], [90, 6, 116, 20, 6]]),
+      front: (g) => hp(g, TOPMASS + locksD(fringe(7, 58, 142, 34, 94, 21, 7)) + locksD(sym([[52, 80, 56, 142, 11, -5]]))) + ring(g, 44)
     },
     wavy: {
       name: "大波浪",
-      back: (c) =>
-        `<path d="M38 100 Q34 24 100 24 Q166 24 162 100 Q178 130 164 160 Q180 192 160 218 Q132 236 100 226 Q68 236 40 218 Q20 192 36 160 Q22 130 38 100Z" fill="${c}" ${stk(c)}/>`,
-      front: (c) => sweep(c) + `<path d="M48 96 Q40 124 52 146 Q44 168 58 184 Q62 150 64 112Z" fill="${c}" ${stk(c, 1.2)}/><path d="M152 96 Q160 124 148 146 Q156 168 142 184 Q138 150 136 112Z" fill="${c}" ${stk(c, 1.2)}/>`
-    },
-    spiky: {
-      name: "刺猬头",
-      back: (c) => `<path d="M42 104 Q38 30 100 28 Q162 30 158 104 Q160 126 150 140 L50 140 Q40 126 42 104Z" fill="${c}" ${stk(c)}/>`,
-      front: (c) => `<path d="M44 104 L34 62 L58 70 L54 30 L78 50 L88 16 L104 46 L120 18 L128 50 L150 32 L146 70 L168 62 L156 104 L144 82 L132 96 L122 72 L110 90 L98 68 L86 90 L74 72 L64 94 L56 80Z" fill="${c}" ${stk(c)}/>`
+      g: "f",
+      back: (g) =>
+        hp(g, "M34 100 Q24 14 100 14 Q176 14 166 100 Q184 130 166 162 Q186 194 164 224 Q150 242 130 234 Q116 244 100 236 Q84 244 70 234 Q50 242 36 224 Q14 194 34 162 Q16 130 34 100Z") +
+        hl(g, [[50, 130, 40, 214, -12], [150, 130, 160, 214, 12], [64, 160, 74, 226, 8], [136, 160, 126, 226, -8]]),
+      front: (g) =>
+        hp(g, "M42 104 Q32 18 104 16 Q168 22 158 100 Q150 66 128 58 Q118 78 98 80 Q74 76 62 68 Q50 80 42 104Z" + locksD([[104, 30, 60, 98, 28, 12], [118, 36, 144, 96, 20, -8], [110, 34, 104, 82, 14, -4]]) + locksD([[48, 80, 40, 176, 22, -12], [152, 80, 160, 176, 22, 12]])) +
+        shine(g, "M58 52 Q86 32 120 36") +
+        ring(g, 42, 30)
     },
     bob: {
       name: "波波头",
-      back: (c) => `<path d="M38 100 Q34 26 100 26 Q166 26 162 100 L164 156 Q150 166 134 158 L66 158 Q50 166 36 156Z" fill="${c}" ${stk(c)}/>`,
-      front: (c) => bangs(c) + `<path d="M50 96 Q46 134 52 156 Q60 140 62 104Z" fill="${c}" ${stk(c, 1.2)}/><path d="M150 96 Q154 134 148 156 Q140 140 138 104Z" fill="${c}" ${stk(c, 1.2)}/>`
+      g: "f",
+      back: (g) => hp(g, "M34 100 Q24 16 100 14 Q176 16 166 100 L168 150 Q164 168 146 164 L54 164 Q36 168 32 150Z"),
+      front: (g) => hp(g, TOPMASS + locksD(fringe(8, 56, 144, 34, 98, 22, 3)) + locksD(sym([[46, 78, 56, 164, 24, -10]]))) + ring(g, 44)
+    },
+    braid: {
+      name: "侧编发",
+      g: "f",
+      back: (g) => hp(g, CAP),
+      front: (g) =>
+        hp(g, TOPMASS + locksD([[98, 30, 56, 94, 28, 10], [110, 32, 90, 88, 20, 5], [124, 36, 140, 96, 20, -5], [138, 44, 150, 102, 18, -4], [50, 78, 50, 140, 14, -3]])) +
+        hp(g, [0, 1, 2, 3, 4, 5].map((i) => circ(146 + (i % 2 ? 4 : -2), 118 + i * 15, 12, 9.5)).join("") + lock(147, 198, 151, 224, 13, 2)) +
+        [0, 1, 2, 3, 4].map((i) => `<path d="M${136 + (i % 2 ? 6 : 0)} ${124 + i * 15} q10 4 20 -2" stroke="${shade(g.c, 0.55)}" stroke-width="1" fill="none"/>`).join("") +
+        `<circle cx="147" cy="198" r="4" fill="#ff7a93" stroke="#d9506c" stroke-width="1"/>` +
+        ring(g, 42, 30)
+    },
+
+    /* ── 男生款（参考：中分、背头、碎刘海、侧分卷、低马尾、清爽短发、长层次、纹理侧分、慵懒微卷） ── */
+    center: {
+      name: "经典中分",
+      g: "m",
+      back: (g) => hp(g, CAP_M),
+      front: (g) =>
+        hp(g, "M42 106 Q32 20 100 16 Q168 20 158 106 Q150 70 128 56 Q112 46 100 38 Q88 46 72 56 Q50 70 42 106Z" + locksD(sym([[98, 30, 64, 100, 24, -12], [92, 34, 50, 108, 22, -10], [80, 40, 44, 124, 18, -6], [98, 34, 82, 86, 14, -6]]))) +
+        hl(g, [[96, 38, 66, 94, -8], [88, 40, 54, 102, -7], [104, 38, 134, 94, 8], [112, 40, 146, 102, 7]]) +
+        shine(g, "M62 50 Q80 34 96 32 M104 32 Q120 34 138 50")
+    },
+    slick: {
+      name: "后梳大背头",
+      g: "m",
+      back: (g) => hp(g, CAP_M),
+      front: (g) =>
+        hp(g, "M42 104 Q32 14 100 10 Q168 14 158 104 Q152 76 142 66 Q122 54 100 56 Q78 54 58 66 Q48 76 42 104Z" + locksD([[110, 56, 120, 88, 10, 5], [118, 56, 134, 82, 8, 4]]) + locksD(sym([[48, 72, 46, 114, 13, -2]]))) +
+        hl(g, [[62, 66, 90, 22, -8], [78, 60, 108, 18, -8], [98, 56, 128, 22, -6], [118, 56, 146, 38, -5], [138, 66, 154, 54, -2]]) +
+        shine(g, "M70 38 Q96 20 126 26")
+    },
+    fringe: {
+      name: "轻薄碎刘海",
+      g: "m",
+      back: (g) => hp(g, CAP_M),
+      front: (g) => hp(g, TOPMASS + locksD(fringe(9, 52, 148, 32, 100, 20, 8)) + locksD(sym([[48, 78, 46, 128, 16, -3]]))) + hl(g, [[70, 46, 67, 90, -1], [94, 40, 92, 92, 0], [118, 42, 121, 92, 1]]) + ring(g, 42)
+    },
+    sidecurl: {
+      name: "侧分卷发",
+      g: "m",
+      back: (g) => hp(g, "M38 112 Q26 16 100 12 Q174 16 162 112 Q164 132 152 138 L48 138 Q36 132 38 112Z"),
+      front: (g) =>
+        hp(g, "M42 106 Q32 18 84 14 Q156 14 160 102 Q150 66 120 54 Q96 46 80 46 Q58 62 42 106Z" + locksD([[82, 28, 134, 94, 30, -12], [92, 30, 154, 112, 22, -14], [78, 32, 112, 86, 18, -8], [66, 42, 50, 102, 22, 7], [54, 64, 44, 130, 18, 5]])) +
+        `<path d="M134 94 q9 2 7 11 q-7 0 -4 -7 M154 112 q8 4 3 12 q-6 -2 -1 -8 M44 130 q-7 2 -4 9 q6 0 4 -7" stroke="${shade(g.c, 0.5)}" stroke-width="1.8" fill="none" stroke-linecap="round"/>` +
+        hl(g, [[88, 36, 130, 88, -7], [96, 36, 148, 104, -9], [68, 50, 54, 98, 5]]) +
+        shine(g, "M70 34 Q100 22 128 36")
+    },
+    lowtail: {
+      name: "低马尾束发",
+      g: "m",
+      back: (g) => hp(g, CAP + locksD([[118, 128, 150, 206, 22, 10], [124, 130, 142, 192, 12, 4]])) + `<rect x="112" y="120" width="15" height="11" rx="3" fill="#2b2326" transform="rotate(30 119 125)"/>`,
+      front: (g) =>
+        hp(g, "M42 106 Q32 18 100 14 Q168 18 158 106 Q150 70 128 56 Q112 46 104 36 Q92 50 72 58 Q50 72 42 106Z" + locksD([[104, 32, 68, 102, 24, -10], [96, 34, 52, 110, 22, -9], [108, 34, 130, 94, 20, 7], [114, 38, 150, 104, 20, 8]]) + locksD([[56, 78, 44, 156, 13, -7], [146, 78, 158, 156, 13, 7]])) +
+        hl(g, [[100, 40, 70, 96, -6], [112, 42, 140, 98, 6]]) +
+        shine(g, "M66 50 Q86 34 102 32")
+    },
+    crew: {
+      name: "短发清爽款",
+      g: "m",
+      back: (g) => hp(g, "M42 110 Q32 22 100 18 Q168 22 158 110 Q156 118 150 120 L50 120 Q44 118 42 110Z"),
+      front: (g) =>
+        hp(g, "M44 102 Q34 22 100 16 Q166 22 156 102 Q150 78 134 72 Q100 64 66 72 Q50 78 44 102Z" + locksD([[64, 72, 52, 34, 20, -4], [80, 68, 74, 24, 20, -3], [96, 66, 98, 18, 20, 0], [112, 66, 120, 22, 20, 3], [128, 68, 142, 30, 20, 4], [142, 74, 156, 44, 18, 4]]) + locksD([[86, 66, 70, 88, 16, 4], [102, 66, 90, 86, 14, 3]]) + locksD(sym([[48, 76, 48, 110, 13, -2]]))) +
+        shine(g, "M66 44 Q100 26 134 42")
+    },
+    wolf: {
+      name: "长层次狼尾",
+      g: "m",
+      back: (g) => hp(g, `M36 104 Q26 16 100 14 Q174 16 164 104 L166 152 Q166 172 156 186${zigBottom(156, 44, 186, 12, 8)} Q34 172 34 152Z`),
+      front: (g) => hp(g, TOPMASS + locksD(fringe(8, 54, 146, 32, 104, 21, 8)) + locksD(sym([[48, 78, 40, 156, 18, -6], [56, 92, 56, 140, 10, -2]]))) + hl(g, [[74, 48, 69, 94, -1], [100, 42, 101, 98, 0], [126, 48, 132, 94, 1]]) + ring(g, 42)
+    },
+    texture: {
+      name: "纹理侧分",
+      g: "m",
+      back: (g) => hp(g, CAP_M),
+      front: (g) =>
+        hp(g, "M42 106 Q32 18 100 12 Q168 18 158 106 Q152 72 136 58 Q126 46 122 36 Q104 52 80 58 Q54 70 42 106Z" + locksD([[120, 32, 72, 94, 28, 12], [114, 34, 56, 104, 24, 12], [106, 38, 46, 120, 20, 10], [126, 36, 142, 86, 18, -5], [134, 42, 154, 100, 18, -5], [150, 76, 156, 124, 13, 3]])) +
+        hl(g, [[118, 40, 74, 90, 9], [110, 42, 60, 100, 9], [128, 44, 142, 84, -4]]) +
+        shine(g, "M84 40 Q106 28 126 32")
+    },
+    lazy: {
+      name: "慵懒微卷",
+      g: "m",
+      back: (g) => hp(g, "M38 110 Q26 14 100 10 Q174 14 162 110 Q164 132 152 142 L48 142 Q36 132 38 110Z"),
+      front: (g) =>
+        hp(g, TOPMASS + locksD([[58, 46, 46, 104, 22, 9], [72, 40, 68, 102, 21, -8], [86, 36, 80, 98, 20, 8], [100, 34, 104, 102, 20, -7], [114, 36, 120, 98, 20, 8], [128, 40, 136, 102, 21, -8], [142, 46, 156, 104, 22, -9]]) + locksD([[48, 80, 42, 138, 18, 8], [152, 80, 158, 138, 18, -8]])) +
+        `<path d="M46 104 q-6 4 -1 10 M104 102 q6 4 1 10 M156 104 q6 4 1 10 M42 138 q-5 4 0 9 M158 138 q5 4 0 9" stroke="${shade(g.c, 0.5)}" stroke-width="1.6" fill="none" stroke-linecap="round"/>` +
+        hl(g, [[72, 46, 69, 92, -5], [100, 40, 103, 94, -4], [128, 46, 134, 94, -5]]) +
+        ring(g, 42)
+    },
+    buzz: {
+      name: "寸头",
+      g: "m",
+      back: () => "",
+      front: (g) =>
+        `<path d="M48 98 Q44 28 100 28 Q156 28 152 98 Q146 64 128 58 Q100 52 72 58 Q54 64 48 98Z" fill="url(#${g.id})" stroke="${shade(g.c, 0.5)}" stroke-width="1.6"/>` +
+        `<path d="M58 62 l2 -3 M70 54 l2 -3 M84 48 l2 -3 M100 46 l2 -3 M114 48 l2 -3 M128 54 l2 -3 M140 62 l2 -3" stroke="${shade(g.c, 0.6)}" stroke-width="1.1" opacity=".55"/>`
+    },
+    emo: {
+      name: "刘海遮眼",
+      g: "m",
+      back: (g) => hp(g, `M36 104 Q26 16 100 14 Q174 16 164 104 L166 160${zigBottom(166, 34, 162, 6, 10)} Z`),
+      front: (g) => hp(g, TOPMASS + locksD([[132, 34, 70, 122, 32, 14], [120, 34, 56, 114, 28, 14], [140, 42, 98, 120, 22, 9], [146, 48, 154, 106, 18, -3], [60, 46, 46, 108, 20, -2]])) + hl(g, [[128, 42, 74, 114, 11], [118, 42, 62, 106, 11]]) + ring(g, 42)
     }
   };
+  const HAIR_DEF = { f: "short", m: "fringe" };
   // 眼睛：(80,110) 和 (120,110)
   const EYE_L = 80;
   const EYE_R = 120;
   const EY = 110;
   let gid = 0;
-  const animeEye = (cx, c, id, opt) => {
-    const o = opt || {};
-    if (o.sharp)
-      return `<path d="M${cx - 11} ${EY - 1} Q${cx} ${EY - 9} ${cx + 11} ${EY - 2} Q${cx + 6} ${EY + 7} ${cx} ${EY + 7} Q${cx - 7} ${EY + 7} ${cx - 11} ${EY - 1}Z" fill="#fff"/>
-        <ellipse cx="${cx}" cy="${EY}" rx="6.6" ry="7.4" fill="url(#${id})"/><ellipse cx="${cx}" cy="${EY + 1}" rx="3" ry="4.2" fill="#1d1420"/><circle cx="${cx + 2.6}" cy="${EY - 2.6}" r="2.2" fill="#fff"/>
-        <path d="M${cx - 13} ${EY - 2} Q${cx} ${EY - 11} ${cx + 13} ${EY - 3}" stroke="#2a1d24" stroke-width="3.8" fill="none" stroke-linecap="round"/>
-        <path d="M${cx - 11} ${EY - 16} Q${cx} ${EY - (cx < 100 ? 20 : 18)} ${cx + 11} ${EY - (cx < 100 ? 16 : 20)}" stroke="#3a2a2a" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
-    return `<ellipse cx="${cx}" cy="${EY}" rx="10" ry="12.5" fill="#fff"/>
-      <ellipse cx="${cx}" cy="${EY + 1}" rx="8.6" ry="11.2" fill="url(#${id})"/>
-      ${o.slit ? `<ellipse cx="${cx}" cy="${EY + 1}" rx="1.8" ry="8" fill="#1d1420"/>` : `<ellipse cx="${cx}" cy="${EY + 2}" rx="4.2" ry="5.8" fill="#1d1420"/>`}
-      ${o.star ? `<path d="M${cx} ${EY - 7} l2.4 5.2 5.6 .8 -4.1 3.8 1 5.6 -4.9 -2.7 -4.9 2.7 1 -5.6 -4.1 -3.8 5.6 -.8z" fill="#fff" opacity=".95"/>` : `<circle cx="${cx + 3.5}" cy="${EY - 4}" r="3.4" fill="#fff"/><circle cx="${cx - 3.5}" cy="${EY + 6}" r="1.6" fill="#fff" opacity=".9"/>`}
-      <path d="M${cx - 12} ${EY - 6} Q${cx} ${EY - 17} ${cx + 12} ${EY - 7}" stroke="#2a1d24" stroke-width="3.6" fill="none" stroke-linecap="round"/>
-      <path d="M${cx + (cx < 100 ? -12 : 12)} ${EY - 7} l${cx < 100 ? -4 : 4} -3" stroke="#2a1d24" stroke-width="2.4" stroke-linecap="round"/>`;
+  const LASH = "#24161c";
+  /** 一只精致眼睛；sex 决定女生大眼 / 男生细长眼 */
+  const eye = (cx, c, id, sex, o) => {
+    o = o || {};
+    const s = cx < 100 ? -1 : 1; // 外眼角方向
+    const ox = cx + s * 12;
+    const ix = cx - s * 12;
+    const male = sex === "m" || o.sharp;
+    const cid = `${id}c${cx}`;
+    let sclera;
+    let lid;
+    let brow;
+    let iris;
+    let lower;
+    if (male) {
+      sclera = `M${ix} ${EY - 1}Q${cx} ${EY - 11} ${ox} ${EY - 4}C${ox} ${EY + 3} ${cx + s * 5} ${EY + 8} ${cx} ${EY + 8}C${cx - s * 6} ${EY + 8} ${ix} ${EY + 4} ${ix} ${EY - 1}Z`;
+      lid = `M${ix - s * 1} ${EY - 1}Q${cx} ${EY - 12} ${ox + s * 1} ${EY - 4}L${ox + s * 3} ${EY - 7}Q${cx} ${EY - 16} ${ix - s * 1} ${EY - 4.5}Z`;
+      brow = `M${ix - s * 1} ${EY - 17}Q${cx} ${EY - 22} ${ox + s * 2} ${EY - 19}L${ox + s * 2} ${EY - 17.5}Q${cx} ${EY - 19.5} ${ix - s * 1} ${EY - 13.5}Z`;
+      iris = { cy: EY + 1, rx: 6.4, ry: 7.6, p: 3.2, pr: 4.2 };
+      lower = `M${cx - s * 5} ${EY + 8.6}Q${cx + s * 3} ${EY + 9.4} ${ox - s * 1} ${EY + 4}`;
+    } else {
+      sclera = `M${ix} ${EY - 4}Q${cx} ${EY - 15} ${ox} ${EY - 6}C${ox + s * 1} ${EY + 6} ${cx + s * 6} ${EY + 13} ${cx} ${EY + 13}C${cx - s * 7} ${EY + 13} ${ix} ${EY + 6} ${ix} ${EY - 4}Z`;
+      lid = `M${ix - s * 1} ${EY - 4}Q${cx} ${EY - 16} ${ox + s * 1} ${EY - 6}L${ox + s * 5} ${EY - 9}L${ox + s * 2} ${EY - 9.5}Q${cx} ${EY - 20.5} ${ix - s * 1} ${EY - 7.5}Z`;
+      brow = `M${ix} ${EY - 21}Q${cx} ${EY - 27} ${ox + s * 2} ${EY - 22}L${ox + s * 2} ${EY - 21}Q${cx} ${EY - 25} ${ix} ${EY - 19.5}Z`;
+      iris = { cy: EY + 2, rx: 8.4, ry: 10.6, p: 3.8, pr: 5.2 };
+      lower = `M${cx - s * 6} ${EY + 13.4}Q${cx + s * 2} ${EY + 14.6} ${ox - s * 0.5} ${EY + 7}`;
+    }
+    if (o.closed) {
+      const up = o.closed === "up";
+      return `<path d="${brow}" fill="${LASH}" opacity=".85"/><path d="M${ix} ${EY + (up ? 2 : 0)}Q${cx} ${EY + (up ? -9 : 7)} ${ox} ${EY + (up ? 1 : -1)}" stroke="${LASH}" stroke-width="3.2" fill="none" stroke-linecap="round"/>${male ? "" : `<path d="M${ox} ${EY + (up ? 1 : -1)} l${s * 4} -3" stroke="${LASH}" stroke-width="2" stroke-linecap="round"/>`}`;
+    }
+    const pupil = o.slit ? `<ellipse cx="${cx}" cy="${iris.cy}" rx="1.6" ry="${iris.ry - 2}" fill="#140c12"/>` : `<ellipse cx="${cx}" cy="${iris.cy + 0.6}" rx="${iris.p}" ry="${iris.pr}" fill="#140c12"/>`;
+    const hi = o.star
+      ? `<path d="M${cx + 2} ${iris.cy - 7} l1.8 3.9 4.2 .6 -3.1 2.9 .8 4.2 -3.7 -2 -3.7 2 .8 -4.2 -3.1 -2.9 4.2 -.6z" fill="#fff"/>`
+      : `<ellipse cx="${cx + s * -2.6}" cy="${iris.cy - iris.ry * 0.45}" rx="${male ? 2 : 2.8}" ry="${male ? 2.4 : 3.4}" fill="#fff"/><circle cx="${cx + s * 3}" cy="${iris.cy + iris.ry * 0.45}" r="${male ? 1 : 1.5}" fill="#fff" opacity=".9"/>`;
+    const sleepy = o.sleepy ? `<path d="M${ix - s * 2} ${EY - 16}L${ox + s * 3} ${EY - 16}L${ox + s * 3} ${EY - 1}Q${cx} ${EY - 5} ${ix - s * 2} ${EY + 1}Z" fill="${o.sk}"/><path d="M${ix - s * 1} ${EY + 1}Q${cx} ${EY - 5} ${ox + s * 2} ${EY - 1}" stroke="${LASH}" stroke-width="3" fill="none" stroke-linecap="round"/>` : "";
+    return `<clipPath id="${cid}"><path d="${sclera}"/></clipPath>
+      <path d="${sclera}" fill="#fffdfb"/>
+      <g clip-path="url(#${cid})">
+        <ellipse cx="${cx}" cy="${iris.cy}" rx="${iris.rx}" ry="${iris.ry}" fill="url(#${id})" stroke="${shade(c, 0.4)}" stroke-width=".9"/>
+        ${pupil}
+        <ellipse cx="${cx}" cy="${iris.cy + iris.ry * 0.55}" rx="${iris.rx * 0.6}" ry="${iris.ry * 0.3}" fill="${mixW(c, 0.45)}" opacity=".55"/>
+        ${hi}
+        <path d="${sclera}" fill="none" stroke="#000" stroke-width="5" opacity=".14" transform="translate(0 -3)"/>
+      </g>
+      ${o.sleepy ? sleepy : ""}
+      <path d="${lid}" fill="${LASH}"/>
+      ${male ? "" : `<path d="M${ox + s * 1} ${EY - 7} l${s * 4} 1.5 M${ox} ${EY - 3} l${s * 3.6} 2.6" stroke="${LASH}" stroke-width="1.4" stroke-linecap="round"/>`}
+      <path d="${lower}" stroke="${LASH}" stroke-width="${male ? 0.9 : 1.1}" fill="none" opacity=".55" stroke-linecap="round"/>
+      <path d="${brow}" fill="${male ? "#2a1d20" : "#4a3236"}" opacity="${male ? 0.92 : 0.8}"/>`;
   };
-  const irisGrad = (id, c) => `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${shade(c, 0.45)}"/><stop offset=".55" stop-color="${c}"/><stop offset="1" stop-color="${shade(c, 1.35)}"/></linearGradient>`;
-  const closedArc = (cx, up) => `<path d="M${cx - 10} ${EY + (up ? 2 : -1)} Q${cx} ${EY + (up ? -9 : 6)} ${cx + 10} ${EY + (up ? 2 : -1)}" stroke="#2a1d24" stroke-width="3.4" fill="none" stroke-linecap="round"/>`;
+  const irisGrad = (id, c) => `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${shade(c, 0.35)}"/><stop offset=".45" stop-color="${shade(c, 0.8)}"/><stop offset=".8" stop-color="${c}"/><stop offset="1" stop-color="${mixW(c, 0.35)}"/></linearGradient>`;
+  const pair = (c, id, sex, o) => irisGrad(id, c) + eye(EYE_L, c, id, sex, o) + eye(EYE_R, c, id, sex, o);
   const EYES = {
-    round: { name: "圆眼", draw: (c, id) => irisGrad(id, c) + animeEye(EYE_L, c, id) + animeEye(EYE_R, c, id) },
-    sparkle: { name: "星星眼", draw: (c, id) => irisGrad(id, c) + animeEye(EYE_L, c, id, { star: 1 }) + animeEye(EYE_R, c, id, { star: 1 }) },
-    smile: { name: "笑眼", draw: () => closedArc(EYE_L, true) + closedArc(EYE_R, true) },
-    sleepy: {
-      name: "困困眼",
-      draw: (c, id, sk) =>
-        irisGrad(id, c) +
-        animeEye(EYE_L, c, id) +
-        animeEye(EYE_R, c, id) +
-        `<path d="M66 94 Q80 90 94 94 L94 108 Q80 104 66 108Z M106 94 Q120 90 134 94 L134 108 Q120 104 106 108Z" fill="${sk || "#ffe6d5"}"/><path d="M68 108 Q80 104 92 108 M108 108 Q120 104 132 108" stroke="#2a1d24" stroke-width="3" fill="none" stroke-linecap="round"/>`
-    },
-    cat: { name: "猫猫眼", draw: (c, id) => irisGrad(id, c) + animeEye(EYE_L, c, id, { slit: 1 }) + animeEye(EYE_R, c, id, { slit: 1 }) },
-    wink: { name: "眨眼", draw: (c, id) => irisGrad(id, c) + animeEye(EYE_L, c, id) + `<path d="M110 106 L130 102 M110 106 L130 112" stroke="#2a1d24" stroke-width="3.4" stroke-linecap="round"/>` }
+    round: { name: "圆眼", draw: (c, id, sk, sex) => pair(c, id, sex) },
+    sparkle: { name: "星星眼", g: "f", draw: (c, id, sk, sex) => pair(c, id, sex, { star: 1 }) },
+    smile: { name: "笑眼", draw: (c, id, sk, sex) => eye(EYE_L, c, id, sex, { closed: "up" }) + eye(EYE_R, c, id, sex, { closed: "up" }) },
+    sleepy: { name: "困困眼", draw: (c, id, sk, sex) => pair(c, id, sex, { sleepy: 1, sk }) },
+    cat: { name: "猫猫眼", draw: (c, id, sk, sex) => pair(c, id, sex, { slit: 1 }) },
+    wink: { name: "眨眼", draw: (c, id, sk, sex) => irisGrad(id, c) + eye(EYE_L, c, id, sex) + eye(EYE_R, c, id, sex, { closed: "up" }) },
+    sharp: { name: "冷淡眼", draw: (c, id, sk, sex) => pair(c, id, sex, { sharp: 1, sleepy: sex === "m" ? 0 : 0 }) }
   };
   const MOUTH = {
     smile: { name: "微笑", draw: () => `<path d="M93 134 Q100 140 107 134" stroke="#7a3a3a" stroke-width="2.4" fill="none" stroke-linecap="round"/>` },
@@ -227,73 +474,25 @@
     plain: { name: "纯白", draw: () => `<rect width="200" height="300" fill="#ffffff"/>` }
   };
   /* ───── 男生款 ───── */
-  Object.assign(HAIR, {
-    center: {
-      name: "中分",
-      m: 1,
-      back: (c) => `<path d="M44 104 Q40 30 100 28 Q160 30 156 104 Q156 116 148 124 L52 124 Q44 116 44 104Z" fill="${c}" ${stk(c)}/>`,
-      front: (c) =>
-        `<path d="M48 104 Q44 38 100 34 Q98 50 88 60 Q74 72 64 88 Q58 96 56 104Z" fill="${c}" ${stk(c)}/><path d="M152 104 Q156 38 100 34 Q102 50 112 60 Q126 72 136 88 Q142 96 144 104Z" fill="${c}" ${stk(c)}/><path d="M66 52 Q84 42 98 40 M134 52 Q116 42 102 40" stroke="#fff" stroke-width="4" opacity=".25" fill="none" stroke-linecap="round"/>`
-    },
-    wolf: {
-      name: "狼尾",
-      m: 1,
-      back: (c) => `<path d="M42 104 Q38 30 100 28 Q162 30 158 104 L160 150 Q156 172 140 178 L134 158 L66 158 L60 178 Q44 172 40 150Z" fill="${c}" ${stk(c)}/>`,
-      front: (c) =>
-        `<path d="M46 104 Q42 36 100 32 Q158 36 154 104 L148 86 L140 100 L132 74 L120 92 L110 68 L98 92 L88 70 L78 94 L68 76 L60 98 L54 84Z" fill="${c}" ${stk(c)}/><path d="M48 96 L44 140 L56 118Z M152 96 L156 140 L144 118Z" fill="${c}" ${stk(c, 1.2)}/>`
-    },
-    buzz: {
-      name: "寸头",
-      m: 1,
-      back: () => "",
-      front: (c) => `<path d="M50 94 Q48 36 100 36 Q152 36 150 94 Q146 66 128 60 Q100 54 72 60 Q54 66 50 94Z" fill="${c}" ${stk(c)} opacity=".95"/><path d="M60 64 l2 -3 M72 56 l2 -3 M86 52 l2 -3 M100 50 l2 -3 M114 52 l2 -3 M128 56 l2 -3 M140 64 l2 -3" stroke="${ol(c)}" stroke-width="1.2" opacity=".6"/>`
-    },
-    slick: {
-      name: "背头",
-      m: 1,
-      back: (c) => `<path d="M44 100 Q40 30 100 26 Q160 30 156 100 Q158 126 150 142 L50 142 Q42 126 44 100Z" fill="${c}" ${stk(c)}/>`,
-      front: (c) =>
-        `<path d="M48 96 Q44 30 100 26 Q156 30 152 96 Q146 62 120 54 Q100 50 80 54 Q56 62 48 96Z" fill="${c}" ${stk(c)}/><path d="M64 70 Q80 46 104 40 M80 64 Q96 44 120 40 M98 58 Q114 44 136 46" stroke="${ol(c)}" stroke-width="1.6" fill="none" opacity=".7"/><path d="M118 54 Q130 64 128 80" stroke="${c}" stroke-width="4" fill="none" stroke-linecap="round"/>`
-    },
-    curly: {
-      name: "卷毛",
-      m: 1,
-      back: (c) => `<path d="M42 100 Q36 28 100 24 Q164 28 158 100 Q158 114 150 120 L50 120 Q42 114 42 100Z" fill="${c}" ${stk(c)}/>`,
-      front: (c) =>
-        [[56, 70], [72, 54], [90, 46], [110, 46], [128, 54], [144, 70], [64, 88], [138, 88], [82, 66], [100, 62], [118, 66]]
-          .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="13" fill="${c}" ${stk(c, 1.3)}/>`)
-          .join("") + `<path d="M86 50 q6 -6 12 0 M112 52 q6 -6 12 0" stroke="#fff" stroke-width="2.4" opacity=".3" fill="none"/>`
-    },
-    emo: {
-      name: "刘海遮眼",
-      m: 1,
-      back: (c) => `<path d="M40 104 Q36 28 100 26 Q164 28 160 104 L162 160 Q148 168 136 160 L64 160 Q52 168 38 160Z" fill="${c}" ${stk(c)}/>`,
-      front: (c) =>
-        `<path d="M44 110 Q40 34 104 30 Q160 36 156 104 L148 92 L142 108 L134 86 L124 104 Q116 116 104 120 Q86 124 74 118 L66 128 L64 110 L54 122Z" fill="${c}" ${stk(c)}/><path d="M70 56 Q100 40 132 50" stroke="#fff" stroke-width="5" opacity=".25" fill="none" stroke-linecap="round"/>`
-    }
-  });
-  Object.assign(EYES, {
-    sharp: { name: "冷淡眼", m: 1, draw: (c, id) => irisGrad(id, c) + animeEye(EYE_L, c, id, { sharp: 1 }) + animeEye(EYE_R, c, id, { sharp: 1 }) }
-  });
   Object.assign(MOUTH, {
-    smirk: { name: "坏笑", m: 1, draw: () => `<path d="M92 135 Q102 138 110 131" stroke="#7a3a3a" stroke-width="2.4" fill="none" stroke-linecap="round"/>` },
-    flat: { name: "面无表情", m: 1, draw: () => `<path d="M94 135 h12" stroke="#7a3a3a" stroke-width="2.4" stroke-linecap="round"/>` }
+    smirk: { name: "坏笑", g: "m", draw: () => `<path d="M92 135 Q102 138 110 131" stroke="#7a3a3a" stroke-width="2.4" fill="none" stroke-linecap="round"/>` },
+    flat: { name: "面无表情", g: "m", draw: () => `<path d="M94 135 h12" stroke="#7a3a3a" stroke-width="2.4" stroke-linecap="round"/>` }
   });
   Object.assign(TOP, {
     tank: {
       name: "无袖背心",
-      m: 1,
+      g: "m",
       draw: (c) => `<path d="M84 157 Q90 168 90 178 L86 218 Q100 224 114 218 L110 178 Q110 168 116 157 L108 157 Q100 172 92 157Z" fill="${c}" ${stk(c)}/>`
     },
     jersey: {
       name: "篮球服",
-      m: 1,
+      g: "m",
       draw: (c) =>
         `<path d="M82 157 Q90 170 88 180 L84 220 Q100 226 116 220 L112 180 Q110 170 118 157 L108 157 Q100 172 92 157Z" fill="${c}" ${stk(c)}/><path d="M92 157 Q100 172 108 157" stroke="#fff" stroke-width="2.4" fill="none"/><text x="100" y="204" font-size="17" font-weight="800" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif">23</text>`
     },
     bomber: {
       name: "夹克",
-      m: 1,
+      g: "m",
       draw: (c) =>
         sleeves(c, true) +
         torso(c, "M72 168 Q72 158 88 157 L112 157 Q128 158 128 168 L130 216 Q100 222 70 216Z") +
@@ -301,7 +500,7 @@
     },
     leather: {
       name: "皮衣",
-      m: 1,
+      g: "m",
       draw: (c) =>
         sleeves("#1f1d22", true) +
         torso("#1f1d22") +
@@ -310,14 +509,14 @@
     },
     trench: {
       name: "风衣",
-      m: 1,
+      g: "m",
       draw: (c) =>
         sleeves(c, true) +
         `<path d="M72 166 Q72 158 88 157 L112 157 Q128 158 128 166 L136 252 Q100 260 64 252Z" fill="${c}" ${stk(c)}/><path d="M86 157 L100 190 L94 157Z M114 157 L100 190 L106 157Z" fill="${shade(c, 0.82)}" ${stk(c, 1)}/><path d="M70 204 L130 204 L131 211 L69 211Z" fill="${shade(c, 0.75)}"/><rect x="96" y="203" width="8" height="9" rx="1" fill="none" stroke="#d4b25a" stroke-width="1.6"/><circle cx="92" cy="182" r="2" fill="${ol(c)}"/><circle cx="108" cy="182" r="2" fill="${ol(c)}"/><path d="M100 212 V254" stroke="${ol(c)}" stroke-width="1.4"/>`
     },
     gakuran: {
       name: "立领制服",
-      m: 1,
+      g: "m",
       draw: (c) =>
         sleeves(c, true) +
         torso(c) +
@@ -326,7 +525,7 @@
     },
     cardigan: {
       name: "开衫",
-      m: 1,
+      g: "m",
       draw: (c) =>
         sleeves(c, true) +
         torso("#f7f7fb") +
@@ -337,46 +536,59 @@
   Object.assign(BOTTOM, {
     cargo: {
       name: "工装裤",
-      m: 1,
+      g: "m",
       draw: (c) =>
         `<path d="M74 210 L126 210 L125 264 L104 264 L100 228 L96 264 L75 264Z" fill="${c}" ${stk(c)}/><rect x="72" y="232" width="12" height="14" rx="2" fill="${shade(c, 0.85)}" ${stk(c, 1)}/><rect x="116" y="232" width="12" height="14" rx="2" fill="${shade(c, 0.85)}" ${stk(c, 1)}/><path d="M74 212 h52" stroke="#3a2a2a" stroke-width="3"/>`
     },
     track: {
       name: "运动裤",
-      m: 1,
+      g: "m",
       draw: (c) => `<path d="M74 210 L126 210 L125 264 L104 264 L100 228 L96 264 L75 264Z" fill="${c}" ${stk(c)}/><path d="M77 214 L78 262 M123 214 L122 262" stroke="#fff" stroke-width="2.6"/><path d="M76 260 h20 M104 260 h20" stroke="${shade(c, 0.75)}" stroke-width="4"/>`
     },
     ripped: {
       name: "破洞牛仔裤",
-      m: 1,
+      g: "m",
       draw: (c) =>
         `<path d="M74 210 L126 210 L125 264 L104 264 L100 228 L96 264 L75 264Z" fill="${c}" ${stk(c)}/><path d="M80 236 q5 -2 10 0 q-5 3 -10 0Z M108 246 q5 -2 10 0 q-5 3 -10 0Z" fill="#f6cfb2"/><path d="M80 236 h10 M108 246 h10" stroke="#fff" stroke-width="1" stroke-dasharray="2 1.5"/><path d="M100 212 v14" stroke="${ol(c)}" stroke-width="1.2"/>`
     }
   });
   Object.assign(SHOES, {
-    leather: { name: "皮鞋", m: 1, draw: () => `<path d="M76 264 h20 q6 2 8 8 h-30 q-2 -8 2 -8z M104 264 h20 q4 0 2 8 h-30 q2 -6 8 -8z" fill="#2b2326" stroke="#000" stroke-width="1.2"/><path d="M80 266 q6 -1 10 0 M108 266 q6 -1 10 0" stroke="#fff" stroke-width="1.4" opacity=".5"/>` },
+    leather: { name: "皮鞋", g: "m", draw: () => `<path d="M76 264 h20 q6 2 8 8 h-30 q-2 -8 2 -8z M104 264 h20 q4 0 2 8 h-30 q2 -6 8 -8z" fill="#2b2326" stroke="#000" stroke-width="1.2"/><path d="M80 266 q6 -1 10 0 M108 266 q6 -1 10 0" stroke="#fff" stroke-width="1.4" opacity=".5"/>` },
     hightop: {
       name: "高帮帆布鞋",
-      m: 1,
+      g: "m",
       draw: (c) =>
         `<path d="M80 250 h16 v14 q6 2 8 8 h-30 q0 -6 6 -8z M104 250 h16 v14 q6 2 4 8 h-30 q2 -6 10 -8z" fill="${c}" ${stk(c)}/><path d="M74 272 h30 M98 272 h30" stroke="#fff" stroke-width="3.4"/><path d="M84 254 l8 4 M84 259 l8 4 M108 254 l8 4 M108 259 l8 4" stroke="#fff" stroke-width="1.4"/>`
     }
   });
   Object.assign(ACC, {
-    cap: { name: "鸭舌帽", m: 1, draw: (c) => `<path d="M48 70 Q48 22 100 22 Q152 22 152 70Z" fill="#3b5bdb" stroke="#28409e" stroke-width="1.8"/><path d="M44 70 Q100 62 168 76 Q160 84 100 78 Q60 78 44 70Z" fill="#28409e"/><circle cx="100" cy="24" r="3" fill="#28409e"/>` },
-    capback: { name: "反戴鸭舌帽", m: 1, draw: () => `<path d="M48 66 Q48 22 100 22 Q152 22 152 66Z" fill="#2b2b2b" stroke="#000" stroke-width="1.6"/><path d="M60 64 Q100 70 140 64" stroke="#000" stroke-width="2" fill="none"/><path d="M136 30 Q166 34 172 52 Q160 50 146 42Z" fill="#1a1a1a"/><rect x="92" y="52" width="16" height="8" rx="2" fill="none" stroke="#777" stroke-width="1.4"/>` },
-    beanie: { name: "毛线帽", m: 1, draw: () => `<path d="M48 70 Q46 18 100 16 Q154 18 152 70Z" fill="#5c4b8a" stroke="#3f3266" stroke-width="1.6"/><rect x="44" y="60" width="112" height="16" rx="7" fill="#4a3c72" stroke="#3f3266" stroke-width="1.4"/>${[58, 72, 86, 100, 114, 128, 142].map((x) => `<path d="M${x} 62 v12" stroke="#3f3266" stroke-width="1.2"/>`).join("")}` },
-    earring: { name: "耳钉 + 项链", m: 1, draw: () => `<circle cx="52" cy="122" r="2.8" fill="#e8e8f0" stroke="#999" stroke-width=".8"/><circle cx="148" cy="122" r="2.8" fill="#e8e8f0" stroke="#999" stroke-width=".8"/><path d="M88 158 Q100 176 112 158" stroke="#cfcfd8" stroke-width="2" fill="none" stroke-dasharray="3 1.5"/><path d="M98 172 l2 6 2 -6z" fill="#cfcfd8"/>` },
-    bandaid: { name: "创可贴", m: 1, draw: () => `<rect x="120" y="120" width="20" height="8" rx="4" fill="#f2c9a0" stroke="#d6a77a" stroke-width="1" transform="rotate(-20 130 124)"/><path d="M127 122 l0 4 M130 121 l0 4 M133 120 l0 4" stroke="#d6a77a" stroke-width=".8" transform="rotate(-20 130 124)"/>` },
-    mask: { name: "黑口罩", m: 1, draw: () => `<path d="M72 120 Q100 112 128 120 L126 140 Q100 152 74 140Z" fill="#232126" stroke="#000" stroke-width="1.2"/><path d="M72 122 L52 112 M128 122 L148 112" stroke="#232126" stroke-width="2"/>` }
+    cap: { name: "鸭舌帽", g: "m", draw: (c) => `<path d="M48 70 Q48 22 100 22 Q152 22 152 70Z" fill="#3b5bdb" stroke="#28409e" stroke-width="1.8"/><path d="M44 70 Q100 62 168 76 Q160 84 100 78 Q60 78 44 70Z" fill="#28409e"/><circle cx="100" cy="24" r="3" fill="#28409e"/>` },
+    capback: { name: "反戴鸭舌帽", g: "m", draw: () => `<path d="M48 66 Q48 22 100 22 Q152 22 152 66Z" fill="#2b2b2b" stroke="#000" stroke-width="1.6"/><path d="M60 64 Q100 70 140 64" stroke="#000" stroke-width="2" fill="none"/><path d="M136 30 Q166 34 172 52 Q160 50 146 42Z" fill="#1a1a1a"/><rect x="92" y="52" width="16" height="8" rx="2" fill="none" stroke="#777" stroke-width="1.4"/>` },
+    beanie: { name: "毛线帽", g: "m", draw: () => `<path d="M48 70 Q46 18 100 16 Q154 18 152 70Z" fill="#5c4b8a" stroke="#3f3266" stroke-width="1.6"/><rect x="44" y="60" width="112" height="16" rx="7" fill="#4a3c72" stroke="#3f3266" stroke-width="1.4"/>${[58, 72, 86, 100, 114, 128, 142].map((x) => `<path d="M${x} 62 v12" stroke="#3f3266" stroke-width="1.2"/>`).join("")}` },
+    earring: { name: "耳钉 + 项链", g: "m", draw: () => `<circle cx="52" cy="122" r="2.8" fill="#e8e8f0" stroke="#999" stroke-width=".8"/><circle cx="148" cy="122" r="2.8" fill="#e8e8f0" stroke="#999" stroke-width=".8"/><path d="M88 158 Q100 176 112 158" stroke="#cfcfd8" stroke-width="2" fill="none" stroke-dasharray="3 1.5"/><path d="M98 172 l2 6 2 -6z" fill="#cfcfd8"/>` },
+    bandaid: { name: "创可贴", g: "m", draw: () => `<rect x="120" y="120" width="20" height="8" rx="4" fill="#f2c9a0" stroke="#d6a77a" stroke-width="1" transform="rotate(-20 130 124)"/><path d="M127 122 l0 4 M130 121 l0 4 M133 120 l0 4" stroke="#d6a77a" stroke-width=".8" transform="rotate(-20 130 124)"/>` },
+    mask: { name: "黑口罩", g: "m", draw: () => `<path d="M72 120 Q100 112 128 120 L126 140 Q100 152 74 140Z" fill="#232126" stroke="#000" stroke-width="1.2"/><path d="M72 122 L52 112 M128 122 L148 112" stroke="#232126" stroke-width="2"/>` }
   });
   Object.assign(HELD, {
-    ball: { name: "篮球", m: 1, draw: () => `<circle cx="142" cy="208" r="15" fill="#f08a3c" stroke="#b85a1c" stroke-width="1.6"/><path d="M127 208 h30 M142 193 v30 M131 197 Q142 208 131 219 M153 197 Q142 208 153 219" stroke="#7a3a10" stroke-width="1.4" fill="none"/>` },
-    phone: { name: "手机", m: 1, draw: () => `<rect x="128" y="194" width="16" height="28" rx="3" fill="#2b2b2b" stroke="#000" stroke-width="1"/><rect x="131" y="198" width="10" height="18" rx="1.5" fill="#6a8ad8"/>` },
-    coffee: { name: "咖啡", m: 1, draw: () => `<path d="M126 198 h18 l-2 26 h-14z" fill="#fff" stroke="#bbb" stroke-width="1.2"/><rect x="124" y="194" width="22" height="5" rx="2" fill="#3a2a2a"/><rect x="127" y="206" width="16" height="8" fill="#b98b5e"/>` }
+    ball: { name: "篮球", g: "m", draw: () => `<circle cx="142" cy="208" r="15" fill="#f08a3c" stroke="#b85a1c" stroke-width="1.6"/><path d="M127 208 h30 M142 193 v30 M131 197 Q142 208 131 219 M153 197 Q142 208 153 219" stroke="#7a3a10" stroke-width="1.4" fill="none"/>` },
+    phone: { name: "手机", g: "m", draw: () => `<rect x="128" y="194" width="16" height="28" rx="3" fill="#2b2b2b" stroke="#000" stroke-width="1"/><rect x="131" y="198" width="10" height="18" rx="1.5" fill="#6a8ad8"/>` },
+    coffee: { name: "咖啡", g: "m", draw: () => `<path d="M126 198 h18 l-2 26 h-14z" fill="#fff" stroke="#bbb" stroke-width="1.2"/><rect x="124" y="194" width="22" height="5" rx="2" fill="#3a2a2a"/><rect x="127" y="206" width="16" height="8" fill="#b98b5e"/>` }
   });
-  const isMaleItem = (set, k) => !!(set[k] && set[k].m);
-  const FEMININE = { hair: ["twin", "bun", "wavy", "long"], top: ["dress", "sailor"], bottom: ["skirt", "pleated", "none"], shoes: ["maryjane"], acc: ["bow", "flower", "crown"], held: ["bouquet"], eyes: ["sparkle", "wink"], mouth: ["pout", "tongue"] };
+  // 女生款 / 男生款打标；没打标的是男女都能穿
+  const tag = (set, keys, g) => keys.forEach((k) => set[k] && (set[k].g = g));
+  tag(TOP, ["dress", "sailor", "kimono"], "f");
+  tag(BOTTOM, ["skirt", "pleated", "none"], "f");
+  tag(SHOES, ["maryjane"], "f");
+  tag(ACC, ["bow", "flower", "crown"], "f");
+  tag(HELD, ["bouquet"], "f");
+  tag(MOUTH, ["pout"], "f");
+  // 这些以前算男生款，其实男女都行
+  ["cardigan"].forEach((k) => TOP[k] && delete TOP[k].g);
+  ["track"].forEach((k) => BOTTOM[k] && delete BOTTOM[k].g);
+  ["hightop"].forEach((k) => SHOES[k] && delete SHOES[k].g);
+  ["cap", "beanie", "earring"].forEach((k) => ACC[k] && delete ACC[k].g);
+  ["phone", "coffee"].forEach((k) => HELD[k] && delete HELD[k].g);
+  const fits = (set, k, sex) => !!set[k] && (!set[k].g || set[k].g === sex);
 
   const CATS = [
     { k: "hair", name: "发型", set: HAIR, color: "hairC" },
@@ -390,75 +602,84 @@
     { k: "skin", name: "肤色" },
     { k: "bg", name: "背景", set: BG }
   ];
-  const DEF = { skin: 0, hair: "short", hairC: 1, eyes: "round", eyeC: 1, mouth: "smile", top: "tee", topC: 7, bottom: "skirt", botC: 0, shoes: "sneakers", shoeC: 11, acc: "none", held: "none", bg: "pink" };
+  const DEF_F = { sex: "f", skin: 0, hair: "short", hairC: 1, eyes: "round", eyeC: 1, mouth: "smile", top: "tee", topC: 7, bottom: "skirt", botC: 0, shoes: "sneakers", shoeC: 11, acc: "none", held: "none", bg: "pink" };
+  const DEF_M = { sex: "m", skin: 0, hair: "fringe", hairC: 0, eyes: "round", eyeC: 1, mouth: "smile", top: "shirt", topC: 13, bottom: "pants", botC: 0, shoes: "sneakers", shoeC: 11, acc: "none", held: "none", bg: "plain" };
+  const DEF = DEF_F;
+  const sexOf = (gender) => (/男|male|boy|♂/i.test(String(gender || "")) ? "m" : "f");
+  /** 把存档整理成合法的一身；穿了另一性别的款就换成这个性别的默认 */
   const valid = (o) => {
-    const out = { ...DEF };
+    const sex = o && (o.sex === "m" || o.sex === "f") ? o.sex : "f";
+    const D = sex === "m" ? DEF_M : DEF_F;
+    const out = { ...D };
     for (const c of CATS) {
       const v = o && o[c.k];
-      if (c.k === "skin") out.skin = Number.isInteger(v) && v >= 0 && v < SKIN.length ? v : DEF.skin;
-      else if (c.set && v != null && c.set[v]) out[c.k] = v;
+      if (c.k === "skin") out.skin = Number.isInteger(v) && v >= 0 && v < SKIN.length ? v : D.skin;
+      else if (c.set && v != null && fits(c.set, v, sex)) out[c.k] = v;
       if (c.color) {
         const cv = Number(o && o[c.color]);
         if (Number.isInteger(cv) && cv >= 0 && cv < PAL.length) out[c.color] = cv;
       }
     }
+    if (TOP[out.top].dress) out.bottom = "none";
+    else if (out.bottom === "none") out.bottom = D.bottom;
     return out;
   };
   const rnd = (a) => a[Math.floor(Math.random() * a.length)];
-  /** 随机一身；gender 是「男」就只挑男生款（和中性款），「女」就不挑男生款 */
-  function randomOutfit(gender) {
-    const g = String(gender || "");
-    const boy = /男|male|boy/i.test(g);
-    const girl = /女|female|girl/i.test(g);
-    const o = { skin: Math.floor(Math.random() * SKIN.length) };
+  /** 随机一身：男生只挑男生款 + 通用款，女生只挑女生款 + 通用款 */
+  function randomOutfit(gender, sexForce) {
+    const sex = sexForce || sexOf(gender);
+    const o = { sex, skin: Math.floor(Math.random() * SKIN.length) };
     for (const c of CATS) {
       if (c.set) {
-        let keys = Object.keys(c.set);
-        if (boy) {
-          const fem = FEMININE[c.k] || [];
-          const male = keys.filter((k) => isMaleItem(c.set, k));
-          const neutral = keys.filter((k) => !fem.includes(k));
-          keys = male.length && Math.random() < 0.7 ? male : neutral;
-        } else if (girl) keys = keys.filter((k) => !isMaleItem(c.set, k) || ["center", "cardigan", "track", "hightop", "cap", "beanie", "phone", "coffee"].includes(k));
-        o[c.k] = rnd(keys.length ? keys : Object.keys(c.set));
+        const keys = Object.keys(c.set).filter((k) => fits(c.set, k, sex) && k !== "none");
+        const own = keys.filter((k) => c.set[k].g === sex);
+        o[c.k] = rnd(own.length && Math.random() < 0.6 ? own : keys.length ? keys : Object.keys(c.set));
       }
       if (c.color) o[c.color] = Math.floor(Math.random() * PAL.length);
     }
-    if (boy) {
-      o.hairC = rnd([0, 1, 2, 4, 3, 13]);
-      if (o.bottom === "none" || (FEMININE.bottom || []).includes(o.bottom)) o.bottom = rnd(["pants", "cargo", "track", "ripped", "shorts"]);
-    }
-    if (TOP[o.top].dress) o.bottom = "none";
+    if (Math.random() < 0.5) o.acc = "none";
+    if (Math.random() < 0.5) o.held = "none";
+    if (sex === "m") o.hairC = rnd([0, 0, 1, 1, 2, 4, 3, 13]);
     return valid(o);
   }
 
   /** 画一个小人 */
   function doll(o0) {
     const o = valid(o0);
+    const sex = o.sex;
     const sk = SKIN[o.skin];
-    const skO = shade(sk, 0.8);
+    const skO = shade(sk, 0.78);
+    const skS = shade(sk, 0.9);
     const hc = PAL[o.hairC];
     const isDress = TOP[o.top].dress;
     const id = "dri" + ++gid;
+    const g = { id: id + "h", c: hc };
+    const face = sex === "m" ? FACE_M : FACE_F;
+    const blush = sex === "m" ? 0.16 : 0.42;
     return `<svg viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="${g.id}" gradientUnits="userSpaceOnUse" x1="0" y1="20" x2="0" y2="230"><stop offset="0" stop-color="${mixW(hc, 0.14)}"/><stop offset=".35" stop-color="${hc}"/><stop offset="1" stop-color="${shade(hc, 0.68)}"/></linearGradient>
+        <radialGradient id="${id}bl"><stop offset="0" stop-color="#ff7d95" stop-opacity=".9"/><stop offset="1" stop-color="#ff7d95" stop-opacity="0"/></radialGradient>
+        <linearGradient id="${id}lt" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".1"/><stop offset=".35" stop-color="#000" stop-opacity="0"/><stop offset=".7" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".12"/></linearGradient>
+      </defs>
       ${BG[o.bg].draw()}
-      <ellipse cx="100" cy="276" rx="44" ry="7" fill="#000" opacity=".08"/>
-      ${HAIR[o.hair].back(hc)}
-      <rect x="84" y="212" width="13" height="54" rx="6" fill="${sk}" stroke="${skO}" stroke-width="1.4"/><rect x="103" y="212" width="13" height="54" rx="6" fill="${sk}" stroke="${skO}" stroke-width="1.4"/>
+      <ellipse cx="100" cy="276" rx="44" ry="7" fill="#000" opacity=".1"/>
+      ${paintHair(HAIR[o.hair].back, g)}
+      <rect x="84" y="212" width="13" height="54" rx="6" fill="${sk}" stroke="${skO}" stroke-width="1.2"/><rect x="103" y="212" width="13" height="54" rx="6" fill="${sk}" stroke="${skO}" stroke-width="1.2"/>
       ${SHOES[o.shoes].draw(PAL[o.shoeC])}
-      <path d="M80 164 Q69 188 66 210 M120 164 Q131 188 134 210" stroke="${skO}" stroke-width="14.5" stroke-linecap="round" fill="none"/><path d="M80 164 Q69 188 66 210 M120 164 Q131 188 134 210" stroke="${sk}" stroke-width="12" stroke-linecap="round" fill="none"/>
-      <circle cx="66" cy="213" r="7.5" fill="${sk}" stroke="${skO}" stroke-width="1.4"/><circle cx="134" cy="213" r="7.5" fill="${sk}" stroke="${skO}" stroke-width="1.4"/>
+      <path d="M80 164 Q69 188 66 210 M120 164 Q131 188 134 210" stroke="${skO}" stroke-width="14" stroke-linecap="round" fill="none"/><path d="M80 164 Q69 188 66 210 M120 164 Q131 188 134 210" stroke="${sk}" stroke-width="11.6" stroke-linecap="round" fill="none"/>
+      <circle cx="66" cy="213" r="7" fill="${sk}" stroke="${skO}" stroke-width="1.2"/><circle cx="134" cy="213" r="7" fill="${sk}" stroke="${skO}" stroke-width="1.2"/>
       <path d="M74 168 Q74 158 88 157 L112 157 Q126 158 126 168 L128 216 Q100 222 72 216Z" fill="${sk}"/>
-      <rect x="93" y="144" width="14" height="18" rx="5" fill="${sk}"/><path d="M93 152 Q100 158 107 152" stroke="${skO}" stroke-width="1.4" fill="none" opacity=".6"/>
+      <rect x="${sex === "m" ? 92 : 93.5}" y="142" width="${sex === "m" ? 16 : 13}" height="20" rx="5" fill="${sk}"/><path d="M92 150 Q100 158 108 150 L108 146 L92 146Z" fill="${skS}" opacity=".9"/>
       ${isDress ? "" : BOTTOM[o.bottom].draw(PAL[o.botC])}
       ${TOP[o.top].draw(PAL[o.topC])}
-      <path d="${FACE}" fill="${sk}" stroke="${skO}" stroke-width="1.6"/>
-      ${EYES[o.eyes].draw(PAL[o.eyeC], id, sk)}
-      <ellipse cx="68" cy="128" rx="9" ry="5" fill="#ff8fa6" opacity=".38"/><ellipse cx="132" cy="128" rx="9" ry="5" fill="#ff8fa6" opacity=".38"/>
-      <path d="M64 126 l3 -3 M69 127 l3 -3 M128 126 l3 -3 M133 127 l3 -3" stroke="#ff7f99" stroke-width="1.2" opacity=".6" stroke-linecap="round"/>
-      <circle cx="100" cy="124" r="1.3" fill="${shade(sk, 0.7)}"/>
+      <path d="M50 104 Q42 104 43 114 Q45 124 53 124Z M150 104 Q158 104 157 114 Q155 124 147 124Z" fill="${sk}" stroke="${skO}" stroke-width="1.2"/><path d="M48 110 q2 4 5 6 M152 110 q-2 4 -5 6" stroke="${skO}" stroke-width="1" fill="none"/>
+      <path d="${face}" fill="${sk}" stroke="${skO}" stroke-width="1.3"/>
+      ${EYES[o.eyes].draw(PAL[o.eyeC], id, sk, sex)}
+      <ellipse cx="68" cy="128" rx="11" ry="6" fill="url(#${id}bl)" opacity="${blush}"/><ellipse cx="132" cy="128" rx="11" ry="6" fill="url(#${id}bl)" opacity="${blush}"/>
+      ${sex === "m" ? `<path d="M102 115 Q104 121 100 123" stroke="${shade(sk, 0.72)}" stroke-width="1.1" fill="none" stroke-linecap="round"/>` : `<path d="M64 127 l2.4 -2.4 M69 128 l2.4 -2.4 M128 127 l2.4 -2.4 M133 128 l2.4 -2.4" stroke="#ff7f99" stroke-width="1" opacity=".55" stroke-linecap="round"/><path d="M100.5 121 l-1 2.2" stroke="${shade(sk, 0.7)}" stroke-width="1.1" stroke-linecap="round"/>`}
       ${MOUTH[o.mouth].draw()}
-      ${HAIR[o.hair].front(hc)}
+      ${paintHair(HAIR[o.hair].front, g)}
       ${ACC[o.acc].draw(hc)}
       ${HELD[o.held].draw()}
     </svg>`;
@@ -501,7 +722,29 @@
   let tab = "hair";
   let busy = false;
 
-  const outfitOf = (w) => (w === "me" ? (S.user = S.user || valid(DEF)) : (S.chars[ch.id] = S.chars[ch.id] || randomOutfit(ch.gender)));
+  /** 取某个小人的这一身；旧存档没有性别就按人设性别补上 */
+  const outfitOf = (w) => {
+    if (w === "me") {
+      if (!S.user) S.user = valid(sexOf(user.gender) === "m" ? DEF_M : DEF_F);
+      else if (!S.user.sex) S.user = valid({ ...S.user, sex: sexOf(user.gender) });
+      return S.user;
+    }
+    const cur = S.chars[ch.id];
+    if (!cur) S.chars[ch.id] = randomOutfit(ch.gender);
+    else if (!cur.sex) S.chars[ch.id] = valid({ ...cur, sex: sexOf(ch.gender) });
+    return S.chars[ch.id];
+  };
+  /** 换性别：不合适的单品换成新性别的默认款，颜色和肤色保留 */
+  function switchSex(w, sex) {
+    const o = outfitOf(w);
+    if (o.sex === sex) return;
+    const D = sex === "m" ? DEF_M : DEF_F;
+    const n = { ...o, sex };
+    for (const c of CATS) if (c.set && !fits(c.set, n[c.k], sex)) n[c.k] = D[c.k];
+    if (w === "me") S.user = valid(n);
+    else S.chars[ch.id] = valid(n);
+    save();
+  }
   function render() {
     if (!root) return;
     if (!ch) {
@@ -513,7 +756,11 @@
     const o = outfitOf(who);
     let items = "";
     if (tab === "skin") items = SKIN.map((c, i) => `<button type="button" class="dr-sw${o.skin === i ? " is-on" : ""}" data-skin="${i}" style="background:${c}"></button>`).join("");
-    else items = Object.entries(cat.set).map(([k, v]) => `<button type="button" class="dr-item${o[tab] === k ? " is-on" : ""}${v.m ? " is-m" : ""}" data-item="${k}">${esc(v.name)}</button>`).join("");
+    else
+      items = Object.entries(cat.set)
+        .filter(([, v]) => !v.g || v.g === o.sex)
+        .map(([k, v]) => `<button type="button" class="dr-item${o[tab] === k ? " is-on" : ""}" data-item="${k}">${esc(v.name)}</button>`)
+        .join("");
     const colors = cat.color ? `<div class="dr-colors">${PAL.map((c, i) => `<button type="button" class="dr-sw${o[cat.color] === i ? " is-on" : ""}" data-col="${i}" style="background:${c}" title="${PAL_NAME[i]}"></button>`).join("")}</div>` : "";
     root.innerHTML = `<div class="dr">
       <div class="dr-stage">
@@ -526,6 +773,7 @@
         <button type="button" data-a="charme" ${busy ? "disabled" : ""}>💝 让 TA 给我搭</button>
         <button type="button" data-a="show" ${busy ? "disabled" : ""}>👀 给 TA 看看</button>
       </div>
+      <div class="dr-sex"><span>给 <b>${who === "me" ? "自己" : esc(ch.name)}</b> 换 · 衣柜</span><button type="button" class="${o.sex === "f" ? "is-on" : ""}" data-sex="f">♀ 女生款</button><button type="button" class="${o.sex === "m" ? "is-on" : ""}" data-sex="m">♂ 男生款</button></div>
       <div class="dr-tabs">${CATS.map((c) => `<button type="button" class="${c.k === tab ? "is-on" : ""}" data-tab="${c.k}">${c.name}</button>`).join("")}</div>
       <div class="dr-items">${items}</div>
       ${colors}
@@ -539,16 +787,16 @@
     render();
   }
 
-  const catalogText = () =>
+  const catalogText = (sex) =>
     CATS.filter((c) => c.set)
-      .map((c) => `${c.k}（${c.name}）：${Object.entries(c.set).map(([k, v]) => `${k}=${v.name}`).join("，")}`)
+      .map((c) => `${c.k}（${c.name}）：${Object.entries(c.set).filter(([, v]) => !v.g || v.g === sex).map(([k, v]) => `${k}=${v.name}`).join("，")}`)
       .join("\n") +
     `\nskin（肤色）：0~${SKIN.length - 1}，0 最白\n颜色编号（hairC 发色 / eyeC 眼睛颜色 / topC 上衣色 / botC 下装色 / shoeC 鞋子色）：${PAL_NAME.map((n, i) => `${i}=${n}`).join("，")}\n注意：top 选 dress（连衣裙）时 bottom 用 none。`;
 
   async function charDress(target) {
     if (busy) return;
     if (!F.hasApiKey()) {
-      const o = randomOutfit(target === "char" ? ch.gender : user.gender);
+      const o = randomOutfit(null, outfitOf(target === "char" ? "char" : "me").sex);
       if (target === "char") S.chars[ch.id] = o;
       else {
         S.prevUser = S.user;
@@ -566,9 +814,9 @@
         [
           {
             role: "system",
-            content: `你是「${ch.name}」。${ch.persona ? "人设：\n" + ch.persona + "\n" : ""}你和「${user.name}」在玩换装游戏，每人有一个 Q 版小人。${ch.gender ? `你是${ch.gender}生。` : ""}${user.gender ? `${user.name}是${user.gender}生。` : ""}衣柜里男生款、女生款都有，按性别和性格挑合适的。${
+            content: `你是「${ch.name}」。${ch.persona ? "人设：\n" + ch.persona + "\n" : ""}你和「${user.name}」在玩换装游戏，每人有一个 Q 版小人。${ch.gender ? `你是${ch.gender}生。` : ""}${user.gender ? `${user.name}是${user.gender}生。` : ""}这个小人是${cur.sex === "m" ? "男生" : "女生"}，衣柜里只列了适合的款式，按性格挑。${
               target === "char" ? "现在你给你自己的小人搭一身衣服，要符合你的性格和审美。" : `现在你给「${user.name}」的小人搭一身你觉得最好看 / 最想看 TA 穿的衣服。`
-            }\n只能从下面的衣柜里选：\n${catalogText()}\n只输出 JSON：{"outfit":{"hair":"","hairC":0,"eyes":"","eyeC":0,"mouth":"","top":"","topC":0,"bottom":"","botC":0,"shoes":"","shoeC":0,"acc":"","held":"","bg":"","skin":0},"say":"你搭完之后说的一两句话（按人设、口语）"}`
+            }\n只能从下面的衣柜里选：\n${catalogText(cur.sex)}\n只输出 JSON：{"outfit":{"hair":"","hairC":0,"eyes":"","eyeC":0,"mouth":"","top":"","topC":0,"bottom":"","botC":0,"shoes":"","shoeC":0,"acc":"","held":"","bg":"","skin":0},"say":"你搭完之后说的一两句话（按人设、口语）"}`
           },
           { role: "user", content: `${target === "char" ? "你" : user.name}现在穿的是：${describe(cur)}。开始搭吧。` }
         ],
@@ -576,7 +824,7 @@
       );
       const j = F.parseJsonLoose(txt);
       if (!j || !j.outfit) throw new Error("没搭出来，再试一次");
-      const o = valid({ ...cur, ...j.outfit });
+      const o = valid({ ...cur, ...j.outfit, sex: cur.sex });
       if (TOP[o.top].dress) o.bottom = "none";
       if (target === "char") S.chars[ch.id] = o;
       else {
@@ -659,6 +907,11 @@
       who = w.dataset.who;
       return render();
     }
+    const sxb = e.target.closest("[data-sex]");
+    if (sxb) {
+      switchSex(who, sxb.dataset.sex);
+      return render();
+    }
     const t = e.target.closest("[data-tab]");
     if (t) {
       tab = t.dataset.tab;
@@ -691,14 +944,16 @@
     if (a === "charme") void charDress("me");
     if (a === "show") void showToChar();
     if (a === "rand") {
-      if (who === "me") S.user = randomOutfit(user.gender);
-      else S.chars[ch.id] = randomOutfit(ch.gender);
+      const sx = outfitOf(who).sex;
+      if (who === "me") S.user = randomOutfit(null, sx);
+      else S.chars[ch.id] = randomOutfit(null, sx);
       save();
       render();
     }
     if (a === "reset") {
-      if (who === "me") S.user = valid(DEF);
-      else S.chars[ch.id] = randomOutfit(ch.gender);
+      const sx = outfitOf(who).sex;
+      if (who === "me") S.user = valid(sx === "m" ? DEF_M : DEF_F);
+      else S.chars[ch.id] = valid(sx === "m" ? DEF_M : DEF_F);
       save();
       render();
     }
@@ -726,5 +981,5 @@
       root = null;
     }
   });
-  window.XXJ_DRESS = { doll, describe, randomOutfit };
+  window.XXJ_DRESS = { doll, describe, randomOutfit, HAIR, EYES };
 })();

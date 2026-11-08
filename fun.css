@@ -8140,3 +8140,7 @@ img.cp-pet-img.is-sleepy { filter: brightness(0.85) saturate(0.8); }
 .net-st.error::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #e5484d; margin-right: 5px; vertical-align: 1px; }
 .net-diag p { margin: 0 0 8px; font-size: 0.86rem; line-height: 1.55; }
 .net-diag p.bad { color: #d23c3c; }
+.dr-sex { display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: var(--text-sub); }
+.dr-sex span { flex: 1; min-width: 0; }
+.dr-sex button { border: 1px solid var(--line); background: var(--bg-card); color: var(--text-sub); border-radius: 99px; padding: 4px 10px; font: inherit; font-size: 0.74rem; cursor: pointer; }
+.dr-sex button.is-on { background: var(--text-main); color: var(--bg-card); border-color: transparent; }
