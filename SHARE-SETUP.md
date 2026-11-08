@@ -83,3 +83,10 @@ Supabase 免费项目 **连续 7 天没人访问会自动暂停**。登录 Supab
 
 Supabase 后台 → SQL Editor → New query，把 `share-category.sql` 全部内容粘进去 → Run（只需要一次）。
 没运行之前资源站照常能用，只是没有分类。
+
+
+## 一个帖子带多张图片和文件（可选）
+
+想让上传的人在一个帖子里附带效果图、别的资源卡或文件，在 Supabase 的 SQL Editor 里再运行一次 `share-attach.sql`（可以重复运行）。
+没运行之前，资源站照常能用，只是上传时加了附件会提示「站长需要先运行 share-attach.sql」。
+附件和主卡片一样：别人要先点赞才能下载 / 导入。

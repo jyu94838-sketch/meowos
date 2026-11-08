@@ -812,8 +812,11 @@
   };
   const catsOf = (kind) => CATS[kind] || ["其他"];
   let hasCat = true;
-  const cols = () => (hasCat ? COLS0 + ",category" : COLS0);
+  let hasExtras = true;
+  const cols = () => (hasCat ? COLS0 + ",category" : COLS0) + (hasExtras ? ",extras" : "");
   const isCatErr = (err) => /category/i.test(String(err && err.message));
+  const isExtrasErr = (err) => /extras/i.test(String(err && err.message));
+  const NEED_ATTACH_SQL = "站长需要先在 Supabase 里运行一次 share-attach.sql，才能在一个帖子里带多张图片和文件";
   function catChips(cur, attr, withAll, kind) {
     const list = (withAll ? [["", "全部分类"]] : []).concat(catsOf(kind).map((c) => [c, c]));
     return `<div class="sh-chips sh-cats">${list.map(([v, n]) => `<button type="button" class="fun-chip-btn${cur === v ? " is-on" : ""}" ${attr}="${esc(v)}">${esc(n)}</button>`).join("")}</div>`;
@@ -887,9 +890,11 @@
     return new Promise((res) => c.toBlob((b) => res(b), "image/jpeg", 0.78));
   }
 
-  async function uploadShare(blob, payload, category) {
+  async function uploadShare(blob, payload, category, atts) {
     const token = uid() + uid() + uid();
     const base = `${payload.kind}/${Date.now()}-${uid()}`;
+    const list = Array.isArray(atts) ? atts.slice(0, 12) : [];
+    if (list.length && !hasExtras) throw new Error(NEED_ATTACH_SQL);
     const path = base + ".png";
     await api(`/storage/v1/object/${BUCKET}/${path}`, { method: "POST", body: blob, headers: { "Content-Type": "image/png", "x-upsert": "false" } });
     let thumbPath = "";
@@ -902,6 +907,21 @@
     } catch (_) {
       /* 缩略图失败不影响上传 */
     }
+    // 附件：图片存 JPG / PNG，资源卡存 PNG，其他文件一律当「下载文件」存
+    const extras = [];
+    for (let i = 0; i < list.length; i++) {
+      const a = list[i];
+      const ext = a.type === "image" ? (a.blob.type === "image/png" ? "png" : "jpg") : a.type === "card" ? "png" : (String(a.name).match(/\.([a-z0-9]{1,6})$/i)?.[1] || "bin").toLowerCase();
+      const ctype = a.type === "image" ? a.blob.type || "image/jpeg" : a.type === "card" ? "image/png" : "application/octet-stream";
+      const pth = `${base}-a${i + 1}.${ext}`;
+      try {
+        await api(`/storage/v1/object/${BUCKET}/${pth}`, { method: "POST", body: a.blob, headers: { "Content-Type": ctype, "x-upsert": "false" } });
+      } catch (err) {
+        if (/mime|type/i.test(err.message) && a.type === "file") throw new Error(NEED_ATTACH_SQL);
+        throw new Error(`附件「${a.name}」上传失败：${err.message}`);
+      }
+      extras.push({ type: a.type, path: pth, name: String(a.name || "").slice(0, 80), size: a.blob.size });
+    }
     const rowData = {
       kind: payload.kind,
       title: String(payload.title || "未命名").slice(0, 60),
@@ -910,14 +930,29 @@
       file_path: path,
       thumb_path: thumbPath,
       size: blob.size,
-      owner_hash: await sha256Hex(token)
+      owner_hash: await sha256Hex(token),
+      ...(extras.length ? { extras } : {})
     };
-    const insert = (data) => api("/rest/v1/mx_shares?select=id", { method: "POST", json: data, headers: { Prefer: "return=representation" } });
+    const insert = async (data) => {
+      try {
+        return await api("/rest/v1/mx_shares?select=id", { method: "POST", json: data, headers: { Prefer: "return=representation" } });
+      } catch (err) {
+        if (isExtrasErr(err)) {
+          hasExtras = false;
+          throw new Error(NEED_ATTACH_SQL);
+        }
+        throw err;
+      }
+    };
     let rows;
     if (hasCat && category) {
       try {
         rows = await insert({ ...rowData, category: String(category).slice(0, 20) });
       } catch (err) {
+        if (isExtrasErr(err)) {
+          hasExtras = false;
+          throw new Error(NEED_ATTACH_SQL);
+        }
         if (!isCatErr(err)) throw err;
         hasCat = false; // 云端还没加分类字段
         rows = await insert(rowData);
@@ -1017,6 +1052,10 @@
       try {
         rows = await api(q);
       } catch (err) {
+        if (hasExtras && isExtrasErr(err)) {
+          hasExtras = false; // 云端还没运行 share-attach.sql
+          return loadGrid(grid, onlyIds);
+        }
         if (!hasCat || !isCatErr(err)) throw err;
         hasCat = false; // 云端还没运行 share-category.sql
         return loadGrid(grid, onlyIds);
@@ -1028,8 +1067,9 @@
       }
       grid.innerHTML = rows
         .map(
-          (r) => `<button type="button" class="sh-item" data-id="${esc(r.id)}">
+          (r) => `<button type="button" class="sh-item${liked.has(r.id) || myTokens()[r.id] ? " is-liked" : ""}" data-id="${esc(r.id)}" style="position:relative">
             <img src="${esc(publicUrl(r.thumb_path || r.file_path))}" alt="" loading="lazy" />
+            <span class="sh-badges" style="position:absolute;top:8px;right:8px;display:flex;gap:4px;pointer-events:none">${Array.isArray(r.extras) && r.extras.length ? `<span class="sh-badge" style="padding:2px 8px;border-radius:99px;background:rgba(0,0,0,.55);color:#fff;font-size:11px">📎 ${r.extras.length}</span>` : ""}${liked.has(r.id) || myTokens()[r.id] ? "" : `<span class="sh-badge sh-lock" style="padding:2px 7px;border-radius:99px;background:rgba(0,0,0,.55);color:#fff;font-size:11px">🔒</span>`}</span>
             <span class="sh-item-meta"><strong>${esc(r.title)}</strong><small>${KIND_META[r.kind]?.icon || ""}${r.category ? " " + esc(r.category) + " ·" : ""} ${esc(r.author)} · ⬇${r.downloads || 0} · ♥${r.likes || 0}</small></span>
           </button>`
         )
@@ -1040,6 +1080,33 @@
     }
   }
 
+  /** 帖子里的附图（随便看）和附件（点赞后才能下载 / 导入） */
+  function extrasHtml(r, open) {
+    const ex = Array.isArray(r.extras) ? r.extras : [];
+    if (!ex.length) return "";
+    const imgs = ex.map((x, i) => ({ ...x, i })).filter((x) => x.type === "image");
+    const files = ex.map((x, i) => ({ ...x, i })).filter((x) => x.type !== "image");
+    const lock = open ? "" : "🔒 ";
+    const kb = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + "MB" : Math.max(1, Math.round(n / 1024)) + "KB");
+    return `${
+      imgs.length
+        ? `<div class="sh-ximgs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0">${imgs
+            .map((x) => `<button type="button" data-a="zoom" data-src="${esc(publicUrl(x.path))}" style="padding:0;border:0;background:none;aspect-ratio:1;border-radius:10px;overflow:hidden"><img src="${esc(publicUrl(x.path))}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;margin:0;border-radius:0"/></button>`)
+            .join("")}</div>`
+        : ""
+    }${
+      files.length
+        ? `<div class="sh-xfiles" style="display:flex;flex-direction:column;gap:6px;margin:10px 0">${files
+            .map(
+              (x) => `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:var(--bg-card)"><span style="font-size:20px">${x.type === "card" ? "🎴" : "📄"}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${esc(x.name || "附件")}<small style="display:block;color:var(--text-sub);font-size:11px">${x.type === "card" ? "Meow 资源卡 · " : ""}${kb(x.size || 0)}</small></span>${
+                x.type === "card" ? `<button type="button" class="fun-btn solid sm${open ? "" : " is-locked"}" data-a="ximp" data-i="${x.i}">${lock}导入</button>` : ""
+              }<button type="button" class="fun-btn ghost sm${open ? "" : " is-locked"}" data-a="xdl" data-i="${x.i}">${lock}下载</button></div>`
+            )
+            .join("")}</div>`
+        : ""
+    }`;
+  }
+
   function openDetail(r, grid) {
     const mine = !!myTokens()[r.id];
     const unlocked = () => mine || liked.has(r.id); // 自己上传的不用点赞
@@ -1048,6 +1115,7 @@
         <img src="${esc(publicUrl(r.file_path))}" alt="" />
         <p class="fun-note">${KIND_META[r.kind]?.icon} ${KIND_META[r.kind]?.name}${r.category ? " · " + esc(r.category) : ""} · by ${esc(r.author)} · ${new Date(r.created_at).toLocaleDateString()} · ${(r.size / 1024).toFixed(0)}KB</p>
         ${r.description ? `<p class="sh-desc">${esc(r.description)}</p>` : ""}
+        ${extrasHtml(r, unlocked())}
         <div class="fun-sheet-actions">
           <button type="button" class="fun-btn ghost" data-a="like">${liked.has(r.id) ? "♥ 已赞" : "♡ 点赞"} ${r.likes || 0}</button>
           <button type="button" class="fun-btn ghost${unlocked() ? "" : " is-locked"}" data-a="dl">${unlocked() ? "" : "🔒 "}下载 PNG</button>
@@ -1083,9 +1151,12 @@
           sh.body.querySelector(".sh-like-tip")?.remove();
           toast("点赞成功，现在可以导入啦");
           const card = grid?.querySelector?.(`[data-id="${CSS.escape(r.id)}"]`);
-          if (card) card.classList.add("is-liked");
+          if (card) {
+            card.classList.add("is-liked");
+            card.querySelector(".sh-lock")?.remove();
+          }
         }
-        if ((a === "dl" || a === "import") && !unlocked()) {
+        if ((a === "dl" || a === "import" || a === "xdl" || a === "ximp") && !unlocked()) {
           toast("要先点赞才能" + (a === "dl" ? "下载" : "导入") + "哦 ♡");
           const lb = sh.body.querySelector('[data-a="like"]');
           lb?.classList.add("sh-pulse");
@@ -1093,6 +1164,34 @@
           return;
         }
         if (a === "dl") downloadBlob(await fetchBlob(), safeName(r.title) + ".png");
+        if (a === "zoom") {
+          const src = e.target.closest("[data-src]")?.dataset.src;
+          if (src) F.openSheet(`<img src="${esc(src)}" alt="" style="width:100%;border-radius:12px"/>`, { title: "图片" });
+        }
+        if (a === "xdl" || a === "ximp") {
+          const x = (r.extras || [])[Number(e.target.closest("[data-i]")?.dataset.i)];
+          if (!x) return;
+          const btn = e.target.closest("button");
+          const old = btn.textContent;
+          btn.disabled = true;
+          btn.textContent = a === "xdl" ? "下载中…" : "导入中…";
+          try {
+            const res = await fetch(publicUrl(x.path));
+            if (!res.ok) throw new Error("文件下载失败");
+            const b = await res.blob();
+            api("/rest/v1/rpc/mx_share_download", { method: "POST", json: { p_id: r.id } }).catch(() => {});
+            if (a === "xdl") downloadBlob(b, x.name || x.path.split("/").pop());
+            else {
+              const payload = await extractPayload(b);
+              if (!payload) throw new Error("这不是 Meow 资源卡");
+              if (payload.kind === "look" && !(await confirmSheet(payload.data?.chatCssOnly ? "导入会覆盖你现在的聊天界面样式，继续吗？" : "导入美化会覆盖你现在的装扮（壁纸、图标、字体、聊天样式等），继续吗？"))) return;
+              toast(await applyImport(payload));
+            }
+          } finally {
+            btn.disabled = false;
+            btn.textContent = old;
+          }
+        }
         if (a === "import") {
           const btn = e.target.closest("button");
           btn.disabled = true;
@@ -1153,6 +1252,24 @@
   }
 
   let makeState = { kind: "char", ids: [], withBooks: true, sub: "theater", cat: "" };
+  /** 「制作卡片」里一起上传的附图 / 附件 */
+  let makeAtts = [];
+  /** 附图压成 JPG，长边 1600 */
+  async function shrinkForShare(file) {
+    const url = URL.createObjectURL(file);
+    const img = await loadImg(url);
+    URL.revokeObjectURL(url);
+    if (!img) return null;
+    const k = Math.min(1, 1600 / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round((img.naturalWidth || img.width) * k));
+    c.height = Math.max(1, Math.round((img.naturalHeight || img.height) * k));
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    return new Promise((res) => c.toBlob((b) => res(b), "image/jpeg", 0.86));
+  }
   async function renderMake(p) {
     await hydrateStores();
     const user = await F.loadUser();
@@ -1201,6 +1318,11 @@
         <label class="fun-field"><span>作者署名</span><input id="sh-author" maxlength="20" value="${esc(localStorage.getItem("mx_share_author") || user.name)}" /></label>
         <p class="fun-kicker">4 · 选择分类</p>
         ${catChips(makeState.cat, "data-mcat", false, makeState.kind)}
+        <p class="fun-kicker">5 · 附图 / 附件（可选）</p>
+        <p class="fun-note">可以再加几张效果图、别的资源卡或文件（txt / json / docx / zip / 字体…），最多 9 个，每个 10MB 以内。别人点赞以后才能下载附件。</p>
+        <div class="sh-atts" id="sh-atts" style="display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px"></div>
+        <button type="button" class="fun-btn ghost sm" id="sh-att-add">＋ 添加图片或文件</button>
+        <input type="file" id="sh-att-file" multiple hidden accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.json,.css,.docx,.zip,.ttf,.otf,.woff,.woff2" />
         <div class="sh-preview" id="sh-preview"></div>
         <div class="fun-setup-btns"><button type="button" class="fun-btn ghost" id="sh-dl">生成并下载 PNG</button><button type="button" class="fun-btn solid" id="sh-up" ${cfg() ? "" : "disabled"}>上传到广场</button></div>
         ${cfg() ? "" : `<p class="fun-note">广场未开通，暂时只能下载 PNG。</p>`}
@@ -1220,6 +1342,58 @@
         })
     );
     p.querySelector("#sh-withbooks")?.addEventListener("change", (e) => (makeState.withBooks = e.target.checked));
+    const drawAtts = () => {
+      const box = p.querySelector("#sh-atts");
+      if (!box) return;
+      box.innerHTML = makeAtts
+        .map(
+          (a, i) =>
+            `<span style="position:relative;display:inline-flex;align-items:center;gap:6px;max-width:160px;padding:4px 26px 4px 4px;border-radius:12px;border:1px solid var(--line);background:var(--bg-card);font-size:12px">${
+              a.type === "file" ? `<span style="font-size:20px;padding:0 4px">📄</span>` : `<img src="${a.url}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:8px;margin:0"/>`
+            }<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.type === "card" ? "🎴 " : ""}${esc(a.name)}</span><button type="button" data-attdel="${i}" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;color:inherit;opacity:.6">✕</button></span>`
+        )
+        .join("");
+      box.querySelectorAll("[data-attdel]").forEach((b) => (b.onclick = () => (makeAtts.splice(Number(b.dataset.attdel), 1), drawAtts())));
+    };
+    drawAtts();
+    const attInp = p.querySelector("#sh-att-file");
+    p.querySelector("#sh-att-add").onclick = () => attInp.click();
+    attInp.onchange = async () => {
+      for (const f of [...attInp.files]) {
+        if (makeAtts.length >= 9) {
+          toast("最多 9 个附件");
+          break;
+        }
+        if (f.size > 10 * 1024 * 1024) {
+          toast(`「${f.name}」超过 10MB 了`);
+          continue;
+        }
+        const isImg = /^image\//.test(f.type) || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
+        if (isImg) {
+          // 先看是不是 Meow 资源卡（卡片要原样保存，不能压缩）
+          let isCard = false;
+          if (/png/i.test(f.type) || /\.png$/i.test(f.name)) {
+            try {
+              isCard = !!(await extractPayload(f));
+            } catch (_) {
+              isCard = false;
+            }
+          }
+          if (isCard) {
+            makeAtts.push({ type: "card", name: f.name, blob: f, url: URL.createObjectURL(f) });
+            continue;
+          }
+          const small = await shrinkForShare(f);
+          if (!small) {
+            toast(`「${f.name}」打不开`);
+            continue;
+          }
+          makeAtts.push({ type: "image", name: f.name, blob: small, url: URL.createObjectURL(small) });
+        } else makeAtts.push({ type: "file", name: f.name, blob: f, url: "" });
+      }
+      attInp.value = "";
+      drawAtts();
+    };
     p.querySelectorAll("[data-mcat]").forEach(
       (b) =>
         (b.onclick = () => {
@@ -1248,7 +1422,8 @@
         if (blob.size > 9.5 * 1024 * 1024) throw new Error(`卡片 ${(blob.size / 1048576).toFixed(1)}MB，超过 10MB 上限（多半是图片太大）`);
         if (upload) {
           toast("上传中…");
-          await uploadShare(blob, payload, makeState.cat);
+          await uploadShare(blob, payload, makeState.cat, makeAtts);
+          makeAtts = [];
           toast("上传成功！");
           switchTab("mine");
         } else {
