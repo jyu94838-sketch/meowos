@@ -427,6 +427,7 @@
     });
     clearInterval(clockTimer);
     clockTimer = setInterval(() => {
+      if (document.documentElement.classList.contains("mx-fun-open")) return;
       if (widgets.some((w) => w.type === "clock" || w.type === "music")) void renderDesk();
     }, 20000);
     // 角色库可能稍后才加载完

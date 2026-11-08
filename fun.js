@@ -339,11 +339,17 @@
     screen.querySelector("#fun-title").textContent = app.title || key;
     screen.classList.add("is-open");
     screen.setAttribute("aria-hidden", "false");
+    // 页面盖满以后，把底下的桌面、小组件、壁纸先藏起来（手机不用再一直画它们，玩游戏不卡）
+    clearTimeout(hideDeskT);
+    hideDeskT = setTimeout(() => screen.classList.contains("is-open") && document.documentElement.classList.add("mx-fun-open"), 260);
     app.mount(bodyEl, actEl);
     syncMini();
   }
 
+  let hideDeskT = 0;
   function closeFunScreen() {
+    clearTimeout(hideDeskT);
+    document.documentElement.classList.remove("mx-fun-open");
     if (current && current.unmount) current.unmount();
     current = null;
     sheetHost.innerHTML = "";

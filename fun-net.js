@@ -308,8 +308,10 @@
       Net.online = new Set(r?.online || []);
       Net.status = "ok";
       Net.lastErr = "";
+      const changed = (r?.inbox || []).length || (r?.msgs || []).length;
       if (needProfiles.size || Date.now() - lastProfiles > 10 * 60 * 1000) await loadProfiles();
-      save();
+      // 没收到新东西就不写本地存储（大段 JSON 写入在手机上会卡一下）
+      if (changed) save();
     } catch (e) {
       Net.status = e.kind || "offline";
       Net.lastErr = e.message || String(e);

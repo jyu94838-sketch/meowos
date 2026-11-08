@@ -19103,7 +19103,11 @@ if (typeof window !== "undefined") {
   if (typeof isLikelyIosWebKit === "function" && !isLikelyIosWebKit()) return;
   if (!/iPhone|iPad|iPod/i.test(navigator.userAgent || "")) return;
   const INTERVAL = 10_000;
+  let flushedSeq = -1;
   setInterval(async () => {
+    // 没有新改动就不重复整包写入（以前每 10 秒写一次全部聊天记录，玩游戏时会周期性卡顿）
+    if (flushedSeq === chatInboxDirtySeq) return;
+    flushedSeq = chatInboxDirtySeq;
     try {
       await flushChatInboxKvPersist({ force: true });
     } catch (e) {
@@ -19125,7 +19129,10 @@ function invalidateChatInboxMemCache(opts) {
  * @param {{ fast?: boolean, dirtyThreadKey?: string, force?: boolean, allowEmpty?: boolean, deferPersist?: boolean }} [opts]
  *   fast：跳过全量 normalize；dirtyThreadKey 保留兼容；deferPersist：仅更新内存（等防抖落盘）
  */
+/** 每次改动聊天数据 +1；定时落盘时没变化就跳过 */
+let chatInboxDirtySeq = 0;
 function writeChatInboxStore(store, opts) {
+  chatInboxDirtySeq++;
   const D = window.XXJ_DB;
   if (!D || !D.isReady) return;
   const runWrite = () => {
@@ -29799,6 +29806,27 @@ function tagAssistantEntryDmSurface(entry, roundDmSurface) {
   else delete entry.dmSurface;
 }
 
+/** 用户小号：提示词说明（谁是小号、角色认不认得出） */
+function buildUserAltPromptLines(th, userCall) {
+  const ua = th && typeof th === "object" ? th.userAlt : null;
+  if (!ua || !ua.name || th.kind === "group") return [];
+  const on = !!th.userAltOn;
+  if (!on && !th.userAltUsed) return [];
+  const nm = String(ua.name).slice(0, 20);
+  const rec = ua.recognize || "unknown";
+  const recLine =
+    rec === "know"
+      ? `你一眼就认出「${nm}」是「${userCall}」的小号，可以按人设配合着演、调侃 TA，或者直接拆穿。`
+      : rec === "suspect"
+        ? `你隐约觉得「${nm}」有点像「${userCall}」（说话习惯、出现的时间点等），可以试探，但没有实锤前不能确定。`
+        : `你不知道「${nm}」就是「${userCall}」本人，把这个小号当成另一个人来回应（按你的人设决定对陌生人 / 新认识的人是什么态度），不要无根据地说出 TA 是「${userCall}」。`;
+  return [
+    `[用户小号] 「${userCall}」有一个小号「${nm}」${ua.persona ? `（小号对外的样子：${String(ua.persona).slice(0, 300)}）` : ""}。历史里带【用户小号·${nm}】前缀的消息是这个小号发的；没有这个前缀的是「${userCall}」本人发的。`,
+    on ? `现在对方正在用小号「${nm}」给你发消息。` : `对方现在已经换回了大号「${userCall}」本人。`,
+    recLine
+  ];
+}
+
 /** 用户侧写入（文字 / 图 / 表情等）：当前在线下页则标记离线频道；并标记发送时马甲段。 */
 function tagOutgoingChatDmSurfaceIfOffline(entry) {
   if (!entry || typeof entry !== "object") return;
@@ -29813,6 +29841,14 @@ function tagOutgoingChatDmSurfaceIfOffline(entry) {
     }
   }
   if (entry.role === "user") tagOutgoingUserMessagePersonaEpoch(entry);
+  // 用户小号：发送时正开着小号，就在这条消息上记一笔
+  if (entry.role === "user") {
+    const th = readActiveThread();
+    if (th && th.kind !== "group" && th.userAltOn && th.userAlt?.name) {
+      entry.userAlt = String(th.userAlt.name).slice(0, 20);
+      if (!th.userAltUsed) patchActiveThread((t) => (t.userAltUsed = true));
+    }
+  }
 }
 
 /** 更多面板：群聊隐藏单聊项；线下晤面隐藏即时消息类入口。 */
@@ -37902,6 +37938,23 @@ function updateChatHeaderFaces() {
  */
 function createChatRowAvatarEl(role, charP, userM, msg) {
   const th = readActiveThread();
+  if (role === "user" && msg && typeof msg === "object" && msg.userAlt && th?.userAlt) {
+    // 小号发的消息用小号头像
+    const ua = th.userAlt;
+    if (ua.avatar) {
+      const im = document.createElement("img");
+      im.className = "chat-msg-avatar chat-msg-avatar--image mx-ua-av";
+      im.alt = "";
+      im.title = "小号 · " + msg.userAlt;
+      im.src = ua.avatar;
+      return im;
+    }
+    const av = document.createElement("div");
+    av.className = "chat-msg-avatar chat-msg-avatar--user mx-ua-av";
+    av.title = "小号 · " + msg.userAlt;
+    av.textContent = String(msg.userAlt || "小").trim().slice(0, 1);
+    return av;
+  }
   if (role === "user") {
     const uUrl = resolveChatThreadUserAvatarUrl(th, userM);
     if (uUrl) {
@@ -44407,6 +44460,12 @@ function buildChatSystemPrompt(opts) {
           ];
         })()
       : []),
+    ...(charHasAltPersona(charItemRaw) && th?.charAltAuto
+      ? [
+          `[主动开马甲] 你可以偶尔（不要每轮，大约十几轮一次、或剧情合适时）主动切到马甲「${resolvePersonaDisplayName(charItemRaw, "alt")}」来找「${userCall}」：比如假装别人试探 TA、匿名关心 TA、逗 TA 玩；切换时在 JSON 末尾写 "speakAs": "alt"，玩够了再写 "speakAs": "main" 换回大号。`
+        ]
+      : []),
+    ...buildUserAltPromptLines(th, userCall),
     ...(sceneOffline
       ? buildOfflineDmProsePromptLines(th, name, userCall, char, postCheckupArcOffline, promptLog)
       : []),
@@ -49751,7 +49810,27 @@ function buildChatApiMessagesFromLog(emptySend, logSlice, opts, roundSurface, ap
   const promptTh = resolveChatPromptThread(opts);
   const userCallForRecall = String(readUserMask()?.displayName || "").trim() || "对方";
   let lockLogMarkerAdded = false;
+  // 用户小号发的消息：给刚加进去的那几条加上【用户小号·名字】前缀
+  let altMark = null;
+  const flushAltMark = () => {
+    if (!altMark) return;
+    const tag = `【用户小号·${altMark.name}】`;
+    for (let i = altMark.from; i < msgs.length; i++) {
+      const x = msgs[i];
+      if (!x || x.role !== "user") continue;
+      if (typeof x.content === "string") x.content = `${tag}${x.content}`;
+      else if (Array.isArray(x.content)) {
+        const t = x.content.find((p) => p && p.type === "text");
+        if (t) t.text = `${tag}${t.text || ""}`;
+        else x.content.push({ type: "text", text: tag });
+      }
+      break;
+    }
+    altMark = null;
+  };
   for (const m of logSlice) {
+    flushAltMark();
+    if (m && m.role === "user" && m.userAlt) altMark = { from: msgs.length, name: String(m.userAlt) };
     if (tryAppendCallEndNoticeToChatApiMessages(msgs, m)) continue;
     if (tryAppendOfflineEndNoticeToChatApiMessages(msgs, m)) continue;
     if (tryAppendCharLockEndNoticeToChatApiMessages(msgs, m)) continue;
@@ -49956,6 +50035,7 @@ function buildChatApiMessagesFromLog(emptySend, logSlice, opts, roundSurface, ap
       }
     }
   }
+  flushAltMark();
   if (!emptySend) return msgs;
   const custom = opts && String(opts.emptySendUserContent || "").trim();
   if (custom) {

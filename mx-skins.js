@@ -317,7 +317,9 @@ body.dark #chat-screen .chat-msg--assistant .chat-msg-bubble--composer-quote .ch
   const watchLast = () => {
     if (!document.body || !window.MutationObserver) return;
     let t = 0;
-    new MutationObserver(() => {
+    // 只有新插进来的是样式表时才挪（以前任何弹层 / 提示插进来都会挪一次，整页样式重算，玩游戏会卡一下）
+    new MutationObserver((muts) => {
+      if (!muts.some((m) => [...m.addedNodes].some((n) => n.nodeName === "STYLE" || n.nodeName === "LINK"))) return;
       clearTimeout(t);
       t = setTimeout(keepLast, 50);
     }).observe(document.body, { childList: true });
