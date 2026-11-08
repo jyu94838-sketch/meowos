@@ -28247,7 +28247,16 @@ function formatMomentListTime(iso) {
 
 function getMomentDisplayLabel(m) {
   const kind = m?.kind === "user" ? "user" : "char";
-  if (kind === "user") return "我";
+  if (kind === "user") {
+    // 用户自己的动态显示网名（当前面具的名字），不再是一个「我」
+    let nm = "";
+    try {
+      nm = String(getActiveMaskForMoments()?.displayName || "").trim();
+    } catch (_) {
+      nm = "";
+    }
+    return nm || String(m?.displayName || "").trim() || "我";
+  }
   const nm = String(m?.displayName || "未命名角色").trim();
   return nm || "—";
 }

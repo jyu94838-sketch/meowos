@@ -1752,7 +1752,7 @@
 
 /** 开屏 + 注入 app.js（原 boot.js，合并进 db.js 以减少请求） */
 (function () {
-  const ASSET_V = "399";
+  const ASSET_V = "400";
   const MAIN_APP = "app.js?v=" + ASSET_V;
   const INLINE_HTML_MODULE = "inline-html.js?v=" + ASSET_V;
   const GROUP_MODULE = "group.js?v=" + ASSET_V;
@@ -1781,7 +1781,7 @@
     "fun-sprout.js?v=2",
     "fun-mart.js?v=1",
     "fun-widgets.js?v=8", "fun-icons.js?v=5", "mx-chatsearch.js?v=3", "fun-mimi.js?v=13", "mx-choose.js?v=3", "fun-yuzu.js?v=5", "fun-names.js?v=1", "fun-net.js?v=11", "fun-arcade.js?v=4", "fun-dress.js?v=5", "mx-import.js?v=2", "fun-weather.js?v=1", "fun-diet.js?v=1", "fun-snake.js?v=3", "mx-alt.js?v=1",
-    "changelog.js?v=67",
+    "changelog.js?v=68",
     "share-config.js?v=3", "st-gate.js?v=1",
     "fun-share.js?v=15"
   ];
