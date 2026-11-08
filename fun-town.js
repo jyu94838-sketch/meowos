@@ -539,7 +539,7 @@
        })()}
        ${r.memory.length ? `<p class="fun-kicker">TA 记得的事</p><ul class="pt-mem">${r.memory.slice().reverse().map((m) => `<li>${esc(m)}</li>`).join("")}</ul>` : ""}
        <p class="fun-kicker">最近动态</p><div class="pt-hist">${mine.length ? mine.map(feedItemHtml).join("") : `<p class="fun-note">还没有动态</p>`}</div>
-       <div class="fun-sheet-actions">${r.charId ? "" : `<button type="button" class="fun-btn ghost" data-a="del">请 TA 搬走</button>`}<button type="button" class="fun-btn ghost" data-a="save">保存</button><button type="button" class="fun-btn solid" data-a="chat">去聊聊</button></div>`,
+       <div class="fun-sheet-actions">${r.charId ? "" : `<button type="button" class="fun-btn ghost" data-a="del">请 TA 搬走</button><button type="button" class="fun-btn ghost" data-a="edit">编辑资料</button>`}<button type="button" class="fun-btn ghost" data-a="save">保存</button><button type="button" class="fun-btn solid" data-a="chat">去聊聊</button></div>`,
       { title: "居民档案" }
     );
     sh.el.classList.add("fun-sheet--tall");
@@ -551,6 +551,10 @@
       }
       const a = e.target.closest("[data-a]")?.dataset.a;
       if (!a) return;
+      if (a === "edit") {
+        sh.close();
+        return npcSheet(r);
+      }
       if (a === "diary") {
         const ok = await writeDiary(r, Number(e.target.closest("[data-a]").dataset.day), e.target.closest("button"));
         if (ok) {
@@ -600,6 +604,8 @@
     const notIn = cast.filter((c) => !S.residents.some((r) => r.charId === c.id));
     const sh = F.openSheet(
       `${notIn.length ? `<p class="fun-kicker">邀请角色入住</p><div class="pt-people">${notIn.map((c) => `<button type="button" class="pt-person" data-c="${esc(c.id)}">${avHtml(c, "fun-av")}<strong>${esc(c.name)}</strong></button>`).join("")}</div>` : ""}
+       <p class="fun-kicker">自己写一位</p>
+       <div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-a="manual">＋ 新加 NPC</button></div>
        <p class="fun-kicker">从角色卡里找 NPC</p>
        <p class="fun-note">AI 会读角色人设，把里面写到的朋友、家人、同事这些有名字的人请进小镇，并记下 TA 们和角色的关系。</p>
        <div class="fun-sheet-actions"><button type="button" class="fun-btn ghost" data-a="persona">选角色卡</button></div>
@@ -613,6 +619,10 @@
     sh.body.addEventListener("click", async (e) => {
       const cb = e.target.closest("[data-c]");
       const go = e.target.closest('[data-a="npc"]');
+      if (e.target.closest('[data-a="manual"]')) {
+        sh.close();
+        return npcSheet();
+      }
       const act = e.target.closest('[data-a="persona"],[data-a="batch"]')?.dataset.a;
       if (!cb && !go && !act) return;
       const btn = e.target.closest("button");
@@ -662,6 +672,119 @@
         toast("失败：" + err.message);
         btn.disabled = false;
       }
+    });
+  }
+
+  /** 图片 → 小头像 dataURL */
+  function avatarFromFile(file) {
+    return new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onerror = () => rej(new Error("读不了这张图"));
+      fr.onload = () => {
+        const img = new Image();
+        img.onerror = () => rej(new Error("读不了这张图"));
+        img.onload = () => {
+          const n = 192;
+          const cv = document.createElement("canvas");
+          cv.width = cv.height = n;
+          const k = Math.max(n / img.width, n / img.height);
+          const w = img.width * k;
+          const h = img.height * k;
+          cv.getContext("2d").drawImage(img, (n - w) / 2, (n - h) / 2, w, h);
+          res(cv.toDataURL("image/jpeg", 0.85));
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  /** 镇长亲自加一位 NPC（ex 传入就是编辑现有 NPC） */
+  function npcSheet(ex) {
+    let avatar = ex?.avatar || "";
+    const others = S.residents.filter((r) => r !== ex);
+    const relRow = (id = "", t = "") => `<div class="pt-relrow"><select class="pt-rel-who"><option value="">和谁认识…</option>${others.map((r) => `<option value="${r.id}" ${r.id === id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select><input class="pt-rel-t" maxlength="8" placeholder="是 TA 的…（好友）" value="${esc(t)}" /><button type="button" data-a="rmrel">✕</button></div>`;
+    const curRels = ex ? relsOf(ex.id).filter((x) => x.t !== "亲子" && !(x.dir && x.a === ex.id)) : [];
+    const sh = F.openSheet(
+      `<div class="pt-npcform">
+        <button type="button" class="pt-npc-av" data-a="av">${avatar ? `<img src="${esc(avatar)}" alt="" />` : "<span>＋<small>头像</small></span>"}</button>
+        <input type="file" accept="image/*" hidden id="pt-npc-file" />
+        <label class="fun-field"><span>名字</span><input id="pt-npc-name" maxlength="12" value="${esc(ex?.name || "")}" placeholder="必填" /></label>
+        <label class="fun-field"><span>人设 / 性格</span><textarea id="pt-npc-persona" rows="3" maxlength="600" placeholder="比如：面包店老板娘，嗓门大心肠软，总给小孩塞饼干">${esc(ex?.persona || "")}</textarea></label>
+        <div class="dt-form"><label class="fun-field"><span>职业</span><input id="pt-npc-job" maxlength="20" value="${esc(ex?.job || "")}" placeholder="可不填" /></label>
+        <label class="fun-field"><span>工作地点</span><select id="pt-npc-place"><option value="">让 AI 定</option>${PLACES.map((p) => `<option value="${p.id}" ${ex?.place === p.id ? "selected" : ""}>${p.icon} ${p.name}</option>`).join("")}</select></label></div>
+        ${others.length ? `<p class="fun-kicker">TA 认识谁（可不填）</p><div class="pt-relrows">${curRels.length ? curRels.map((x) => relRow(otherOf(x, ex.id), x.t)).join("") : relRow()}</div><button type="button" class="fun-btn ghost sm" data-a="addrel">＋ 再加一个</button>` : ""}
+        <p class="fun-note">只填名字也行，职业、地点、性格没写的话 AI 会帮你补上。</p>
+        <div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-a="ok">${ex ? "保存" : "搬进小镇"}</button></div>
+      </div>`,
+      { title: ex ? "编辑居民" : "新加 NPC" }
+    );
+    sh.el.classList.add("fun-sheet--tall");
+    const $ = (q) => sh.body.querySelector(q);
+    $("#pt-npc-file").onchange = async (e) => {
+      const f = e.target.files?.[0];
+      e.target.value = "";
+      if (!f) return;
+      try {
+        avatar = await avatarFromFile(f);
+        $(".pt-npc-av").innerHTML = `<img src="${esc(avatar)}" alt="" />`;
+      } catch (err) {
+        toast(err.message);
+      }
+    };
+    sh.body.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-a]");
+      const a = b?.dataset.a;
+      if (a === "av") return $("#pt-npc-file").click();
+      if (a === "addrel") return $(".pt-relrows").insertAdjacentHTML("beforeend", relRow());
+      if (a === "rmrel") return b.closest(".pt-relrow").remove();
+      if (a !== "ok") return;
+      const name = $("#pt-npc-name").value.trim();
+      if (!name) return toast("给 TA 起个名字");
+      if (S.residents.some((r) => r !== ex && r.name === name)) return toast("小镇里已经有叫这个名字的人了");
+      let persona = $("#pt-npc-persona").value.trim();
+      let job = $("#pt-npc-job").value.trim();
+      let place = $("#pt-npc-place").value;
+      const rels = [...sh.body.querySelectorAll(".pt-relrow")].map((row) => ({ id: row.querySelector(".pt-rel-who").value, t: row.querySelector(".pt-rel-t").value.trim() })).filter((x) => x.id);
+      if ((!job || !place || !persona) && F.hasApiKey()) {
+        b.disabled = true;
+        b.textContent = "AI 在补全…";
+        try {
+          const txt = await F.aiText(
+            [
+              { role: "system", content: `为小镇「${S.name}」补全一位居民的资料。地点只有：${PLACES.map((p) => p.name).join("、")}。已经写了的不要改，只补空着的。只输出 JSON。` },
+              { role: "user", content: `名字：${name}\n人设：${persona || "（空）"}\n职业：${job || "（空）"}\n工作地点：${place ? placeById(place).name : "（空）"}${rels.length ? "\n认识：" + rels.map((x) => `${resById(x.id)?.name}（${x.t || "认识"}）`).join("、") : ""}\n格式：{"persona":"性格，20~40字","job":"职业","place":"地点"}` }
+            ],
+            { maxTokens: 400, temperature: 0.9 }
+          );
+          const o = F.parseJsonLoose(txt) || {};
+          if (!persona && o.persona) persona = String(o.persona).slice(0, 600);
+          if (!job && o.job) job = String(o.job).slice(0, 20);
+          if (!place && o.place) place = placeByName(o.place)?.id || "";
+        } catch (_) {
+          /* 补不上就用默认的 */
+        }
+      }
+      job ||= "居民";
+      place ||= "park";
+      let r = ex;
+      if (ex) {
+        Object.assign(ex, { name, persona, job, place, avatar });
+        S.rels = S.rels.filter((x) => !curRels.includes(x));
+        toast("已保存");
+      } else {
+        r = addResident({ name, persona, job, place, avatar, byMayor: true });
+      }
+      for (const x of rels) {
+        const o = resById(x.id);
+        if (!o) continue;
+        const t = cleanRel(x.t || "认识");
+        setDirRel(o.id, r.id, t);
+        if (!ex) pushMem(r, `我是${o.name}的${t}`);
+      }
+      save();
+      sh.close();
+      render();
     });
   }
 
@@ -783,7 +906,7 @@
     }
     if (tab === "people") {
       const now = whereNow();
-      p.innerHTML = `<div class="pt-res-list">${S.residents
+      p.innerHTML = `<div class="pt-circle-head"><span>${S.residents.length} 位居民</span><span><button type="button" class="fun-btn ghost sm" data-a="recruit">招新居民</button> <button type="button" class="fun-btn solid sm" data-a="addnpc">＋ 新加 NPC</button></span></div><div class="pt-res-list">${S.residents
         .map((r) => `<button type="button" class="pt-res" data-r="${r.id}">${resAv(r, "fun-av")}<span><strong>${esc(r.name)} ${esc(r.mood || "")}</strong><small>${esc(r.job)} · ${r.charId ? "主要角色" : "NPC"}</small><small>现在：${now[r.id] ? placeById(now[r.id]).icon + placeById(now[r.id]).name : "🏠 在家"}</small></span></button>`)
         .join("")}</div>`;
     }
@@ -801,7 +924,7 @@
         <label class="fun-switch"><input type="checkbox" id="pt-romance" ${S.romance ? "checked" : ""}/><span>允许镇民恋爱、结婚、生小孩</span></label>
         <p class="fun-note">${S.romance ? "已开启：成年居民之间会慢慢产生好感，暧昧→恋人→夫妻，结婚后可能会有宝宝。" : "关着的时候，镇民之间只会做朋友、同事、邻居。"}</p>
         <p class="fun-kicker">🏠 居民</p>
-        <div class="ww-row"><button type="button" class="fun-btn ghost" data-a="recruit">招新居民</button><button type="button" class="fun-btn ghost" data-a="reset">重建小镇</button></div>
+        <div class="ww-row"><button type="button" class="fun-btn ghost" data-a="addnpc">＋ 新加 NPC</button><button type="button" class="fun-btn ghost" data-a="recruit">招新居民</button><button type="button" class="fun-btn ghost" data-a="reset">重建小镇</button></div>
         ${S.notices.length ? `<p class="fun-kicker">历史公告</p><ul class="pt-mem">${S.notices.slice(-6).reverse().map((n) => `<li>第${n.day}天：${esc(n.text)}</li>`).join("")}</ul>` : ""}
       </div>`;
     }
@@ -832,6 +955,7 @@
     }
     if (a === "recruit") return void recruit();
     if (a === "circle") return void refreshCircle();
+    if (a === "addnpc") return npcSheet();
     const postEl = e.target.closest("[data-post]");
     if (postEl && (a === "plike" || a === "pcmt" || a === "psend")) {
       const post = S.posts.find((x) => x.id === postEl.dataset.post);

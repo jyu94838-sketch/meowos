@@ -8547,3 +8547,16 @@ body.dark .ua-pill { background: #3a2a22; color: #f0b890; }
 .dt-preview { text-align: center; line-height: 1.7; }
 .dt-form .fun-field, .dt-form .fun-field input, .dt-form .fun-field select { min-width: 0; max-width: 100%; box-sizing: border-box; }
 .dt-form .fun-field input, .dt-form .fun-field select { width: 100%; }
+/* Pocket Town · 镇长新加 NPC */
+.pt-npcform { display: flex; flex-direction: column; }
+.pt-npc-av { align-self: center; width: 76px; height: 76px; border-radius: 50%; border: 1px dashed var(--line); background: color-mix(in srgb, var(--text-main) 5%, transparent); color: var(--text-sub); cursor: pointer; overflow: hidden; padding: 0; margin: 4px 0 10px; font: inherit; }
+.pt-npc-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pt-npc-av span { display: flex; flex-direction: column; align-items: center; font-size: 1.3rem; line-height: 1.1; }
+.pt-npc-av small { font-size: 0.68rem; }
+.pt-npcform textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.pt-relrows { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.pt-relrow { display: flex; gap: 6px; align-items: center; }
+.pt-relrow select, .pt-relrow input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 0.82rem; }
+.pt-relrow button { border: 0; background: none; color: var(--text-sub); cursor: pointer; }
+.pt-npcform > .fun-btn.sm { align-self: flex-start; }
+.pt-circle-head > span:last-child { display: flex; gap: 6px; }
