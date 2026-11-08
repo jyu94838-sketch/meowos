@@ -55547,14 +55547,41 @@ document.getElementById("xxji-import-file")?.addEventListener("change", async (e
     showToast("导入失败");
   }
 });
+// 旧版首页里设置最底部的「关于 Meow」：如果手机还缓存着旧首页，就把它换回一行版本号
+(() => {
+  const old = document.getElementById("settings-about");
+  if (old) old.outerHTML = `<div class="settings-panel settings-panel--soft"><div class="settings-row settings-row-static"><span class="settings-row-l">版本</span><span class="settings-row-r">Meow OS</span></div></div>`;
+})();
+/** 关于 Meow 的内容直接写在这里（不依赖 index.html，手机缓存了旧首页也能正常显示） */
+const MX_ABOUT_HTML = `<div class="mx-about-head">
+                  <img src="icons/icon-192.png?v=8" alt="" class="mx-about-icon" width="64" height="64">
+                  <div>
+                    <strong class="mx-about-name">关于 Meow</strong>
+                    <span class="mx-about-sub">Meow OS · 角色聊天与小世界</span>
+                  </div>
+                </div>
+                <p class="mx-about-p">Meow 是在 <b>Ruiya</b> 的开源作品 <b>「没心机」</b> 的基础上二次创作的：桌面、聊天、角色、世界书这些最核心的部分都来自没心机，Meow 只是在上面加了一些自己喜欢的小玩意儿，换了一身新衣服。</p>
+                <p class="mx-about-p">没有没心机，就不会有 Meow。</p>
+                <div class="mx-about-thanks">
+                  <p>再次感谢 <b>Ruiya</b> 🌷</p>
+                  <p>再次感谢 <b>没心机</b> 🤍</p>
+                </div>
+                <p class="mx-about-note">没心机以 AGPL-3.0 协议开源，Meow 同样遵守这个协议并公开全部源代码。</p>
+                <div class="settings-row settings-row-static">
+                  <span class="settings-row-l">原作</span>
+                  <span class="settings-row-r">没心机 · Ruiya</span>
+                </div>
+                <div class="settings-row settings-row-static">
+                  <span class="settings-row-l">Meow 源代码</span>
+                  <span class="settings-row-r"><a href="https://github.com/jyu94838-sketch/meowos" target="_blank" rel="noopener">GitHub</a></span>
+                </div>`;
 document.getElementById("my-open-about")?.addEventListener("click", () => {
   // 「我的 → 关于」：进入关于页（整页，左上角返回「我的」）
   if (document.getElementById("mx-about-page")) return;
-  const tpl = document.getElementById("mx-about-tpl");
   const pg = document.createElement("section");
   pg.id = "mx-about-page";
   pg.className = "mx-about-page";
-  pg.innerHTML = `<header class="mx-about-bar"><button type="button" class="chip ghost chip-xs mx-about-back"><i class="ph ph-arrow-left"></i> 我的</button><b>关于</b><span></span></header><div class="mx-about-body"><div class="mx-about">${tpl ? tpl.innerHTML : ""}</div></div>`;
+  pg.innerHTML = `<header class="mx-about-bar"><button type="button" class="chip ghost chip-xs mx-about-back"><i class="ph ph-arrow-left"></i> 我的</button><b>关于</b><span></span></header><div class="mx-about-body"><div class="mx-about">${MX_ABOUT_HTML}</div></div>`;
   const host = document.getElementById("my-screen") || document.body;
   host.appendChild(pg);
   requestAnimationFrame(() => pg.classList.add("is-open"));
