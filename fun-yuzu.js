@@ -393,6 +393,295 @@
     });
   }
 
+  /* ───── 健康社区（大家分享经验 / 提问 / 评论；存在站长的 Supabase 里） ───── */
+  const CATS = ["全部", "痛经", "月经不调", "备孕", "避孕", "情绪", "日常护理", "妇科检查", "其他"];
+  const FS = { cat: "全部", sort: "new", q: "", list: [], more: true, loading: false, err: "", open: null, detail: null, loaded: false };
+  const lsGet = (k, d) => {
+    try {
+      return localStorage.getItem(k) ?? d;
+    } catch (_) {
+      return d;
+    }
+  };
+  const lsSet = (k, v) => {
+    try {
+      localStorage.setItem(k, v);
+    } catch (_) {
+      /* ignore */
+    }
+  };
+  let yzToken = lsGet("meowos_yz_token", "");
+  if (!yzToken) {
+    const a = new Uint8Array(20);
+    (window.crypto || {}).getRandomValues?.(a);
+    yzToken = [...a].map((b) => (b || Math.floor(Math.random() * 256)).toString(16).padStart(2, "0")).join("");
+    lsSet("meowos_yz_token", yzToken);
+  }
+  let yzNick = lsGet("meowos_yz_nick", "") || "柚子" + Math.floor(1000 + Math.random() * 9000);
+  lsSet("meowos_yz_nick", yzNick);
+  const liked = new Set(JSON.parse(lsGet("meowos_yz_liked", "[]") || "[]"));
+  const saveLiked = () => lsSet("meowos_yz_liked", JSON.stringify([...liked].slice(-500)));
+  const sbCfg = () => {
+    const c = window.MX_SHARE_CONFIG || {};
+    return c.url && c.anonKey ? { url: String(c.url).replace(/\/+$/, ""), key: c.anonKey } : null;
+  };
+  async function yrpc(fn, args) {
+    const c = sbCfg();
+    if (!c) throw new Error("还没有配置资源站（Supabase）");
+    let res;
+    try {
+      res = await fetch(c.url + "/rest/v1/rpc/" + fn, {
+        method: "POST",
+        headers: { apikey: c.key, ...(/^eyJ/.test(c.key) ? { Authorization: "Bearer " + c.key } : {}), "Content-Type": "application/json" },
+        body: JSON.stringify(args)
+      });
+    } catch (_) {
+      throw new Error("网络连不上社区服务器");
+    }
+    const t = await res.text();
+    let d = null;
+    try {
+      d = t ? JSON.parse(t) : null;
+    } catch (_) {
+      d = t;
+    }
+    if (!res.ok) {
+      if (res.status === 404 || (d && d.code === "PGRST202")) throw new Error("社区还没开通：站长需要在 Supabase 里运行一次 supabase-yuzu.sql");
+      throw new Error((d && d.message) || "HTTP " + res.status);
+    }
+    return d;
+  }
+  const ago = (s) => {
+    const t = (Date.now() - Date.parse(s)) / 1000;
+    if (t < 60) return "刚刚";
+    if (t < 3600) return Math.floor(t / 60) + " 分钟前";
+    if (t < 86400) return Math.floor(t / 3600) + " 小时前";
+    if (t < 86400 * 30) return Math.floor(t / 86400) + " 天前";
+    const d = new Date(s);
+    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+  };
+  const br = (s) => esc(s).replace(/\n/g, "<br>");
+  async function loadList(reset) {
+    if (FS.loading) return;
+    FS.loading = true;
+    FS.err = "";
+    if (reset) {
+      FS.list = [];
+      FS.more = true;
+    }
+    if (tab === "forum") draw();
+    try {
+      const rows = await yrpc("mx_yz_list", { p_cat: FS.cat, p_sort: FS.sort, p_offset: FS.list.length, p_q: FS.q, p_token: yzToken });
+      FS.list = FS.list.concat(rows || []);
+      FS.more = (rows || []).length >= 30;
+      FS.loaded = true;
+    } catch (e) {
+      FS.err = e.message;
+    } finally {
+      FS.loading = false;
+      if (tab === "forum") draw();
+    }
+  }
+  async function openPost(id) {
+    FS.open = id;
+    FS.detail = null;
+    draw();
+    try {
+      FS.detail = await yrpc("mx_yz_get", { p_id: id, p_token: yzToken });
+      if (!FS.detail?.post) {
+        toast("这个帖子不见了");
+        FS.open = null;
+      }
+    } catch (e) {
+      toast(e.message);
+      FS.open = null;
+    }
+    draw();
+  }
+  function forumHtml() {
+    if (FS.open) return postHtml();
+    return `<div class="yzf">
+      <div class="yzf-top"><div class="yzf-search"><input type="search" id="yzf-q" placeholder="搜搜大家的经验…" value="${esc(FS.q)}" enterkeyhint="search"/></div><button type="button" class="fun-btn solid sm" data-fa="new">✏️ 发帖</button></div>
+      <div class="yzf-cats">${CATS.map((c) => `<button type="button" class="${FS.cat === c ? "is-on" : ""}" data-fcat="${c}">${c}</button>`).join("")}</div>
+      <div class="yzf-sort"><button type="button" class="${FS.sort === "new" ? "is-on" : ""}" data-fsort="new">最新</button><button type="button" class="${FS.sort === "hot" ? "is-on" : ""}" data-fsort="hot">热门</button><button type="button" class="${FS.sort === "mine" ? "is-on" : ""}" data-fsort="mine">我发的</button><span>我的昵称：<b>${esc(yzNick)}</b> <button type="button" class="yzf-mini" data-fa="nick">改</button></span></div>
+      ${FS.err ? `<p class="yzf-err">${esc(FS.err)}</p>` : ""}
+      <div class="yzf-list">${
+        FS.list
+          .map(
+            (p) => `<button type="button" class="yzf-item" data-fpost="${p.id}"><span class="yzf-cat">${esc(p.cat)}</span><b>${esc(p.title)}</b><p>${esc(p.preview)}${p.preview.length >= 140 ? "…" : ""}</p><small>${esc(p.nick)}${p.mine ? "（我）" : ""} · ${ago(p.created_at)}<span>💗 ${p.likes}　💬 ${p.comments}</span></small></button>`
+          )
+          .join("") || (FS.loading ? `<p class="fun-note yzf-empty">加载中…</p>` : FS.err ? "" : `<p class="fun-note yzf-empty">${FS.sort === "mine" ? "你还没发过帖子" : "这里还没有帖子，来发第一个吧～"}</p>`)
+      }</div>
+      ${FS.more && FS.list.length ? `<button type="button" class="fun-btn ghost wide" data-fa="more">${FS.loading ? "加载中…" : "加载更多"}</button>` : ""}
+      <p class="fun-note yz-foot">这里是大家匿名分享经验和互相提问的地方，彼此温柔一点 🌷。网友的经验不能代替医生的诊断，身体不舒服请及时就医。不要发手机号、住址等个人信息；看到不好的内容可以举报。</p>
+    </div>`;
+  }
+  function postHtml() {
+    const d = FS.detail;
+    if (!d) return `<div class="yzf"><button type="button" class="yzf-back" data-fa="back">‹ 返回</button><p class="fun-note yzf-empty">加载中…</p></div>`;
+    const p = d.post;
+    const lk = liked.has("p" + p.id);
+    return `<div class="yzf yzf-detail">
+      <button type="button" class="yzf-back" data-fa="back">‹ 返回</button>
+      <article class="yzf-post"><span class="yzf-cat">${esc(p.cat)}</span><h3>${esc(p.title)}</h3><small>${esc(p.nick)}${p.mine ? "（我）" : ""} · ${ago(p.created_at)}</small><p>${br(p.body)}</p>
+        <div class="yzf-acts"><button type="button" class="${lk ? "is-on" : ""}" data-flike="post:${p.id}">💗 ${p.likes}</button><button type="button" data-fa="focus">💬 评论</button>${p.mine ? `<button type="button" data-fdel="post:${p.id}">删除</button>` : `<button type="button" data-frep="post:${p.id}">举报</button>`}</div>
+      </article>
+      <h4 class="yzf-h4">评论 ${d.comments.length}</h4>
+      <div class="yzf-cmts">${
+        d.comments
+          .map((c, i) => {
+            const l = liked.has("c" + c.id);
+            return `<div class="yzf-cmt"><div class="yzf-cmt-h"><b>${esc(c.nick)}${c.mine ? "（我）" : ""}</b><small>${i + 1} 楼 · ${ago(c.created_at)}</small></div><p>${br(c.body)}</p><div class="yzf-acts sm"><button type="button" class="${l ? "is-on" : ""}" data-flike="comment:${c.id}">💗 ${c.likes}</button><button type="button" data-freply="${esc(c.nick)}">回复</button>${c.mine ? `<button type="button" data-fdel="comment:${c.id}">删除</button>` : `<button type="button" data-frep="comment:${c.id}">举报</button>`}</div></div>`;
+          })
+          .join("") || `<p class="fun-note yzf-empty">还没有评论，说说你的经验或者给 TA 一点鼓励吧</p>`
+      }</div>
+      <form class="yzf-bar"><input type="text" id="yzf-cin" maxlength="500" placeholder="温柔地评论一下…（以 ${esc(yzNick)} 的身份）" enterkeyhint="send"/><button type="submit" class="fun-btn solid sm">发送</button></form>
+    </div>`;
+  }
+  function newPost() {
+    const sh = F.openSheet(
+      `<div class="yzf-new">
+        <div class="yzf-cats">${CATS.slice(1).map((c, i) => `<button type="button" class="${i === 0 ? "is-on" : ""}" data-pc="${c}">${c}</button>`).join("")}</div>
+        <input type="text" id="yzf-t" maxlength="40" placeholder="标题：想问什么 / 想分享什么（40 字内）"/>
+        <textarea id="yzf-b" rows="7" maxlength="2000" placeholder="具体说说～比如年龄段、周期情况、试过什么办法、有没有看过医生……（不要写真实姓名、电话、住址）"></textarea>
+        <p class="fun-note">以「${esc(yzNick)}」的身份匿名发布</p>
+        <div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-x="ok">发布</button></div>
+      </div>`,
+      { title: "发帖" }
+    );
+    let cat = CATS[1];
+    sh.body.addEventListener("click", async (e) => {
+      const pc = e.target.closest("[data-pc]");
+      if (pc) {
+        cat = pc.dataset.pc;
+        sh.body.querySelectorAll("[data-pc]").forEach((b) => b.classList.toggle("is-on", b === pc));
+        return;
+      }
+      if (!e.target.closest("[data-x=ok]")) return;
+      const title = sh.body.querySelector("#yzf-t").value.trim();
+      const body = sh.body.querySelector("#yzf-b").value.trim();
+      if (!title) return toast("写个标题吧");
+      if (body.length < 5) return toast("内容再多写一点点");
+      const btn = e.target.closest("[data-x=ok]");
+      btn.disabled = true;
+      try {
+        const id = await yrpc("mx_yz_post", { p_token: yzToken, p_nick: yzNick, p_cat: cat, p_title: title, p_body: body });
+        if (id === -2) throw new Error("发得太快了，过几分钟再发");
+        if (!(id > 0)) throw new Error("发布失败");
+        sh.close();
+        toast("发布成功 🌷");
+        FS.sort = "new";
+        FS.cat = "全部";
+        loadList(true);
+        openPost(id);
+      } catch (err) {
+        btn.disabled = false;
+        toast(err.message);
+      }
+    });
+  }
+  async function sendComment(text, input) {
+    const t = String(text || "").trim();
+    if (!t || !FS.detail) return;
+    input.disabled = true;
+    try {
+      const id = await yrpc("mx_yz_comment", { p_token: yzToken, p_nick: yzNick, p_post: FS.detail.post.id, p_body: t });
+      if (id === -2) throw new Error("评论太频繁了，歇一会儿");
+      if (!(id > 0)) throw new Error("评论失败");
+      await openPost(FS.detail.post.id);
+      const box = root?.querySelector(".yzf-cmts");
+      box?.lastElementChild?.scrollIntoView({ block: "center" });
+      const it = FS.list.find((x) => x.id === FS.open);
+      if (it) it.comments++;
+    } catch (err) {
+      toast(err.message);
+      input.disabled = false;
+    }
+  }
+  async function forumClick(e) {
+    const fa = e.target.closest("[data-fa]")?.dataset.fa;
+    if (fa === "new") return newPost();
+    if (fa === "more") return loadList(false);
+    if (fa === "back") {
+      FS.open = null;
+      FS.detail = null;
+      return draw();
+    }
+    if (fa === "focus") return root.querySelector("#yzf-cin")?.focus();
+    if (fa === "nick") {
+      const v = prompt("在社区里显示的昵称（不要用真名哦）", yzNick);
+      if (v == null) return true;
+      yzNick = String(v).trim().slice(0, 20) || yzNick;
+      lsSet("meowos_yz_nick", yzNick);
+      draw();
+      return true;
+    }
+    const fc = e.target.closest("[data-fcat]");
+    if (fc) {
+      FS.cat = fc.dataset.fcat;
+      return loadList(true);
+    }
+    const fs = e.target.closest("[data-fsort]");
+    if (fs) {
+      FS.sort = fs.dataset.fsort;
+      return loadList(true);
+    }
+    const fp = e.target.closest("[data-fpost]");
+    if (fp) return openPost(Number(fp.dataset.fpost));
+    const fr = e.target.closest("[data-freply]");
+    if (fr) {
+      const inp = root.querySelector("#yzf-cin");
+      if (inp) {
+        inp.value = `回复 @${fr.dataset.freply}：`;
+        inp.focus();
+      }
+      return true;
+    }
+    const fl = e.target.closest("[data-flike]");
+    if (fl) {
+      const [kind, id] = fl.dataset.flike.split(":");
+      const key = (kind === "post" ? "p" : "c") + id;
+      const on = !liked.has(key);
+      if (on) liked.add(key);
+      else liked.delete(key);
+      saveLiked();
+      yrpc("mx_yz_like", { p_kind: kind, p_id: Number(id), p_delta: on ? 1 : -1 }).catch(() => {});
+      const obj = kind === "post" ? FS.detail?.post : FS.detail?.comments.find((c) => String(c.id) === id);
+      if (obj) obj.likes = Math.max(0, obj.likes + (on ? 1 : -1));
+      const li = FS.list.find((x) => String(x.id) === id);
+      if (kind === "post" && li) li.likes = obj ? obj.likes : li.likes;
+      draw();
+      return true;
+    }
+    const frp = e.target.closest("[data-frep]");
+    if (frp) {
+      if (!confirm("举报这条内容？被多人举报后会自动隐藏。")) return true;
+      const [kind, id] = frp.dataset.frep.split(":");
+      yrpc("mx_yz_report", { p_kind: kind, p_id: Number(id) }).then(() => toast("已举报，谢谢你"), (er) => toast(er.message));
+      return true;
+    }
+    const fd = e.target.closest("[data-fdel]");
+    if (fd) {
+      const [kind, id] = fd.dataset.fdel.split(":");
+      if (!confirm(kind === "post" ? "删除这个帖子？评论也会一起删掉。" : "删除这条评论？")) return true;
+      try {
+        const ok = await yrpc("mx_yz_delete", { p_token: yzToken, p_kind: kind, p_id: Number(id) });
+        if (!ok) throw new Error("删除失败");
+        toast("已删除");
+        if (kind === "post") {
+          FS.open = null;
+          FS.detail = null;
+          FS.list = FS.list.filter((x) => String(x.id) !== id);
+          draw();
+        } else openPost(FS.detail.post.id);
+      } catch (er) {
+        toast(er.message);
+      }
+      return true;
+    }
+    return false;
+  }
+
   async function draw() {
     if (!root) return;
     const p = predict();
@@ -406,8 +695,28 @@
           ? `<small>距离下次经期</small><b>${p.until}</b><span>天</span><small>预计 ${md(p.next)}</small>`
           : `<small>预计经期</small><b>${p.until === 0 ? "今天" : "推迟 " + -p.until + " 天"}</b><small>来了就点「经期来了」</small>`;
     const recs = sorted().reverse();
-    const tabs = `<div class="yz-tabs"><button type="button" data-tab="cycle" class="${tab === "cycle" ? "is-on" : ""}">🍊 经期</button><button type="button" data-tab="health" class="${tab === "health" ? "is-on" : ""}">🌷 女性健康</button></div>`;
+    const tabs = `<div class="yz-tabs"><button type="button" data-tab="cycle" class="${tab === "cycle" ? "is-on" : ""}">🍊 经期</button><button type="button" data-tab="forum" class="${tab === "forum" ? "is-on" : ""}">💬 女性健康</button><button type="button" data-tab="health" class="${tab === "health" ? "is-on" : ""}">🌷 我的身体</button></div>`;
     castCache = cast;
+    if (tab === "forum") {
+      root.innerHTML = `<div class="yz">${tabs}${forumHtml()}</div>`;
+      if (!FS.loaded && !FS.loading && !FS.err) loadList(true);
+      const f = root.querySelector(".yzf-bar");
+      if (f)
+        f.addEventListener("submit", (ev) => {
+          ev.preventDefault();
+          const inp = root.querySelector("#yzf-cin");
+          sendComment(inp.value, inp);
+        });
+      const q = root.querySelector("#yzf-q");
+      if (q)
+        q.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter") {
+            FS.q = q.value.trim();
+            loadList(true);
+          }
+        });
+      return;
+    }
     if (tab === "health") {
       root.innerHTML = `<div class="yz">${tabs}${healthHtml(p)}</div>`;
       return;
@@ -486,6 +795,10 @@
     });
   }
   async function onClick(e) {
+    if (tab === "forum" && !e.target.closest("[data-tab]")) {
+      await forumClick(e);
+      return;
+    }
     const a = e.target.closest("[data-a]")?.dataset.a;
     if (a === "start") return setStart(today());
     if (a === "end") return setEnd(today());
