@@ -8690,3 +8690,5 @@ html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-a
 .sv-bgm.is-playing .sv-note { display: inline-block; animation: sv-note-bob 1s ease-in-out infinite; }
 @keyframes sv-note-bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-2px) rotate(-12deg); } }
 .pt-office .ww-row .fun-btn { white-space: nowrap; padding-left: 8px; padding-right: 8px; }
+/* 联机：带着角色那一条，两个开关挤不下时换行 */
+.net-charbar { flex-wrap: wrap; row-gap: 4px; }

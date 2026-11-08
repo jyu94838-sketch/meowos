@@ -570,10 +570,33 @@
       return "";
     }
   }
+  /** 角色这句话的整理：去掉动作旁白（没开的时候）、补齐被截断的尾巴 */
+  function tidyCharLine(c, text, name) {
+    let t = String(text || "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+    if (!c.charActions) {
+      t = t
+        .replace(/[（(][^（）()]{0,80}[）)]/g, " ")
+        .replace(/\*[^*\n]{1,80}\*/g, " ")
+        .replace(/【[^【】]{0,40}】/g, " ")
+        .replace(/\s{2,}/g, " ")
+        .replace(/^\s+|\s+$/g, "");
+    }
+    t = F.cleanLine(t, 600, name);
+    // 模型被截断时末尾会剩一两个字的半句：切回最后一个完整的句子
+    const m = t.match(/^([\s\S]*[。！？!?…~～」”）)])([^。！？!?…~～」”）)]{1,2})$/);
+    if (m && m[1].length >= 6 && !/[\p{Emoji_Presentation}]/u.test(m[2])) t = m[1];
+    return t;
+  }
+  /** 角色说话的风格要求（看「动作旁白」开关） */
+  function charStyleRule(c) {
+    return c.charActions
+      ? "可以在说话前用（）写一个很短的动作或神态（一小句以内），但重点是说出口的话；话要说完整，别说一半就断。"
+      : "只写说出口的话：不要括号里的动作、神态、旁白，不要 *动作*，也不要描写自己在做什么；话要说完整，别说一半就断。";
+  }
   function sendAsChar(c, text) {
     const ch = c.char;
     if (!ch) return;
-    const t = F.cleanLine(text, 300, ch.name);
+    const t = tidyCharLine(c, text, ch.name);
     if (!t) return;
     sendMsg(c, { id: rid(), at: Date.now(), text: t, from: { mid: S.mid, name: ch.name, isChar: true, owner: me().name } });
   }
@@ -604,11 +627,11 @@
         [
           {
             role: "system",
-            content: `你是「${ch.name}」。${persona ? "人设：\n" + persona + "\n" : ""}你的主人是「${me().name}」，TA 把你带进了和其他 Meow 用户的${c.dm ? "好友私聊" : "群聊「" + c.name + "」"}，里面有别的真人和他们带来的角色。像在群聊里一样自然地说话：口语、简短（一两句），符合人设，可以和别人互动、开玩笑。不要替别人说话，不要加名字前缀，不要旁白，不要输出思考过程。`
+            content: `你是「${ch.name}」。${persona ? "人设：\n" + persona + "\n" : ""}你的主人是「${me().name}」，TA 把你带进了和其他 Meow 用户的${c.dm ? "好友私聊" : "群聊「" + c.name + "」"}，里面有别的真人和他们带来的角色。像在群聊里一样自然地说话：口语、简短（一到三句），符合人设，可以和别人互动、开玩笑。${charStyleRule(c)}不要替别人说话，不要加名字前缀，不要输出思考过程。`
           },
           { role: "user", content: `最近的消息：\n${ctx}\n\n现在轮到你说一句。` }
         ],
-        { maxTokens: 300, temperature: 0.95 }
+        { maxTokens: 1200, temperature: 0.95 }
       );
       R.charLast = Date.now();
       sendAsChar(c, reply);
@@ -1087,10 +1110,10 @@
         const persona = await charPersona(c);
         const reply = await F.aiText(
           [
-            { role: "system", content: `你是「${ch.name}」。${persona ? "人设：\n" + persona + "\n" : ""}你在和其他 Meow 用户的群里玩真心话大冒险。用你的人设回答，口语、简短（一到三句），可以害羞、耍赖或认真。不要加名字前缀，不要输出思考过程。` },
+            { role: "system", content: `你是「${ch.name}」。${persona ? "人设：\n" + persona + "\n" : ""}你在和其他 Meow 用户的群里玩真心话大冒险。用你的人设回答，口语、简短（一到三句），可以害羞、耍赖或认真。${charStyleRule(c)}不要加名字前缀，不要输出思考过程。` },
             { role: "user", content: `你抽到了${g.choice === "dare" ? "大冒险" : "真心话"}：「${g.q}」。现在完成它。` }
           ],
-          { maxTokens: 300, temperature: 0.95 }
+          { maxTokens: 1200, temperature: 0.95 }
         );
         sendAsChar(c, reply);
         rt(c.gid).charLast = Date.now();
@@ -1115,13 +1138,13 @@
                   { role: "system", content: `你是「${ch.name}」。${persona ? "人设：\n" + persona + "\n" : ""}你在玩谁是卧底。你拿到的词是「${word}」（你不知道自己是不是卧底）。用一句话（15 字以内）描述你的词，不能说出这个词本身，也别太直白，按你的人设说话。只输出这句描述。` },
                   { role: "user", content: prev ? `前面大家的描述：\n${prev}\n轮到你了。` : "你第一个描述。" }
                 ],
-                { maxTokens: 120, temperature: 0.9 }
+                { maxTokens: 800, temperature: 0.9 }
               );
             } catch (_) {
               t = "";
             }
           }
-          t = F.cleanLine(t || "这个东西大家应该都见过吧", 40, ch.name);
+          t = tidyCharLine({ charActions: false }, t, ch.name).slice(0, 40) || "这个东西大家应该都见过吧";
           setTimeout(() => act(c, "desc", t, me2.pid), 800);
         }
         if (g.phase === "vote" && !g.votes[me2.pid] && !answered.has(k2(`v${g.round}${me2.pid}`))) {
@@ -1136,7 +1159,7 @@
                   { role: "system", content: `你在玩谁是卧底，你的词是「${g.words[me2.pid]}」。根据大家的描述，投出你觉得最可能是卧底的人。只输出序号数字。` },
                   { role: "user", content: list.join("\n") }
                 ],
-                { maxTokens: 10, temperature: 0.5 }
+                { maxTokens: 400, temperature: 0.5 }
               );
               const n = parseInt(String(r).match(/\d+/)?.[0] || "0", 10);
               if (n >= 1 && n <= cands.length) target = cands[n - 1];
@@ -1446,6 +1469,9 @@
   }
 
   function drawConv() {
+    keepTyping(root, drawConvInner);
+  }
+  function drawConvInner() {
     const c = S.convs[V.open];
     c.unread = 0;
     save();
@@ -1453,7 +1479,7 @@
       <div class="net-head" id="net-head"></div>
       <div class="net-game" id="net-game" hidden></div>
       <div class="net-list mx-net-list chat-messages" id="net-list"></div>
-      <form class="net-bar mx-net-bar chat-composer"><button type="button" class="net-ico mx-net-more chat-more-btn" data-a="games" title="一起玩">🎲</button><div class="chat-input-ruled net-input-wrap"><input type="text" class="mx-net-input chat-input" maxlength="500" placeholder="说点什么…" enterkeyhint="send" /></div><button type="submit" class="fun-btn solid sm mx-net-send chat-send-fab">发送</button></form>
+      <form class="net-bar mx-net-bar chat-composer"><button type="button" class="net-ico mx-net-more chat-more-btn" data-a="games" title="一起玩">🎲</button><div class="chat-input-ruled net-input-wrap"><input type="text" id="net-msg-in" class="mx-net-input chat-input" maxlength="500" placeholder="说点什么…" enterkeyhint="send" /></div><button type="submit" class="fun-btn solid sm mx-net-send chat-send-fab">发送</button></form>
     </div>`;
     setNetFullscreen(true);
     applyNetStyle();
@@ -1491,11 +1517,40 @@
       }
       <div class="net-charbar">${
         c.char
-          ? `${F.avHtml({ name: c.char.name, avatar: c.char.av }, "fun-av sm")}<span>带着 <b>${esc(c.char.name)}</b>${F.hasApiKey() ? "" : "（没填 API Key，TA 只能玩游戏不能聊天）"}</span><label class="net-auto"><input type="checkbox" ${c.charAuto ? "checked" : ""} data-a="auto" />会主动接话</label><button type="button" data-a="char">换</button>`
+          ? `${F.avHtml({ name: c.char.name, avatar: c.char.av }, "fun-av sm")}<span>带着 <b>${esc(c.char.name)}</b>${F.hasApiKey() ? "" : "（没填 API Key，TA 只能玩游戏不能聊天）"}</span><label class="net-auto"><input type="checkbox" ${c.charAuto ? "checked" : ""} data-a="auto" />会主动接话</label><label class="net-auto"><input type="checkbox" ${c.charActions ? "checked" : ""} data-a="acts" />带动作旁白</label><button type="button" data-a="char">换</button>`
           : `<span>还没带角色进来</span><button type="button" data-a="char">带上我的角色</button>`
       }</div>`;
   }
+  /** 重画前记下输入框里打了一半的字和光标，重画后放回去（别人说话 / 游戏更新时不冲掉你在打的字） */
+  function keepTyping(scope, fn) {
+    const saved = [];
+    if (scope) {
+      for (const el of scope.querySelectorAll("input[id], textarea[id]")) {
+        if (el.type === "checkbox" || el.type === "radio") continue;
+        saved.push({ id: el.id, v: el.value, f: document.activeElement === el, s: el.selectionStart, e: el.selectionEnd });
+      }
+    }
+    fn();
+    for (const x of saved) {
+      const el = document.getElementById(x.id);
+      if (!el || (!x.v && !x.f)) continue;
+      if (!el.value && x.v) el.value = x.v;
+      if (x.f) {
+        try {
+          el.focus({ preventScroll: true });
+          if (x.s != null && typeof el.setSelectionRange === "function") el.setSelectionRange(x.s, x.e);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    }
+  }
   function drawGame() {
+    const box0 = root?.querySelector("#net-game");
+    if (!box0) return;
+    keepTyping(box0, drawGameInner);
+  }
+  function drawGameInner() {
     const box = root?.querySelector("#net-game");
     const c = S.convs[V.open];
     if (!box || !c) return;
@@ -1998,6 +2053,12 @@
     if (a === "auto") {
       c.charAuto = e.target.checked;
       save();
+      return;
+    }
+    if (a === "acts") {
+      c.charActions = e.target.checked;
+      save();
+      F.toast(c.charActions ? "TA 说话时可以带一点动作和神态" : "TA 只说话，不带动作旁白");
       return;
     }
     if (a === "games") return pickGame(c);
