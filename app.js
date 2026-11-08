@@ -10182,10 +10182,12 @@ function normalizeWorldBookVolume(raw) {
   }
   const scopeRaw = String(raw.scope || "").trim().toLowerCase();
   const scope = scopeRaw === "global" ? "global" : "local";
+  const group = String(raw.group || "").trim().slice(0, 20);
   return {
     id,
     title: titleRaw || "未命名世界书",
     scope,
+    ...(group ? { group } : {}),
     entries
   };
 }
@@ -10614,7 +10616,48 @@ function renderWorldBookList() {
     return;
   }
   const n = store.volumes.length;
-  store.volumes.forEach((vol, idx) => {
+  // 分组：顶上一排分组筛选；「全部」时按分组排在一起，每组前面一个小标题
+  const groups = [];
+  for (const v of store.volumes) if (v.group && !groups.includes(v.group)) groups.push(v.group);
+  let curGroup = "";
+  try {
+    curGroup = localStorage.getItem("meowos_wb_group") || "";
+  } catch (_) {
+    curGroup = "";
+  }
+  if (curGroup && curGroup !== "__none" && !groups.includes(curGroup)) curGroup = "";
+  renderWorldBookGroupBar(root, groups, curGroup, store.volumes);
+  const order = store.volumes.map((vol, idx) => ({ vol, idx }));
+  const shown = (curGroup === "__none"
+    ? order.filter((x) => !x.vol.group)
+    : curGroup
+      ? order.filter((x) => x.vol.group === curGroup)
+      : groups.length
+        ? [...groups.flatMap((g) => order.filter((x) => x.vol.group === g)), ...order.filter((x) => !x.vol.group)]
+        : order);
+  if (!shown.length) {
+    const li = document.createElement("li");
+    li.className = "world-book-li world-book-li--hint";
+    li.setAttribute("role", "presentation");
+    li.textContent = "这个分组里还没有书。在书下面点「📁」就能把书放进分组。";
+    root.appendChild(li);
+    return;
+  }
+  let lastHead = null;
+  shown.forEach(({ vol, idx }) => {
+    if (!curGroup && groups.length) {
+      const head = vol.group || "未分组";
+      if (head !== lastHead) {
+        lastHead = head;
+        const h = document.createElement("li");
+        h.className = "world-book-li world-book-li--group-head";
+        h.setAttribute("role", "presentation");
+        h.style.cssText = "list-style:none;margin:6px 2px -6px;font-size:.78rem;font-weight:700;color:var(--text-sub);letter-spacing:.06em;display:flex;align-items:center;gap:6px";
+        h.innerHTML = `<i class="ph ph-folder-simple" aria-hidden="true"></i><span></span>`;
+        h.querySelector("span").textContent = `${head} · ${shown.filter((x) => (x.vol.group || "未分组") === head).length} 本`;
+        root.appendChild(h);
+      }
+    }
     const anyOn = vol.entries.some((e) => e.enabled !== false);
     const nEnt = vol.entries.length;
     const li = document.createElement("li");
@@ -10677,11 +10720,130 @@ function renderWorldBookList() {
     down.disabled = idx >= n - 1;
     down.setAttribute("aria-label", "在书架上下移");
     down.innerHTML = '<i class="ph ph-caret-down" aria-hidden="true"></i>';
-    foot.append(up, down);
+    const grp = document.createElement("button");
+    grp.type = "button";
+    grp.className = "chip ghost chip-xs world-book-tool-chip";
+    grp.setAttribute("aria-label", "放进分组");
+    grp.innerHTML = `<i class="ph ph-folder-simple" aria-hidden="true"></i>${vol.group ? `<span style="margin-left:4px;font-size:.7rem">${escapeHtmlText(vol.group)}</span>` : ""}`;
+    grp.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      pickWorldBookVolumeGroup(vol.id);
+    });
+    foot.append(up, down, grp);
 
     wrap.append(face, foot);
     li.appendChild(wrap);
     root.appendChild(li);
+  });
+}
+
+function escapeHtmlText(t) {
+  return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+/** 书架顶上的分组筛选条 */
+function renderWorldBookGroupBar(root, groups, cur, vols) {
+  let bar = document.getElementById("mx-wb-groups");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "mx-wb-groups";
+    bar.style.cssText = "display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 12px;align-items:center";
+    root.parentNode.insertBefore(bar, root);
+    bar.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-wbg]");
+      if (!b) return;
+      const v = b.dataset.wbg;
+      if (v === "__add") {
+        const vs = readWorldBookStore().volumes;
+        if (!vs.length) return showToast("先新建一本世界书");
+        const name = String(prompt("新分组叫什么？（建好后在书下面点「📁」把书放进来）", "") || "").trim().slice(0, 20);
+        if (!name) return;
+        try {
+          localStorage.setItem("meowos_wb_group", name);
+          const extra = JSON.parse(localStorage.getItem("meowos_wb_groups_extra") || "[]");
+          if (!extra.includes(name)) extra.push(name);
+          localStorage.setItem("meowos_wb_groups_extra", JSON.stringify(extra.slice(-30)));
+        } catch (_) {
+          /* ignore */
+        }
+        renderWorldBookList();
+        return;
+      }
+      try {
+        localStorage.setItem("meowos_wb_group", v);
+      } catch (_) {
+        /* ignore */
+      }
+      renderWorldBookList();
+    });
+  }
+  // 刚建好、还没放书的分组也显示出来
+  let extra = [];
+  try {
+    extra = JSON.parse(localStorage.getItem("meowos_wb_groups_extra") || "[]");
+  } catch (_) {
+    extra = [];
+  }
+  const all = [...groups, ...extra.filter((g) => !groups.includes(g))];
+  if (cur && cur !== "__none" && !all.includes(cur)) cur = "";
+  const chip = (v, label, on) =>
+    `<button type="button" data-wbg="${escapeHtmlText(v)}" class="chip ${on ? "solid" : "ghost"} chip-xs" style="flex:none">${label}</button>`;
+  const noneN = vols.filter((x) => !x.group).length;
+  bar.innerHTML =
+    chip("", `全部 ${vols.length}`, !cur) +
+    all.map((g) => chip(g, `${escapeHtmlText(g)} ${vols.filter((x) => x.group === g).length}`, cur === g)).join("") +
+    (all.length && noneN ? chip("__none", `未分组 ${noneN}`, cur === "__none") : "") +
+    chip("__add", `<i class="ph ph-plus" aria-hidden="true"></i> 分组`, false);
+}
+
+function pickWorldBookVolumeGroup(volumeId) {
+  const store = readWorldBookStore();
+  const vol = store.volumes.find((v) => v.id === volumeId);
+  if (!vol) return;
+  let extra = [];
+  try {
+    extra = JSON.parse(localStorage.getItem("meowos_wb_groups_extra") || "[]");
+  } catch (_) {
+    extra = [];
+  }
+  const groups = [...new Set([...store.volumes.map((v) => v.group).filter(Boolean), ...extra])];
+  const F = window.XXJ_FUN;
+  const apply = (g) => {
+    const st = readWorldBookStore();
+    const v = st.volumes.find((x) => x.id === volumeId);
+    if (!v) return;
+    if (g) v.group = g;
+    else delete v.group;
+    writeWorldBookStore(st);
+    renderWorldBookList();
+    showToast(g ? `已放进「${g}」` : "已移出分组");
+  };
+  if (!F?.openSheet) {
+    const g = prompt(`「${vol.title}」放进哪个分组？${groups.length ? "\n已有：" + groups.join("、") : ""}\n留空 = 不分组`, vol.group || "");
+    if (g != null) apply(String(g).trim().slice(0, 20));
+    return;
+  }
+  const sh = F.openSheet(
+    `<div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px">${groups
+        .map((g) => `<button type="button" class="chip ${g === vol.group ? "solid" : "ghost"}" data-g="${escapeHtmlText(g)}">${escapeHtmlText(g)}</button>`)
+        .join("")}${vol.group ? `<button type="button" class="chip ghost" data-g="">移出分组</button>` : ""}</div>
+      <div style="display:flex;gap:8px"><input type="text" maxlength="20" placeholder="新分组名" style="flex:1;min-width:0;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg-card);color:var(--text-main);font:inherit"/><button type="button" class="chip solid" data-new>新建并放入</button></div>
+    </div>`,
+    { title: `「${vol.title}」放进分组` }
+  );
+  sh.body.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-g]");
+    if (b) {
+      sh.close();
+      return apply(b.dataset.g);
+    }
+    if (e.target.closest("[data-new]")) {
+      const g = String(sh.body.querySelector("input").value || "").trim().slice(0, 20);
+      if (!g) return showToast("写个分组名");
+      sh.close();
+      apply(g);
+    }
   });
 }
 
@@ -10994,10 +11156,13 @@ async function parseWorldBookEntriesFromZipObject(path, zipFile) {
     const isHtml = lower.endsWith(".html") || lower.endsWith(".htm");
     const text = normalizeWorldBookImportedContent(await zipFile.async("string"), isHtml);
     const base = worldBookImportBasenameFromPath(name);
+    const split = splitWorldBookTextIntoEntries(text);
+    if (split.length >= 2) return split.map((p) => ({ title: p.title || base || "未命名条目", content: p.content, keywords: p.title || "", enabled: true }));
+    const det = detectWorldBookEntryTitleFromText(text);
     return [
       {
-        title: base || "未命名条目",
-        content: text,
+        title: det.title || base || "未命名条目",
+        content: det.title ? det.content : text,
         keywords: "",
         enabled: true
       }
@@ -11012,10 +11177,13 @@ async function parseWorldBookEntriesFromZipObject(path, zipFile) {
     const result = await mammoth.extractRawText({ arrayBuffer: buf });
     const text = normalizeWorldBookImportedContent(String(result?.value ?? ""), false);
     const base = worldBookImportBasenameFromPath(name);
+    const split = splitWorldBookTextIntoEntries(text);
+    if (split.length >= 2) return split.map((p) => ({ title: p.title || base || "未命名条目", content: p.content, keywords: p.title || "", enabled: true }));
+    const det = detectWorldBookEntryTitleFromText(text);
     return [
       {
-        title: base || "未命名条目",
-        content: text,
+        title: det.title || base || "未命名条目",
+        content: det.title ? det.content : text,
         keywords: "",
         enabled: true
       }
@@ -11169,6 +11337,59 @@ async function importCharAltPersonaFromFile(file) {
   showToast(isDocx ? "已从 Word 导入马甲人设" : "已从文本文件导入马甲人设");
 }
 
+
+/**
+ * 从导入的文字里认出条目标题。
+ * 认得出的写法：# 标题 / 【标题】 / 《标题》 / [标题] / 标题：xxx / 条目：xxx / 名称：xxx，
+ * 以及「第一行很短、后面还有正文」的那种。
+ * @returns {{ title: string, content: string }}
+ */
+function detectWorldBookEntryTitleFromText(text) {
+  const src = String(text || "").replace(/^﻿/, "");
+  const lines = src.split(/\r?\n/);
+  let i = 0;
+  while (i < lines.length && !lines[i].trim()) i++;
+  if (i >= lines.length) return { title: "", content: src };
+  const first = lines[i].trim();
+  const rest = () => lines.slice(i + 1).join("\n").replace(/^\s*\n/, "").trim();
+  const clean = (t) => String(t || "").replace(/^[\s#*>\-—=]+|[\s*=—\-]+$/g, "").trim().slice(0, 40);
+  let m;
+  if ((m = first.match(/^#{1,6}\s*(.+)$/))) return { title: clean(m[1]), content: rest() };
+  if ((m = first.match(/^[【\[《「『](.{1,30}?)[】\]》」』]\s*(.*)$/))) {
+    const tail = m[2].replace(/^[:：\s]+/, "");
+    return { title: clean(m[1]), content: [tail, rest()].filter(Boolean).join("\n") };
+  }
+  if ((m = first.match(/^(?:标题|条目|条目名|名称|名字|词条|title|name)\s*[:：]\s*(.+)$/i))) return { title: clean(m[1]), content: rest() };
+  const body = rest();
+  if (body && first.length <= 20 && !/[。！？!?，,；;…]$/.test(first) && !/[:：]\s*\S/.test(first)) {
+    return { title: clean(first), content: body };
+  }
+  return { title: "", content: src.trim() };
+}
+
+/** 一份文字里有好几个标题（# / 【】）就拆成多条 */
+function splitWorldBookTextIntoEntries(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const isHead = (l) => /^\s*#{1,6}\s*\S/.test(l) || /^\s*【[^】]{1,30}】\s*$/.test(l) || /^\s*【[^】]{1,30}】\s*[:：]/.test(l);
+  const heads = lines.reduce((n, l) => n + (isHead(l) ? 1 : 0), 0);
+  if (heads < 2) return [];
+  const out = [];
+  let cur = null;
+  let pre = [];
+  for (const l of lines) {
+    if (isHead(l)) {
+      if (cur) out.push(cur);
+      cur = [l];
+    } else if (cur) cur.push(l);
+    else pre.push(l);
+  }
+  if (cur) out.push(cur);
+  const rows = out.map((ls) => detectWorldBookEntryTitleFromText(ls.join("\n"))).filter((r) => r.title || r.content);
+  const preText = pre.join("\n").trim();
+  if (preText) rows.unshift({ title: detectWorldBookEntryTitleFromText(preText).title || "概述", content: detectWorldBookEntryTitleFromText(preText).title ? detectWorldBookEntryTitleFromText(preText).content : preText });
+  return rows;
+}
+
 /**
  * @param {File} file
  */
@@ -11196,20 +11417,46 @@ async function importWorldBookContentFromFile(file) {
     return;
   }
   const { text, isDocx } = await readTxtOrDocxFileAsText(file);
-  ta.value = text;
+  // 一份文件里有好几个标题：问要不要拆成多条
+  const parts = splitWorldBookTextIntoEntries(text);
+  if (parts.length >= 2 && window.confirm(`认出了 ${parts.length} 个条目：\n${parts.slice(0, 10).map((p) => "· " + (p.title || "未命名条目")).join("\n")}${parts.length > 10 ? "\n……" : ""}\n\n要拆成 ${parts.length} 条加进这本世界书吗？（取消就整份填进当前条目）`)) {
+    const store = readWorldBookStore();
+    const vol = store.volumes.find((v) => v.id === worldBookVolumeId);
+    if (vol) {
+      const curIdx = vol.entries.findIndex((e) => e.id === worldBookEntryId);
+      const cur = vol.entries[curIdx];
+      const rows = parts.map((p) => ({ id: newWorldBookEntryId(), title: p.title || "未命名条目", content: p.content || "", keywords: p.title || "", enabled: true }));
+      // 当前条目是空的就直接用掉
+      if (cur && !String(cur.content || "").trim() && (!String(cur.title || "").trim() || cur.title === "未命名条目")) {
+        Object.assign(cur, { title: rows[0].title, content: rows[0].content, keywords: rows[0].keywords });
+        rows.shift();
+      }
+      vol.entries.splice(curIdx + 1, 0, ...rows);
+      writeWorldBookStore(store);
+      applyWorldBookEditorFromActive();
+      renderWorldBookEntryList();
+      renderWorldBookList();
+      refreshWorldBookReaderChrome();
+      showToast(`已拆成 ${parts.length} 条导入`);
+      return;
+    }
+  }
+  const det = detectWorldBookEntryTitleFromText(text);
+  ta.value = det.title ? det.content : text;
 
-  const base = worldBookImportBasenameFromPath(file.name);
+  const base = det.title || worldBookImportBasenameFromPath(file.name);
   if (base) {
     const titleInput = document.getElementById("world-book-edit-title");
     const cur = String(titleInput?.value || "").trim();
-    if (titleInput instanceof HTMLInputElement && (!cur || cur === "未命名条目")) {
+    if (titleInput instanceof HTMLInputElement && (det.title || !cur || cur === "未命名条目")) {
       titleInput.value = base;
+      titleInput.dispatchEvent(new Event("input", { bubbles: true }));
       const disp = document.getElementById("world-book-reader-title-display");
       if (disp) disp.textContent = base;
     }
   }
 
-  showToast(isDocx ? "已从 Word 导入内文" : "已从文本文件导入内文");
+  showToast(`${isDocx ? "已从 Word 导入" : "已从文本文件导入"}${det.title ? `，标题认出来是「${det.title}」` : ""}`);
 }
 
 function deleteWorldBookActive() {
@@ -13305,7 +13552,17 @@ function getBackupZipModuleDefs() {
         K.DESKTOP_APP_TOWER_BG,
         K.DESKTOP_DOCK_BG,
         K.DESKTOP_HERO_CARD_BG,
-        "ls:meowos_mimi_css"
+        // 第二页图标 / 桌面布局 / 小组件 / 风格包 / 弥弥写的美化：存在 localStorage 和 FunDB 里，也一起打包
+        "ls:meowos_mimi_css",
+        "ls:meowos_desk_icons_v1",
+        "ls:meowos_desk_layout_v1",
+        "ls:meowos_desk_layout_v2",
+        "ls:meowos_icon_size",
+        "ls:meowos_skin_chat",
+        "ls:meowos_skin_home",
+        "ls:meowos_chat_fs",
+        "ls:meowos_hide_status",
+        "fun:desk_widgets_v1"
       ]
     }
   ];
@@ -13484,9 +13741,42 @@ function formatBackupModuleSizeLine(bytes, hint) {
 }
 
 /** 备份导出：lazy / iOS 未灌内存的 KV 从 IndexedDB 兜底读取 */
+/** 把值里的本机媒体引用（图片 blob）换成 data URL */
+async function hydrateBlobRefsDeepForBackup(v, depth = 0) {
+  const M = window.XXJ_MEDIA;
+  if (!M || typeof M.isBlobRef !== "function" || depth > 8) return v;
+  if (typeof v === "string") {
+    if (!M.isBlobRef(v)) return v;
+    try {
+      return (await M.hydrateImageUrlForExport(v)) || v;
+    } catch (_) {
+      return v;
+    }
+  }
+  if (Array.isArray(v)) {
+    const out = [];
+    for (const x of v) out.push(await hydrateBlobRefsDeepForBackup(x, depth + 1));
+    return out;
+  }
+  if (v && typeof v === "object") {
+    const o = {};
+    for (const [k, x] of Object.entries(v)) o[k] = await hydrateBlobRefsDeepForBackup(x, depth + 1);
+    return o;
+  }
+  return v;
+}
+
 async function readKvForBackup(key) {
   const D = window.XXJ_DB;
   if (!D || !key) return undefined;
+  if (String(key).startsWith("fun:")) {
+    try {
+      const v = await window.XXJ_FUN?.FunDB?.get?.(String(key).slice(4));
+      return v == null ? undefined : { __fun: await hydrateBlobRefsDeepForBackup(v) };
+    } catch (_) {
+      return undefined;
+    }
+  }
   if (String(key).startsWith("ls:")) {
     const lk = String(key).slice(3);
     try {
@@ -13583,6 +13873,14 @@ async function collectBackupModuleSnapshot(def) {
         v = await D.hydrateInboxThreadMessagesForExport(v);
       } catch (err) {
         console.warn("backup hydrate inbox messages failed", err);
+      }
+    }
+    // 美化里的图片 / 图标多数存在本机媒体库里（只是个引用），打包时换成真图，换手机也能恢复
+    if (v !== undefined && key !== D.K.CHAT_INBOX_STORE && !String(key).startsWith("ls:") && !String(key).startsWith("fun:")) {
+      try {
+        v = await hydrateBlobRefsDeepForBackup(v);
+      } catch (err) {
+        console.warn("backup hydrate media failed", key, err);
       }
     }
     if (v !== undefined) kv[key] = v;
@@ -13702,6 +14000,12 @@ function refreshDesktopDecorFromKvStore() {
 
 /** @param {{ moduleIds?: string[], moduleLabels?: string[] }} result */
 function refreshSurfacesAfterBackupZipImport(result) {
+  if (window.__mxNeedReloadAfterImport) {
+    window.__mxNeedReloadAfterImport = false;
+    setTimeout(() => {
+      if (window.confirm("桌面图标、布局、小组件和风格包已经恢复，要刷新一下页面让它们生效吗？")) location.reload();
+    }, 2800);
+  }
   const ids = new Set(Array.isArray(result?.moduleIds) ? result.moduleIds : []);
   const has = (id) => ids.has(id);
   const refreshChatUi = () => {
@@ -14093,6 +14397,18 @@ async function applyBackupZipImport(zip, manifest, onStatus) {
           importedInboxPayload = v;
           continue;
         }
+        if (String(k).startsWith("fun:")) {
+          const val = v && typeof v === "object" ? v.__fun : undefined;
+          if (val !== undefined) {
+            try {
+              await window.XXJ_FUN?.FunDB?.set?.(String(k).slice(4), val);
+              if (k === "fun:desk_widgets_v1") window.__mxNeedReloadAfterImport = true;
+            } catch (err) {
+              console.warn("[backup] fun restore failed", k, err);
+            }
+          }
+          continue;
+        }
         if (String(k).startsWith("ls:")) {
           const raw = v && typeof v === "object" ? v.__ls : null;
           if (typeof raw === "string") {
@@ -14100,6 +14416,7 @@ async function applyBackupZipImport(zip, manifest, onStatus) {
               localStorage.setItem(String(k).slice(3), raw);
               if (k === "ls:meowos_net_v2") window.XXJ_NET?.reloadFromStorage?.();
               if (k === "ls:meowos_mimi_css") window.XXJ_MIMI?.applyCss?.();
+              if (/^ls:meowos_(desk_|icon_size|skin_|chat_fs|hide_status)/.test(k)) window.__mxNeedReloadAfterImport = true;
             } catch (err) {
               console.warn("[backup] ls restore failed", k, err);
             }
@@ -20600,14 +20917,22 @@ async function autoNpcCommentsOnMoment(momentId, o) {
   }
   if (!ctx || !ctx.charId || !ctx.ident) return;
   const npcs = ctx.entries.filter((e) => e.kind === "npc");
-  if (!npcs.length) return;
-  const n = Math.random() < 0.45 ? 1 : 2;
-  const batch = pickMomentInviteRelationBatch(npcs, n);
-  const npcRaw = String(ctx.ident.persona?.npcRelations || ctx.ident.charItem?.npcRelations || "");
-  const notes = new Map(parseNpcEntriesFromRelationsText(npcRaw).map((x) => [x.name, x.note]));
-  for (const entry of batch) {
-    await new Promise((r) => setTimeout(r, 700 + Math.floor(Math.random() * 1400)));
-    await runMomentsNpcCommentForNpc(mid, maskId, mm, { name: entry.name, note: notes.get(entry.name) || "" }, ctx);
+  if (npcs.length) {
+    const n = Math.random() < 0.45 ? 1 : 2;
+    const batch = pickMomentInviteRelationBatch(npcs, n);
+    const npcRaw = String(ctx.ident.persona?.npcRelations || ctx.ident.charItem?.npcRelations || "");
+    const notes = new Map(parseNpcEntriesFromRelationsText(npcRaw).map((x) => [x.name, x.note]));
+    for (const entry of batch) {
+      await new Promise((r) => setTimeout(r, 700 + Math.floor(Math.random() * 1400)));
+      await runMomentsNpcCommentForNpc(mid, maskId, mm, { name: entry.name, note: notes.get(entry.name) || "" }, ctx);
+    }
+  } else {
+    // 角色卡没单独填「NPC 关系」：从人设摘要 / 世界书里找设定好的 NPC，一次写好评论
+    try {
+      await autoNpcCommentsFromPersonaText(mid, maskId, mm, ctx);
+    } catch (e) {
+      console.warn("[moments] npc from persona failed", e);
+    }
   }
   if (!o?.noRender) {
     try {
@@ -20616,6 +20941,66 @@ async function autoNpcCommentsOnMoment(momentId, o) {
     } catch (_) {
       /* ignore */
     }
+  }
+}
+
+async function autoNpcCommentsFromPersonaText(mid, maskId, mm, ctx) {
+  const ai = window.RP_AI;
+  const ident = ctx.ident;
+  const p = ident.persona || {};
+  const charName = ctx.charName || "角色";
+  const userLabel = resolveUserMaskDisplayLabelForInbox(maskId);
+  const personaText = [p.summary, p.npcRelations, p.boundaries].filter((x) => String(x || "").trim()).join("\n").slice(0, 3000);
+  let wb = "";
+  try {
+    const th = ident.th;
+    const ids = Array.from(
+      new Set([
+        ...normalizeWorldBookVolumeIdsArray(th?.worldBookVolumeIds, th?.defaultWorldBookVolumeId),
+        ...normalizeWorldBookVolumeIdsArray(p.worldBookVolumeIds, p.defaultWorldBookVolumeId)
+      ])
+    ).slice(0, 4);
+    wb = buildWorldBookBlockForVolumeIds(ids, charName, userLabel).slice(0, 3000);
+  } catch (_) {
+    wb = "";
+  }
+  if (!personaText && !wb) return;
+  const done = new Set((mm.comments || []).map((c) => String(c?.authorName || "").trim()));
+  const poster = mm.kind === "user" ? `用户「${userLabel}」` : `角色「${String(mm.displayName || charName)}」`;
+  const data = await ai.chatCompletions({
+    messages: [
+      {
+        role: "system",
+        content: `你在模拟微信朋友圈里的评论。下面是「${charName}」的人设和世界设定。请从设定里找出**明确写到的、有名字的其他人物（NPC）**——朋友、家人、同事、对手等，不能是「${charName}」本人，也不能是「${userLabel}」。挑 1～2 个最可能来评论的，用他们各自的身份和口吻、按他们和发帖人的关系，给这条动态写一句评论（口语、一两句、像随手评的）。
+设定里没有任何有名字的 NPC，就只输出 []。
+只输出 JSON 数组：[{"name":"NPC 名字","comment":"评论"}]
+
+【人设】
+${personaText || "（无）"}
+${wb ? "\n【世界设定】\n" + wb : ""}`
+      },
+      { role: "user", content: `发帖人：${poster}\n动态：${getMomentPostDisplayText(mm) || "（图片/分享）"}${mm.music?.title ? `\n（分享了歌曲《${mm.music.title}》${mm.music.artist ? " - " + mm.music.artist : ""}）` : ""}` }
+    ],
+    temperature: 0.9,
+    max_tokens: 500
+  });
+  const txt = String(readMomentsPostCompletionText(data) || "");
+  const m = txt.match(/\[[\s\S]*\]/);
+  if (!m) return;
+  let arr = [];
+  try {
+    arr = JSON.parse(m[0]);
+  } catch (_) {
+    return;
+  }
+  const bad = new Set([charName, userLabel, "我", "用户", "主控"].map((x) => String(x || "").trim()));
+  for (const it of (Array.isArray(arr) ? arr : []).slice(0, 2)) {
+    const name = String(it?.name || "").trim().slice(0, 24);
+    const text = String(it?.comment || "").replace(/\s*\n+\s*/g, " ").trim();
+    if (!name || !text || bad.has(name) || done.has(name)) continue;
+    await new Promise((r) => setTimeout(r, 600 + Math.floor(Math.random() * 1200)));
+    applyMomentsNpcComment(mid, name, text);
+    done.add(name);
   }
 }
 
@@ -22072,6 +22457,11 @@ function insertCharMomentForMask(maskId, charId, payload) {
       console.warn("[moments] feed notice failed", e);
     }
   }
+  // 角色发了动态（不管是手动、主动还是分享歌曲）：先让人设里的 NPC 来评论
+  if (newId) {
+    const autoId = newId;
+    setTimeout(() => queueMomentsCharReactions(() => autoNpcCommentsOnMoment(autoId)), 1200);
+  }
   return newId;
 }
 
@@ -22601,12 +22991,6 @@ async function publishCharMomentFromAi(charId, opts) {
     if (th && tid && isThreadCharMomentsProactiveEnabled(th)) {
       touchThreadCharMomentsProactiveLastAt(maskId, tid);
     }
-    try {
-      const autoId = newId;
-      queueMomentsCharReactions(() => autoNpcCommentsOnMoment(autoId));
-    } catch (_) {
-      /* ignore */
-    }
     return true;
   } catch (e) {
     console.warn("[moments] publish failed", name, e);
@@ -22820,6 +23204,28 @@ function openMomentsCharPostSheet() {
   sheet.hidden = false;
   sheet.setAttribute("aria-hidden", "false");
 }
+
+/** 朋友圈顶栏的 ⚙：配图 / NPC 自动评论设置（JS 注入） */
+function ensureMomentsOptsTopbarBtn() {
+  const host = document.querySelector("#moments-feed-root .moments-ins-topbar-actions");
+  if (!host || document.getElementById("mx-moments-opts-btn")) return;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.id = "mx-moments-opts-btn";
+  b.className = "moments-ins-topbar-btn";
+  b.setAttribute("aria-label", "朋友圈设置");
+  b.innerHTML = `<i class="ph ph-gear-six" aria-hidden="true"></i>`;
+  b.addEventListener("click", () => openMomentsOptsSheet());
+  host.insertBefore(b, host.firstChild);
+}
+function openMomentsOptsSheet() {
+  const F = window.XXJ_FUN;
+  if (!F?.openSheet) return;
+  const sh = F.openSheet(`<div id="mx-moments-opts-host"><ul id="mx-moments-opts-list" hidden></ul></div>`, { title: "朋友圈设置" });
+  const list = sh.body.querySelector("#mx-moments-opts-list");
+  renderMomentsCharPostOpts(sh.body, list);
+}
+setInterval(ensureMomentsOptsTopbarBtn, 1500);
 
 /** 发朋友圈面板里的「配图 / NPC 自动评论」选项（JS 注入，兼容旧缓存的 index.html） */
 function renderMomentsCharPostOpts(sheet, list) {
@@ -27522,6 +27928,27 @@ function buildMomentsMusicCard(host, mm) {
   const cover = document.createElement("span");
   cover.className = "moments-music-cover";
   cover.textContent = "♪";
+  const setCover = (url) => {
+    if (!url) return;
+    cover.textContent = "";
+    cover.style.background = `#ddd url("${String(url).replace(/"/g, "%22")}") center / cover no-repeat`;
+  };
+  if (mu.cover) setCover(mu.cover);
+  else if (window.XXJ_MUSIC?.findCover && !mu.coverTried) {
+    // 第一次显示时去曲库找封面，找到就记在这条动态上，下次不用再找
+    void window.XXJ_MUSIC.findCover(mu.title, mu.artist).then((url) => {
+      setCover(url);
+      try {
+        patchMomentById(String(mm.id || ""), (m) => {
+          if (!m.music) return;
+          if (url) m.music.cover = url;
+          else m.music.coverTried = true;
+        });
+      } catch (_) {
+        /* ignore */
+      }
+    });
+  }
   const info = document.createElement("span");
   info.className = "moments-music-info";
   const t = document.createElement("b");

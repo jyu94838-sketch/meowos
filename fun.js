@@ -883,6 +883,49 @@
     return d;
   }
   const neTrack = (x) => ({ ne: true, neId: x.id, title: x.title, artist: x.artist, album: x.album, cover: x.cover, vip: !!x.vip, dur: x.dur, url: `https://music.163.com/song/media/outer/url?id=${x.id}.mp3` });
+  /** 按歌名 + 歌手找封面（朋友圈分享的歌用）：先网易云，再 iTunes；结果记在本机 */
+  const COVER_KEY = "meowos_cover_cache";
+  let coverCache = null;
+  async function findCover(title, artist) {
+    const k = `${String(title || "").trim()}|${String(artist || "").trim()}`.toLowerCase();
+    if (!title) return "";
+    if (!coverCache) {
+      try {
+        coverCache = JSON.parse(localStorage.getItem(COVER_KEY) || "{}") || {};
+      } catch (_) {
+        coverCache = {};
+      }
+    }
+    if (k in coverCache) return coverCache[k];
+    const q = `${title} ${artist || ""}`.trim();
+    const norm = (x) => String(x || "").toLowerCase().replace(/\s+/g, "");
+    const pick = (list) => {
+      const arr = (list || []).filter((x) => x && x.cover);
+      return (arr.find((x) => norm(x.title) === norm(title) && (!artist || norm(x.artist).includes(norm(artist).slice(0, 4)))) || arr.find((x) => norm(x.title) === norm(title)) || arr[0] || {}).cover || "";
+    };
+    let url = "";
+    try {
+      if (neApiBase()) url = pick(await neteaseSearch(q));
+    } catch (_) {
+      url = "";
+    }
+    if (!url) {
+      try {
+        url = pick(await itunesSearch(q));
+      } catch (_) {
+        url = "";
+      }
+    }
+    coverCache[k] = url;
+    try {
+      const keys = Object.keys(coverCache);
+      if (keys.length > 300) for (const x of keys.slice(0, keys.length - 300)) delete coverCache[x];
+      localStorage.setItem(COVER_KEY, JSON.stringify(coverCache));
+    } catch (_) {
+      /* ignore */
+    }
+    return url;
+  }
   async function neteaseSearch(term) {
     const d = await neCall("search", { s: term, limit: 40 });
     return (d.songs || []).filter((x) => !x.off).map(neTrack);
@@ -1390,6 +1433,9 @@
     const onMusicPage = screen.classList.contains("is-open");
     mini.hidden = !t || onMusicPage;
     if (!t) return;
+    const md = mini.querySelector(".fun-mini-disc");
+    md.style.setProperty("--cover", t.cover ? `url("${String(t.cover).replace(/"/g, "%22")}")` : "none");
+    md.classList.toggle("has-cover", !!t.cover);
     mini.querySelector("strong").textContent = t.title;
     mini.querySelector("small").textContent = t.artist || (audio.paused ? "已暂停" : "正在播放");
     mini.classList.toggle("is-playing", !audio.paused);
@@ -1422,6 +1468,7 @@
     root.querySelector("#fm-mode").title = mm.label;
     root.querySelector("#fm-disc").style.setProperty("--disc-h", t ? hue(t.title) : 220);
     root.querySelector("#fm-disc").style.setProperty("--cover", t && t.cover ? `url("${t.cover}")` : "none");
+    root.querySelector("#fm-disc").classList.toggle("has-cover", !!(t && t.cover));
     root.classList.toggle("show-lyrics", music.showLyrics);
     root.querySelector("#fm-lrc-btn").classList.toggle("is-on", music.showLyrics);
     updateProgress();
@@ -1535,7 +1582,7 @@
         <div class="fm">
           <section class="fm-now">
             <div class="fm-stage">
-              <div class="fm-disc" id="fm-disc"><span class="fm-disc-hole"></span></div>
+              <div class="fm-disc" id="fm-disc"><span class="fm-disc-hole">♪</span></div>
               <div class="fm-lyrics" id="fm-lyrics"></div>
             </div>
             <div class="fm-now-meta"><strong id="fm-title"></strong><span id="fm-artist"></span></div>
@@ -1718,6 +1765,7 @@
     progress: () => (Number.isFinite(audio.duration) && audio.duration > 0 ? audio.currentTime / audio.duration : 0),
     subscribe: (fn) => (musicSubs.add(fn), () => musicSubs.delete(fn)),
     ready: () => loadTracks(),
+    findCover: (title, artist) => findCover(title, artist),
     /** 打开搜歌（朋友圈音乐卡片、让 TA 选歌用） */
     search: (q) => {
       void loadTracks().then(() => openSearch(q || ""));

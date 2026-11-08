@@ -8396,3 +8396,71 @@ body.dark .ua-pill { background: #3a2a22; color: #f0b890; }
 .ua-pill span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ua-pill button { border: 0; background: rgba(255,255,255,.7); color: inherit; border-radius: 99px; padding: 3px 10px; font: inherit; font-size: 0.72rem; cursor: pointer; }
 #chat-more-drawer .chat-more-drawer-item.is-active { color: #c4664a; }
+
+/* ═════════ 音乐封面：方形、不转，背景就是正在放的歌的封面（没封面时是渐变 + ♪） ═════════ */
+.fm-stage {
+  height: 190px !important;
+}
+.fm-disc {
+  width: 180px !important;
+  height: 180px !important;
+  border-radius: 22px !important;
+  animation: none !important;
+  transform: none !important;
+  background: linear-gradient(135deg, hsl(var(--disc-h) 70% 78%), hsl(calc(var(--disc-h) + 50) 60% 64%)) !important;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.18) !important;
+  overflow: hidden;
+}
+.fm-disc::before {
+  inset: 0 !important;
+  border-radius: inherit !important;
+  background: var(--cover, none) center / cover no-repeat !important;
+}
+.fm-disc::after {
+  border-radius: inherit !important;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.16), transparent 45%) !important;
+}
+.fm-disc-hole {
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0 !important;
+  background: none !important;
+  display: grid;
+  place-items: center;
+  font-size: 64px;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.fm-disc.has-cover .fm-disc-hole {
+  display: none !important;
+}
+.fun-mini-disc {
+  border-radius: 9px !important;
+  animation: none !important;
+  box-shadow: none !important;
+  background: var(--cover, none) center / cover no-repeat, linear-gradient(135deg, #ff9ab5, #b38bff) !important;
+  position: relative;
+}
+.fun-mini-disc:not(.has-cover)::after {
+  content: "♪";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 17px;
+}
+.wg-disc {
+  border-radius: 16px !important;
+  animation: none !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12) !important;
+  background: var(--cover, none) center / cover no-repeat, linear-gradient(135deg, #ff9ab5, #b38bff) !important;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 28px;
+}
+.wg-music.s .wg-disc {
+  border-radius: 12px !important;
+  font-size: 22px;
+}
