@@ -980,6 +980,9 @@
   function renderShell() {
     root.innerHTML = `
       <div class="sh">
+        <div class="sh-notice" role="note" style="display:flex;gap:8px;align-items:flex-start;margin:0 0 10px;padding:9px 12px;border-radius:14px;background:#fff6dc;border:1px solid #f3dc9a;color:#7a5a12;font-size:12.5px;line-height:1.5">
+          <span aria-hidden="true">💡</span><span><b>温馨提示</b>：Meow 是开源机，资源站里上传的文件所有人都能看到、下载。上传前请确认自己的文件可以公开（别放隐私、真实个人信息或没授权的内容）。</span>
+        </div>
         <div class="sh-tabs">
           <button type="button" data-tab="square">广场</button>
           <button type="button" data-tab="make">制作卡片</button>
