@@ -145,6 +145,12 @@
       }
     }
     function endSheet(win, sec, rec) {
+      // 联机比分挑战：把成绩交回去
+      try {
+        window.XXJ_NET?.reportScore?.("喵了个喵", win ? 1000 - Number(sec || 0) : G.cleared || 0, win ? `通关 ${sec} 秒` : `消了 ${G.cleared || 0} 张`);
+      } catch (_) {
+        /* ignore */
+      }
       const sh = F.openSheet(
         win
           ? `<div class="mlm-end">🎉<h3>通关啦！</h3><p>用时 ${sec} 秒${rec ? " · 新纪录！" : ""}</p></div><div class="fun-sheet-actions">${G.lv < LEVELS.length - 1 ? `<button type="button" class="fun-btn solid" data-e="next">下一关</button>` : ""}<button type="button" class="fun-btn ghost" data-e="menu">选关</button></div>`
@@ -458,6 +464,11 @@
         ctx.fillStyle = "rgba(230,60,60,0.85)";
         ctx.fillRect((P.failCol * W) / 4 + 1, y + 1, W / 4 - 2, rowH - 2);
       });
+      try {
+        window.XXJ_NET?.reportScore?.("猫爪琴键", P.score, `${P.score} 块`);
+      } catch (_) {
+        /* ignore */
+      }
       const k = "pt" + song;
       const rec = P.score > (best[k] || 0);
       if (rec) {

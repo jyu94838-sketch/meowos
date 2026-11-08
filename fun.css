@@ -8262,3 +8262,51 @@ body.dark .yzf-cat { background: #4a2e28; color: #f0b8a4; }
 .yzf-new { display: flex; flex-direction: column; gap: 10px; }
 .yzf-new input, .yzf-new textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 0.9rem; resize: vertical; }
 .yz-tabs button { white-space: nowrap; }
+
+/* ───── 联机：游戏厅联机版 ───── */
+.net-game { max-height: 62vh; overflow-y: auto; }
+.net-wrap { flex-wrap: wrap; justify-content: center; }
+.net-spy-word { margin: 0; font-size: 0.9rem; }
+.net-spy-word b { font-size: 1.1rem; color: #c4664a; }
+.net-spy-seats { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+.net-spy-seats span { padding: 3px 9px; border-radius: 99px; background: rgba(255,255,255,.65); font-size: 0.72rem; }
+body.dark .net-spy-seats span { background: rgba(0,0,0,.2); }
+.net-spy-seats span.is-cur { background: #f4b183; color: #fff; }
+.net-spy-seats span.is-out { opacity: .4; text-decoration: line-through; }
+.net-spy-log { width: 100%; text-align: left; max-height: 140px; overflow-y: auto; }
+.net-spy-log p { margin: 2px 0; font-size: 0.8rem; }
+.net-spy-log small { opacity: .6; }
+.net-guess input[type=text] { width: 170px; }
+.net-draw-top { display: flex; flex-direction: column; gap: 2px; }
+.net-draw-word { font-size: 1rem; letter-spacing: .1em; }
+.net-cvbox { width: 100%; }
+.net-cv { width: 100%; aspect-ratio: 600 / 440; border-radius: 12px; background: #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); display: block; }
+.net-pen { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.15); cursor: pointer; }
+.net-draw-log { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; font-size: 0.74rem; }
+.net-draw-log span { padding: 2px 8px; border-radius: 8px; background: rgba(255,255,255,.65); }
+.net-uno-top { display: flex; align-items: center; gap: 12px; }
+.nu-card { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 54px; border-radius: 8px; color: #fff; font-weight: 800; font-size: 0.95rem; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.18); }
+.nu-card b { text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.nu-r { background: #e8534e; } .nu-y { background: #f2b632; } .nu-g { background: #3fae6a; } .nu-b { background: #3d7fd9; }
+.nu-w { background: conic-gradient(#e8534e 0 25%, #f2b632 0 50%, #3fae6a 0 75%, #3d7fd9 0); }
+.nu-col { font-size: 0.8rem; font-weight: 700; padding: 3px 10px; border-radius: 99px; color: #fff; }
+.nu-hand { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.nu-btn { border: 0; background: none; padding: 0; cursor: pointer; opacity: .45; transition: transform .15s; }
+.nu-btn.ok { opacity: 1; }
+.nu-btn.ok:active { transform: translateY(-4px); }
+.nu-pick { justify-content: center; gap: 10px; }
+.nu-pick .nu-card { width: 56px; height: 76px; cursor: pointer; }
+.nm-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; width: 100%; max-width: 300px; }
+.nm-c { aspect-ratio: 1; border: 0; border-radius: 5px; background: #e9c9a6; color: #5a3a28; font-weight: 700; font-size: 0.85rem; cursor: default; padding: 0; }
+.nm-c.can { background: #f4b183; cursor: pointer; }
+.nm-c.is-o { background: rgba(255,255,255,.75); }
+.net-dress { width: 120px; border-radius: 12px; overflow: hidden; margin-bottom: 4px; }
+.net-dress svg { width: 100%; height: auto; display: block; }
+.gh-net { display: flex; align-items: center; gap: 12px; width: 100%; margin-bottom: 12px; padding: 14px; border-radius: 18px; border: 0; background: linear-gradient(135deg, #e8f2ff, #f3e9ff); color: #2f3a55; font: inherit; text-align: left; cursor: pointer; }
+body.dark .gh-net { background: linear-gradient(135deg, #24304a, #33284a); color: #e6e9f5; }
+.gh-net > span { font-size: 1.8rem; }
+.gh-net div { flex: 1; min-width: 0; }
+.gh-net b { display: block; font-size: 0.98rem; }
+.gh-net small { display: block; font-size: 0.72rem; opacity: .75; margin-top: 2px; line-height: 1.5; }
+.gh-net i { font-style: normal; font-size: 1.4rem; opacity: .5; }
+.net-charbar .fun-av { flex: none; width: 28px !important; height: 28px !important; }

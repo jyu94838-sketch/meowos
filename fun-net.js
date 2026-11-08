@@ -219,6 +219,8 @@
             c.joined = true;
             c.needJoin = false;
             for (const row of r.msgs || []) handleRow(row, false);
+            // 告诉大家我带着哪个角色（新设备 / 重新进会话时）
+            if (c.char) S.outbox.push({ id: rid(), type: "post", gid: c.gid, body: { t: "char", char: c.char } });
             // 旧版（点对点）时自己发的消息没存到服务器：第一次进会话时补传，对方之前没收到的也能收到
             if (!c.legacyUp) {
               c.legacyUp = true;
@@ -435,7 +437,7 @@
   const avOf = (c, mid) => (mid === S.mid ? S.av : S.friends[mid]?.av || c?.members?.[mid]?.av || "");
   const nameOf = (c, mid) => (mid === S.mid ? me().name : S.friends[mid]?.name || c?.members?.[mid]?.name || "Meow 用户");
   const isOn = (mid) => mid === S.mid || Net.online.has(mid);
-  const onlineIn = (c) => Object.keys(c.members).filter(isOn);
+  const onlineIn = (c) => [...new Set([S.mid, ...(c.dm ? [c.dm] : []), ...Object.keys(c.members)])].filter(isOn);
 
   const RT = new Map();
   const rt = (gid) => {
@@ -506,6 +508,18 @@
       }
     } else if (b.t === "act") {
       if (live && !mine && rt(c.gid).game?.host === S.mid) hostAct(c, b.a);
+    } else if (b.t === "draw") {
+      if (mine || !b.key) return;
+      const R = rt(c.gid);
+      R.strokes ||= {};
+      const arr = (R.strokes[b.key] ||= []);
+      const st = b.clear ? { clear: true } : { s: b.s || [], col: b.col, w: b.w };
+      arr.push(st);
+      const cv = root?.querySelector("canvas.net-cv");
+      if (cv && cv.dataset.key === b.key) {
+        if (b.clear) redrawCanvas(cv, b.key, c.gid);
+        else paintStroke(cv.getContext("2d"), st, cv.width, cv.height);
+      }
     }
   }
   function post(c, body) {
@@ -608,10 +622,59 @@
   ];
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
   const GAMES = {
-    dice: { name: "掷骰子比大小", icon: "🎲", desc: "每人掷两颗骰子，点数最小的人接惩罚（真心话或大冒险）" },
-    bomb: { name: "数字炸弹", icon: "💣", desc: "1~100 里藏着一个炸弹数字，轮流猜，猜中的人被炸" },
-    td: { name: "真心话大冒险", icon: "🎡", desc: "转盘随机选一个人，选真心话或大冒险" }
+    uno: { name: "UNO", icon: "🃏", desc: "经典卡牌，先出完的人赢，手里牌最多的受罚" },
+    spy: { name: "谁是卧底", icon: "🕵️", desc: "每人一个词，有一个人的词不一样，描述 + 投票揪出卧底（3 人以上）" },
+    draw: { name: "你画我猜", icon: "🎨", desc: "轮流画，大家猜，角色也会来瞎猜" },
+    mines: { name: "扫雷对战", icon: "💣", desc: "一块雷盘轮流挖，踩到雷的人受罚" },
+    td: { name: "真心话大冒险", icon: "🍾", desc: "转盘随机选一个人，选真心话或大冒险" },
+    mlm: { name: "喵了个喵 · 比分", icon: "🐱", desc: "每人玩一局，比谁玩得好，垫底的受罚" },
+    piano: { name: "猫爪琴键 · 比分", icon: "🐾", desc: "每人弹一局，比谁弹得多，垫底的受罚" },
+    dice: { name: "掷骰子比大小", icon: "🎲", desc: "每人掷两颗骰子，点数最小的人接惩罚" },
+    bomb: { name: "数字炸弹", icon: "🧨", desc: "1~100 里藏着一个炸弹数字，轮流猜，猜中的人被炸" }
   };
+  /* ───── 游戏厅联机版：谁是卧底、你画我猜、UNO、扫雷对战、喵了个喵 / 猫爪琴键比分 ───── */
+  const shuffle = (a) => {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  const SPY_PAIRS = [
+    ["牛奶", "豆浆"], ["火锅", "麻辣烫"], ["眼镜", "隐形眼镜"], ["包子", "饺子"], ["蝴蝶", "蜜蜂"], ["猫", "老虎"],
+    ["地铁", "公交"], ["奶茶", "咖啡"], ["口红", "唇膏"], ["枕头", "抱枕"], ["微信", "QQ"], ["电影院", "剧场"],
+    ["橙子", "橘子"], ["雨伞", "雨衣"], ["钢琴", "电子琴"], ["婚纱", "旗袍"], ["蛋糕", "面包"], ["游泳", "潜水"],
+    ["月亮", "太阳"], ["情书", "日记"], ["保安", "警察"], ["演唱会", "音乐节"], ["烧烤", "铁板烧"], ["香水", "花露水"]
+  ];
+  const DRAW_WORDS = ["猫", "西瓜", "火锅", "长颈鹿", "彩虹", "雪人", "钢琴", "眼镜", "冰淇淋", "月亮", "企鹅", "雨伞", "蛋糕", "自行车", "向日葵", "灯塔", "章鱼", "热气球", "仙人掌", "耳机", "汉堡", "恐龙", "风筝", "城堡", "蜗牛", "奶茶", "吉他", "外星人", "帆船", "蝴蝶", "兔子", "太阳", "房子", "鱼", "飞机", "苹果", "花", "树", "星星", "爱心"];
+  const UCOL = ["r", "y", "g", "b"];
+  const UCN = { r: "红", y: "黄", g: "绿", b: "蓝", w: "万能" };
+  const unoDeck = () => {
+    const d = [];
+    for (const c of UCOL) {
+      d.push(c + "0");
+      for (let n = 1; n <= 9; n++) d.push(c + n, c + n);
+      for (const s of ["S", "R", "D"]) d.push(c + s, c + s);
+    }
+    for (let i = 0; i < 4; i++) d.push("wW", "wF");
+    return shuffle(d);
+  };
+  const unoLabel = (k) => ({ S: "🚫", R: "🔁", D: "+2", W: "🌈", F: "+4" })[k[1]] || k[1];
+  const unoName = (k, col) => (k[0] === "w" ? (k[1] === "F" ? "万能+4" : "万能牌") + (col ? `（变${UCN[col]}）` : "") : UCN[k[0]] + ({ S: "禁止", R: "反转", D: "+2" }[k[1]] || k[1]));
+  const unoCan = (k, g) => k[0] === "w" || k[0] === g.color || k[1] === g.top[1];
+  const unoCard = (k, extra) => `<span class="nu-card nu-${k[0]}${extra || ""}"><b>${unoLabel(k)}</b></span>`;
+  const MN = 8;
+  const MINES = 10;
+  const mNeighbors = (i) => {
+    const r = Math.floor(i / MN);
+    const c0 = i % MN;
+    const out = [];
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if ((dr || dc) && r + dr >= 0 && r + dr < MN && c0 + dc >= 0 && c0 + dc < MN) out.push((r + dr) * MN + c0 + dc);
+    return out;
+  };
+  const mCount = (g, i) => mNeighbors(i).filter((j) => g.mines.includes(j)).length;
+  const pun = () => (Math.random() < 0.5 ? "真心话 · " + pick(TRUTH) : "大冒险 · " + pick(DARE));
+  const CHAL = { mlm: "喵了个喵", piano: "猫爪琴键" };
   function allPlayers(c) {
     const out = [];
     for (const mid of onlineIn(c)) {
@@ -644,6 +707,58 @@
       g.target = pick(players).pid;
       g.choice = "";
       g.q = "";
+    }
+    if (kind === "spy") {
+      if (players.length < 3) return toast("谁是卧底至少要 3 个人（带上角色也算）");
+      const pair = shuffle(pick(SPY_PAIRS).slice());
+      g.players = shuffle(g.players);
+      g.spy = pick(g.players).pid;
+      g.words = Object.fromEntries(g.players.map((p) => [p.pid, p.pid === g.spy ? pair[1] : pair[0]]));
+      g.alive = g.players.map((p) => p.pid);
+      g.round = 1;
+      g.t = 0;
+      g.phase = "desc";
+      g.descs = [];
+      g.votes = {};
+    }
+    if (kind === "draw") {
+      const humans = g.players.filter((p) => !p.isChar).map((p) => p.pid);
+      if (humans.length < 1 || players.length < 2) return toast("你画我猜至少要两个人");
+      g.drawers = shuffle(humans);
+      g.di = 0;
+      g.scores = Object.fromEntries(g.players.map((p) => [p.pid, 0]));
+      g.word = pick(DRAW_WORDS);
+      g.solved = {};
+      g.deadline = Date.now() + 90000;
+      g.log = [];
+    }
+    if (kind === "uno") {
+      if (players.length > 8) return toast("UNO 最多 8 个人");
+      g.deck = unoDeck();
+      g.hands = {};
+      for (const p of g.players) g.hands[p.pid] = g.deck.splice(0, 7);
+      let top = g.deck.shift();
+      while (top[0] === "w") {
+        g.deck.push(top);
+        top = g.deck.shift();
+      }
+      g.top = top;
+      g.color = top[0];
+      g.turn = 0;
+      g.dir = 1;
+      g.players = shuffle(g.players);
+      g.last = "";
+    }
+    if (kind === "mines") {
+      const cells = shuffle([...Array(MN * MN).keys()]);
+      g.mines = cells.slice(0, MINES);
+      g.open = [];
+      g.turn = 0;
+      g.players = shuffle(g.players);
+    }
+    if (kind === "mlm" || kind === "piano") {
+      g.scores = {};
+      g.labels = {};
     }
     R.game = g;
     sysMsg(c, `${GAMES[kind].icon} ${me().name} 开了一局「${GAMES[kind].name}」！参加的有：${players.map((p) => p.name).join("、")}`);
@@ -705,8 +820,199 @@
       g.q = "";
       g.phase = "play";
       broadcastGame(c);
+    } else if (g.kind === "spy") {
+      if (a.type === "desc" && g.phase === "desc") {
+        const cur = g.alive[g.t];
+        if (cur !== pl.pid) return;
+        const t = String(a.value || "").trim().slice(0, 60) || "……";
+        g.descs.push({ pid: pl.pid, r: g.round, text: t });
+        g.t++;
+        if (g.t >= g.alive.length) {
+          g.phase = "vote";
+          g.votes = {};
+        }
+        broadcastGame(c);
+      } else if (a.type === "vote" && g.phase === "vote") {
+        if (!g.alive.includes(pl.pid) || !g.alive.includes(a.value) || a.value === pl.pid || g.votes[pl.pid]) return;
+        g.votes[pl.pid] = a.value;
+        if (g.alive.every((pid) => g.votes[pid])) {
+          const cnt = {};
+          Object.values(g.votes).forEach((v) => (cnt[v] = (cnt[v] || 0) + 1));
+          const max = Math.max(...Object.values(cnt));
+          const top = Object.keys(cnt).filter((k) => cnt[k] === max);
+          const nm = (pid) => g.players.find((p) => p.pid === pid)?.name || "";
+          const tally = Object.entries(cnt).map(([k, n]) => `${nm(k)} ${n} 票`).join("，");
+          if (top.length > 1) {
+            sysMsg(c, `🕵️ 第 ${g.round} 轮投票：${tally}。平票，没人出局，继续描述！`);
+          } else {
+            const out = top[0];
+            g.alive = g.alive.filter((p) => p !== out);
+            const civ = g.words[g.players.find((p) => p.pid !== g.spy).pid];
+            if (out === g.spy) {
+              endGame(c, `🕵️ ${tally}。${nm(out)} 出局——TA 就是卧底！平民赢啦 🎉\n平民词「${civ}」，卧底词「${g.words[g.spy]}」。惩罚卧底 ${nm(out)}：${pun()}`, { gameEnd: true, involves: [nm(out)] });
+              return;
+            }
+            if (g.alive.length <= 2) {
+              endGame(c, `🕵️ ${tally}。${nm(out)} 出局，是平民……只剩两个人，卧底 ${nm(g.spy)} 赢了！\n平民词「${civ}」，卧底词「${g.words[g.spy]}」。惩罚平民们：${pun()}`, { gameEnd: true, involves: g.players.filter((p) => p.pid !== g.spy).map((p) => p.name) });
+              return;
+            }
+            sysMsg(c, `🕵️ ${tally}。${nm(out)} 出局，TA 不是卧底！卧底还在，继续…`);
+          }
+          g.round++;
+          g.t = 0;
+          g.phase = "desc";
+          g.votes = {};
+        }
+        broadcastGame(c);
+      }
+    } else if (g.kind === "draw") {
+      if (a.type === "guess" && pl.pid !== g.drawers[g.di] && !g.solved[pl.pid]) {
+        const t = String(a.value || "").trim().slice(0, 20);
+        if (!t) return;
+        if (t === g.word || (t.length >= 1 && t.replace(/\s/g, "") === g.word)) {
+          g.solved[pl.pid] = true;
+          g.scores[pl.pid] = (g.scores[pl.pid] || 0) + 2;
+          g.scores[g.drawers[g.di]] = (g.scores[g.drawers[g.di]] || 0) + 1;
+          g.log.push(`✅ ${pl.name} 猜对了！`);
+          const need = g.players.filter((p) => !p.isChar && p.pid !== g.drawers[g.di]);
+          if (need.every((p) => g.solved[p.pid])) return drawNext(c, "大家都猜对啦！");
+        } else g.log.push(`${pl.name}：${t}`);
+        g.log = g.log.slice(-8);
+        broadcastGame(c);
+      } else if (a.type === "skip" && pl.pid === g.drawers[g.di]) {
+        drawNext(c, "画的人跳过了这题。");
+      }
+    } else if (g.kind === "uno") {
+      const cur = g.players[g.turn];
+      if (!cur || cur.pid !== pl.pid) return;
+      const n = g.players.length;
+      const nx = (k) => (g.turn + g.dir * k + n * 10) % n;
+      const draw = (pid, k) => {
+        for (let i = 0; i < k; i++) {
+          if (!g.deck.length) g.deck = unoDeck();
+          g.hands[pid].push(g.deck.shift());
+        }
+      };
+      if (a.type === "draw") {
+        draw(pl.pid, 1);
+        g.last = `${pl.name} 摸了一张牌`;
+        g.turn = nx(1);
+        return broadcastGame(c);
+      }
+      if (a.type !== "play") return;
+      const hand = g.hands[pl.pid];
+      const i = Number(a.value?.i);
+      const k = hand[i];
+      if (!k || !unoCan(k, g)) return;
+      hand.splice(i, 1);
+      g.top = k;
+      g.color = k[0] === "w" ? (UCOL.includes(a.value?.color) ? a.value.color : pick(UCOL)) : k[0];
+      g.last = `${pl.name} 出了 ${unoName(k, k[0] === "w" ? g.color : "")}`;
+      if (!hand.length) {
+        const worst = g.players.filter((p) => p.pid !== pl.pid).sort((x, y) => g.hands[y.pid].length - g.hands[x.pid].length)[0];
+        endGame(c, `🃏 ${pl.name} 出完了所有牌，赢啦！🎉\n手里牌最多的是 ${worst.name}（${g.hands[worst.pid].length} 张），惩罚：${pun()}`, { gameEnd: true, involves: [worst.name] });
+        return;
+      }
+      if (hand.length === 1) g.last += "，UNO！";
+      let step = 1;
+      if (k[1] === "S") step = 2;
+      if (k[1] === "R") {
+        if (n === 2) step = 2;
+        else g.dir = -g.dir;
+      }
+      if (k[1] === "D" || k[1] === "F") {
+        const victim = g.players[nx(1)];
+        draw(victim.pid, k[1] === "D" ? 2 : 4);
+        g.last += `，${victim.name} 摸 ${k[1] === "D" ? 2 : 4} 张`;
+        step = 2;
+      }
+      g.turn = nx(step);
+      broadcastGame(c);
+    } else if (g.kind === "mines") {
+      const cur = g.players[g.turn % g.players.length];
+      if (a.type !== "dig" || !cur || cur.pid !== pl.pid) return;
+      const i = Number(a.value);
+      if (!(i >= 0 && i < MN * MN) || g.open.includes(i)) return;
+      if (g.mines.includes(i)) {
+        g.open.push(i);
+        g.boom = i;
+        endGame(c, `💥 ${pl.name} 踩到雷啦！惩罚：${pun()}`, { gameEnd: true, involves: [pl.name] });
+        return;
+      }
+      const stack = [i];
+      while (stack.length) {
+        const j = stack.pop();
+        if (g.open.includes(j) || g.mines.includes(j)) continue;
+        g.open.push(j);
+        if (mCount(g, j) === 0) stack.push(...mNeighbors(j));
+      }
+      if (g.open.length >= MN * MN - MINES) {
+        endGame(c, "🎉 雷全部避开了，大家一起赢！");
+        return;
+      }
+      g.turn++;
+      broadcastGame(c);
+    } else if (g.kind === "mlm" || g.kind === "piano") {
+      if (a.type !== "score" || g.scores[pl.pid] != null) return;
+      g.scores[pl.pid] = Number(a.value?.n) || 0;
+      g.labels[pl.pid] = String(a.value?.label || g.scores[pl.pid]).slice(0, 30);
+      if (g.players.every((p) => g.scores[p.pid] != null)) return chalEnd(c);
+      broadcastGame(c);
     }
   }
+  function drawNext(c, why) {
+    const g = rt(c.gid).game;
+    if (!g) return;
+    sysMsg(c, `🎨 ${why} 这题的答案是「${g.word}」`);
+    g.di++;
+    if (g.di >= g.drawers.length) {
+      const rank = g.players.slice().sort((x, y) => (g.scores[y.pid] || 0) - (g.scores[x.pid] || 0));
+      const last = rank[rank.length - 1];
+      endGame(c, `🎨 你画我猜结束！${rank.map((p, i) => `${i + 1}. ${p.name} ${g.scores[p.pid] || 0} 分`).join("　")}\n最后一名 ${last.name}，惩罚：${pun()}`, { gameEnd: true, involves: [last.name] });
+      return;
+    }
+    g.word = pick(DRAW_WORDS.filter((w) => w !== g.word));
+    g.solved = {};
+    g.deadline = Date.now() + 90000;
+    g.log = [];
+    broadcastGame(c);
+  }
+  function chalEnd(c) {
+    const g = rt(c.gid).game;
+    if (!g) return;
+    const done = g.players.filter((p) => g.scores[p.pid] != null);
+    if (!done.length) return endGame(c, "挑战取消了");
+    const rank = done.sort((x, y) => g.scores[y.pid] - g.scores[x.pid]);
+    const last = rank[rank.length - 1];
+    endGame(c, `🏆 「${CHAL[g.kind]}」挑战结果：${rank.map((p, i) => `${i + 1}. ${p.name}（${g.labels[p.pid]}）`).join("　")}${rank.length > 1 ? `\n垫底的 ${last.name}，惩罚：${pun()}` : ""}`, { gameEnd: true, involves: [last.name] });
+  }
+  // 你画我猜：主持人负责计时
+  setInterval(() => {
+    for (const [gid, R] of RT) {
+      const g = R.game;
+      if (g && g.kind === "draw" && g.host === S.mid && Date.now() > g.deadline && S.convs[gid]) drawNext(S.convs[gid], "时间到！");
+    }
+    if (root && V.open) {
+      const el = root.querySelector("#net-draw-left");
+      const g = rt(V.open).game;
+      if (el && g?.deadline) el.textContent = Math.max(0, Math.ceil((g.deadline - Date.now()) / 1000)) + " 秒";
+    }
+  }, 1000);
+  /** 从「游戏厅」玩完单人游戏回来报分 */
+  function reportScore(game, n, label) {
+    const ch = window.__mxNetChallenge;
+    if (!ch || CHAL[ch.kind] !== game) return;
+    const c = S.convs[ch.gid];
+    const g = c && rt(c.gid).game;
+    if (!g || g.id !== ch.gameId) {
+      window.__mxNetChallenge = null;
+      return;
+    }
+    window.__mxNetChallenge = null;
+    act(c, "score", { n, label });
+    toast(`成绩已经交到「${convTitle(c)}」啦`);
+  }
+
   function hostTick(c) {
     const g = rt(c.gid).game;
     if (!g) return;
@@ -757,6 +1063,115 @@
         rt(c.gid).charLast = Date.now();
       } catch (_) {
         sendAsChar(c, "……这个我跳过！");
+      }
+    }
+    const k2 = (s) => `${g.id}:${s}`;
+    if (g.kind === "spy") {
+      const myChars = g.players.filter((p) => p.isChar && p.owner === S.mid && g.alive.includes(p.pid));
+      for (const me2 of myChars) {
+        if (g.phase === "desc" && g.alive[g.t] === me2.pid && !answered.has(k2(`d${g.round}${me2.pid}`))) {
+          answered.add(k2(`d${g.round}${me2.pid}`));
+          const word = g.words[me2.pid];
+          let t = "";
+          if (F.hasApiKey()) {
+            try {
+              const persona = await charPersona(c);
+              const prev = g.descs.map((d) => `${g.players.find((p) => p.pid === d.pid)?.name}：${d.text}`).join("\n");
+              t = await F.aiText(
+                [
+                  { role: "system", content: `你是「${ch.name}」。${persona ? "人设：\n" + persona + "\n" : ""}你在玩谁是卧底。你拿到的词是「${word}」（你不知道自己是不是卧底）。用一句话（15 字以内）描述你的词，不能说出这个词本身，也别太直白，按你的人设说话。只输出这句描述。` },
+                  { role: "user", content: prev ? `前面大家的描述：\n${prev}\n轮到你了。` : "你第一个描述。" }
+                ],
+                { maxTokens: 120, temperature: 0.9 }
+              );
+            } catch (_) {
+              t = "";
+            }
+          }
+          t = F.cleanLine(t || "这个东西大家应该都见过吧", 40, ch.name);
+          setTimeout(() => act(c, "desc", t, me2.pid), 800);
+        }
+        if (g.phase === "vote" && !g.votes[me2.pid] && !answered.has(k2(`v${g.round}${me2.pid}`))) {
+          answered.add(k2(`v${g.round}${me2.pid}`));
+          const cands = g.alive.filter((p) => p !== me2.pid);
+          let target = pick(cands);
+          if (F.hasApiKey()) {
+            try {
+              const list = g.descs.filter((d) => d.r === g.round).map((d) => `${cands.indexOf(d.pid) + 1}. ${g.players.find((p) => p.pid === d.pid)?.name}：${d.text}`).filter((x) => !x.startsWith("0."));
+              const r = await F.aiText(
+                [
+                  { role: "system", content: `你在玩谁是卧底，你的词是「${g.words[me2.pid]}」。根据大家的描述，投出你觉得最可能是卧底的人。只输出序号数字。` },
+                  { role: "user", content: list.join("\n") }
+                ],
+                { maxTokens: 10, temperature: 0.5 }
+              );
+              const n = parseInt(String(r).match(/\d+/)?.[0] || "0", 10);
+              if (n >= 1 && n <= cands.length) target = cands[n - 1];
+            } catch (_) {
+              /* 随便投 */
+            }
+          }
+          setTimeout(() => act(c, "vote", target, me2.pid), 1200 + Math.random() * 1500);
+        }
+      }
+    }
+    if (g.kind === "draw") {
+      const mine2 = g.players.find((p) => p.isChar && p.owner === S.mid);
+      const key = k2(`g${g.di}`);
+      if (mine2 && !g.solved[mine2.pid] && !answered.has(key)) {
+        answered.add(key);
+        const tries = 2 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < tries; i++)
+          setTimeout(() => {
+            const gg = rt(c.gid).game;
+            if (!gg || gg.id !== g.id || gg.di !== g.di || gg.solved[mine2.pid]) return;
+            const guess = Math.random() < 0.18 ? gg.word : pick(DRAW_WORDS);
+            act(c, "guess", guess, mine2.pid);
+          }, 12000 + i * 18000 + Math.random() * 6000);
+      }
+    }
+    if (g.kind === "uno") {
+      const cur = g.players[g.turn];
+      if (cur && cur.isChar && cur.owner === S.mid && !answered.has(k2(`u${g.top}${g.turn}${g.hands[cur.pid].length}${g.deck.length}`))) {
+        answered.add(k2(`u${g.top}${g.turn}${g.hands[cur.pid].length}${g.deck.length}`));
+        const hand = g.hands[cur.pid];
+        let idx = hand.findIndex((k) => k[0] !== "w" && k[0] === g.color);
+        if (idx < 0) idx = hand.findIndex((k) => k[0] !== "w" && unoCan(k, g));
+        if (idx < 0) idx = hand.findIndex((k) => k[0] === "w");
+        const cnt = {};
+        hand.forEach((k) => k[0] !== "w" && (cnt[k[0]] = (cnt[k[0]] || 0) + 1));
+        const col = Object.keys(cnt).sort((x, y) => cnt[y] - cnt[x])[0] || pick(UCOL);
+        setTimeout(() => (idx >= 0 ? act(c, "play", { i: idx, color: col }, cur.pid) : act(c, "draw", null, cur.pid)), 1400 + Math.random() * 1200);
+      }
+    }
+    if (g.kind === "mines") {
+      const cur = g.players[g.turn % g.players.length];
+      if (cur && cur.isChar && cur.owner === S.mid && !answered.has(k2(`m${g.turn}`))) {
+        answered.add(k2(`m${g.turn}`));
+        const closed = [...Array(MN * MN).keys()].filter((i) => !g.open.includes(i));
+        // 尽量挑旁边没有数字的格子
+        const safeish = closed.filter((i) => mNeighbors(i).every((j) => !g.open.includes(j) || mCount(g, j) === 0));
+        setTimeout(() => act(c, "dig", pick(safeish.length ? safeish : closed), cur.pid), 1500 + Math.random() * 1500);
+      }
+    }
+    if (g.kind === "mlm" || g.kind === "piano") {
+      for (const me2 of g.players.filter((p) => p.isChar && p.owner === S.mid)) {
+        if (g.scores[me2.pid] != null || answered.has(k2("s" + me2.pid))) continue;
+        answered.add(k2("s" + me2.pid));
+        let n;
+        let label;
+        if (g.kind === "piano") {
+          n = 15 + Math.floor(Math.random() * 120);
+          label = `${n} 块`;
+        } else if (Math.random() < 0.35) {
+          const sec = 60 + Math.floor(Math.random() * 120);
+          n = 1000 - sec;
+          label = `通关 ${sec} 秒`;
+        } else {
+          n = 20 + Math.floor(Math.random() * 60);
+          label = `消了 ${n} 张`;
+        }
+        setTimeout(() => act(c, "score", { n, label }, me2.pid), 4000 + Math.random() * 8000);
       }
     }
   }
@@ -940,9 +1355,139 @@
       body = `<div class="net-td">🎡 转到了 <b>${esc(t?.name || "")}</b>${g.q ? `<p>${g.choice === "dare" ? "大冒险" : "真心话"}：${esc(g.q)}</p>` : ""}</div>
         ${mineT && !g.choice ? `<div class="ww-row"><button type="button" class="fun-btn ghost sm" data-a="truth">真心话</button><button type="button" class="fun-btn solid sm" data-a="dare">大冒险</button></div>` : ""}
         ${g.phase === "answer" && host ? `<div class="ww-row"><button type="button" class="fun-btn ghost sm" data-a="tdagain">再转一次</button><button type="button" class="fun-btn ghost sm" data-a="tdend">结束游戏</button></div>` : ""}`;
+    } else if (g.kind === "spy") {
+      const nm = (pid) => g.players.find((p) => p.pid === pid)?.name || "";
+      const mineAlive = meP && g.alive.includes(meP.pid);
+      const cur = g.alive[g.t];
+      body = `<p class="net-spy-word">${meP ? `你的词：<b>${esc(g.words[meP.pid])}</b>${mineAlive ? "" : "（你已出局）"}` : "你在旁观"}</p>
+        <div class="net-spy-seats">${g.players.map((p) => `<span class="${g.alive.includes(p.pid) ? "" : "is-out"}${g.phase === "desc" && cur === p.pid ? " is-cur" : ""}">${esc(p.name)}${g.phase === "vote" && g.votes[p.pid] ? " ✓" : ""}</span>`).join("")}</div>
+        <div class="net-spy-log">${g.descs.slice(-8).map((d) => `<p><small>第${d.r}轮</small> <b>${esc(nm(d.pid))}</b>：${esc(d.text)}</p>`).join("") || `<p class="fun-note">按顺序每人用一句话描述自己的词，别直接说出来</p>`}</div>
+        ${
+          g.phase === "desc"
+            ? cur === meP?.pid
+              ? `<div class="net-guess"><input type="text" id="net-spy-in" maxlength="40" placeholder="用一句话描述你的词"/><button type="button" class="fun-btn solid sm" data-a="spydesc">说</button></div>`
+              : `<small>第 ${g.round} 轮 · 轮到 ${esc(nm(cur))} 描述…</small>`
+            : mineAlive && !g.votes[meP.pid]
+              ? `<small>投票：你觉得谁是卧底？</small><div class="ww-row net-wrap">${g.alive.filter((p) => p !== meP.pid).map((p) => `<button type="button" class="fun-btn ghost sm" data-spyvote="${esc(p)}">${esc(nm(p))}</button>`).join("")}</div>`
+              : `<small>投票中…（${Object.keys(g.votes).length}/${g.alive.length}）</small>`
+        }`;
+    } else if (g.kind === "draw") {
+      const drawer = g.drawers[g.di];
+      const iDraw = drawer === S.mid;
+      const dn = g.players.find((p) => p.pid === drawer)?.name || "";
+      body = `<div class="net-draw-top"><small>第 ${g.di + 1}/${g.drawers.length} 题 · <b>${esc(dn)}</b> 在画 · 剩 <b id="net-draw-left">${Math.max(0, Math.ceil((g.deadline - Date.now()) / 1000))} 秒</b></small>${iDraw ? `<b class="net-draw-word">题目：${esc(g.word)}</b>` : `<b class="net-draw-word">${"□".repeat(g.word.length)}（${g.word.length} 个字）</b>`}</div>
+        <div id="net-cvbox" class="net-cvbox"></div>
+        ${iDraw ? `<div class="ww-row"><button type="button" class="fun-btn ghost sm" data-a="dclear">清空</button>${["#3a2a2a", "#e85a5a", "#3b82c4", "#4caf50", "#f2a33a"].map((col) => `<button type="button" class="net-pen" data-pen="${col}" style="background:${col}"></button>`).join("")}<button type="button" class="fun-btn ghost sm" data-a="dskip">跳过</button></div>` : meP && !g.solved[meP.pid] ? `<div class="net-guess"><input type="text" id="net-draw-in" maxlength="20" placeholder="猜猜画的是什么"/><button type="button" class="fun-btn solid sm" data-a="dguess">猜</button></div>` : meP ? `<small>你猜对啦 ✅</small>` : ""}
+        <div class="net-draw-log">${g.log.map((x) => `<span>${esc(x)}</span>`).join("")}</div>
+        <small>${g.players.map((p) => `${esc(p.name)} ${g.scores[p.pid] || 0}`).join(" · ")}</small>`;
+    } else if (g.kind === "uno") {
+      const cur = g.players[g.turn];
+      const myTurn = cur && cur.owner === S.mid && !cur.isChar;
+      const hand = meP ? g.hands[meP.pid] || [] : [];
+      body = `<div class="net-uno-top">${unoCard(g.top)}<span class="nu-col nu-${g.color}">当前颜色：${UCN[g.color]}</span></div>
+        <small>${esc(g.last || "开局！")}</small>
+        <div class="net-spy-seats">${g.players.map((p, i) => `<span class="${i === g.turn ? "is-cur" : ""}">${esc(p.name)} · ${g.hands[p.pid].length} 张</span>`).join("")}</div>
+        ${meP ? `<div class="nu-hand">${hand.map((k, i) => `<button type="button" class="nu-btn${myTurn && unoCan(k, g) ? " ok" : ""}" data-uno="${i}">${unoCard(k)}</button>`).join("")}</div>` : ""}
+        ${myTurn ? `<div class="ww-row"><small>轮到你了：点亮着的牌出牌</small><button type="button" class="fun-btn ghost sm" data-a="unodraw">摸一张</button></div>` : `<small>轮到 ${esc(cur?.name || "")}</small>`}`;
+    } else if (g.kind === "mines") {
+      const cur = g.players[g.turn % g.players.length];
+      const myTurn = cur && cur.owner === S.mid && !cur.isChar;
+      body = `<small>轮流挖格子，踩到雷的人受罚 · 轮到 <b>${esc(cur?.name || "")}</b>${myTurn ? "（你）" : ""}</small>
+        <div class="nm-grid">${[...Array(MN * MN).keys()]
+          .map((i) => {
+            const o = g.open.includes(i);
+            const n = o ? mCount(g, i) : 0;
+            return `<button type="button" class="nm-c${o ? " is-o" : ""}${myTurn && !o ? " can" : ""}" data-dig="${i}">${o ? (g.mines.includes(i) ? "💥" : n || "") : ""}</button>`;
+          })
+          .join("")}</div>`;
+    } else if (g.kind === "mlm" || g.kind === "piano") {
+      const mineDone = meP && g.scores[meP.pid] != null;
+      body = `<small>每个人在自己手机上玩一局「${CHAL[g.kind]}」，成绩自动交上来，最后一名受罚</small>
+        <div class="net-spy-seats">${g.players.map((p) => `<span class="${g.scores[p.pid] != null ? "is-cur" : ""}">${esc(p.name)}：${g.scores[p.pid] != null ? esc(g.labels[p.pid]) : "还在玩…"}</span>`).join("")}</div>
+        ${meP && !mineDone ? `<button type="button" class="fun-btn solid" data-a="chalgo">🎮 去玩「${CHAL[g.kind]}」</button>` : ""}
+        ${g.host === S.mid ? `<button type="button" class="fun-btn ghost sm" data-a="chalend">不等了，现在公布成绩</button>` : ""}`;
     }
+    const oldCv = box.querySelector("canvas.net-cv");
+    box.className = "net-game net-game--" + g.kind;
     box.innerHTML = `<div class="net-gh"><strong>${GAMES[g.kind].icon} ${GAMES[g.kind].name}</strong><button type="button" data-a="gend">结束</button></div>${body}`;
+    if (g.kind === "draw") mountCanvas(c, g, oldCv);
   }
+  /* 你画我猜的画板 */
+  let curPen = "#3a2a2a";
+  function paintStroke(ctx, st, W, H) {
+    const p = st.s || [];
+    if (!p.length) return;
+    ctx.strokeStyle = st.col || "#3a2a2a";
+    ctx.lineWidth = st.w || 3;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(p[0][0] * W, p[0][1] * H);
+    for (const [x, y] of p.slice(1)) ctx.lineTo(x * W, y * H);
+    if (p.length === 1) ctx.lineTo(p[0][0] * W + 0.5, p[0][1] * H);
+    ctx.stroke();
+  }
+  function redrawCanvas(cv, key, gid) {
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    for (const st of rt(gid).strokes?.[key] || []) {
+      if (st.clear) {
+        ctx.fillRect(0, 0, cv.width, cv.height);
+        continue;
+      }
+      paintStroke(ctx, st, cv.width, cv.height);
+    }
+  }
+  function mountCanvas(c, g, oldCv) {
+    const box = root?.querySelector("#net-cvbox");
+    if (!box) return;
+    const key = g.id + ":" + g.di;
+    let cv = oldCv && oldCv.dataset.key === key ? oldCv : null;
+    if (!cv) {
+      cv = document.createElement("canvas");
+      cv.width = 600;
+      cv.height = 440;
+      cv.dataset.key = key;
+      cv.className = "net-cv";
+      redrawCanvas(cv, key, c.gid);
+    }
+    box.appendChild(cv);
+    const iDraw = g.drawers[g.di] === S.mid;
+    if (!iDraw || cv.__bound) return;
+    cv.__bound = true;
+    let cur = null;
+    const pos = (e) => {
+      const r = cv.getBoundingClientRect();
+      return [Math.round(((e.clientX - r.left) / r.width) * 1000) / 1000, Math.round(((e.clientY - r.top) / r.height) * 1000) / 1000];
+    };
+    cv.style.touchAction = "none";
+    cv.addEventListener("pointerdown", (e) => {
+      cur = { s: [pos(e)], col: curPen, w: 6 };
+      cv.setPointerCapture?.(e.pointerId);
+    });
+    cv.addEventListener("pointermove", (e) => {
+      if (!cur) return;
+      const p = pos(e);
+      const last = cur.s[cur.s.length - 1];
+      if (Math.abs(p[0] - last[0]) + Math.abs(p[1] - last[1]) < 0.006) return;
+      cur.s.push(p);
+      const ctx = cv.getContext("2d");
+      paintStroke(ctx, { s: [last, p], col: cur.col, w: cur.w }, cv.width, cv.height);
+    });
+    const end = () => {
+      if (!cur) return;
+      const st = cur;
+      cur = null;
+      const R = rt(c.gid);
+      R.strokes ||= {};
+      (R.strokes[key] ||= []).push(st);
+      post(c, { t: "draw", key, s: st.s.slice(0, 400), col: st.col, w: st.w });
+    };
+    cv.addEventListener("pointerup", end);
+    cv.addEventListener("pointercancel", end);
+  }
+
   function drawMsgs() {
     const box = root?.querySelector("#net-list");
     const c = S.convs[V.open];
@@ -957,7 +1502,7 @@
           const mine = mid === S.mid && !m.from?.isChar;
           const ch = m.from?.isChar ? (mid === S.mid ? c.char : c.memberChars[mid]) : null;
           const av = m.from?.isChar ? ch?.av || "" : avOf(c, mid);
-          return `<div class="net-msg ${mine ? "me" : ""} ${m.from?.isChar ? "char" : ""}" data-mid="${esc(mid)}">${F.avHtml({ name: m.from?.name, avatar: av }, "fun-av sm")}<div><small>${esc(m.from?.name || "")}${m.from?.isChar ? `<em>${esc(m.from.owner || "")}的角色</em>` : ""}</small><p>${esc(m.text)}</p>${m.pending ? `<i class="net-pend">发送中…</i>` : ""}</div></div>`;
+          return `<div class="net-msg ${mine ? "me" : ""} ${m.from?.isChar ? "char" : ""}" data-mid="${esc(mid)}">${F.avHtml({ name: m.from?.name, avatar: av }, "fun-av sm")}<div><small>${esc(m.from?.name || "")}${m.from?.isChar ? `<em>${esc(m.from.owner || "")}的角色</em>` : ""}</small>${m.dress && window.XXJ_DRESS ? `<div class="net-dress">${window.XXJ_DRESS.doll(m.dress)}</div>` : ""}<p>${esc(m.text)}</p>${m.pending ? `<i class="net-pend">发送中…</i>` : ""}</div></div>`;
         })
         .join("") || `<p class="net-sys">还很安静，打个招呼吧～对方不在线也能收到</p>`;
     if (near || c.msgs.length < 3) box.scrollTop = box.scrollHeight;
@@ -1136,15 +1681,32 @@
     const sh = F.openSheet(
       `<div class="net-games">${Object.entries(GAMES)
         .map(([k, g]) => `<button type="button" data-g="${k}"><span>${g.icon}</span><strong>${g.name}</strong><small>${g.desc}</small></button>`)
-        .join("")}</div><p class="fun-note">${R.game ? "正在玩别的游戏，先结束才能开新的。" : "谁开局谁当主持人。"}现在在线的人和大家带来的角色都会一起参加。</p>`,
+        .join("")}<button type="button" data-g="dress"><span>👗</span><strong>晒搭配</strong><small>把你在换装小屋搭好的小人发到这里，大家和角色一起点评</small></button></div><p class="fun-note">${R.game ? "正在玩别的游戏，先结束才能开新的。" : "谁开局谁当主持人。"}现在在线的人和大家带来的角色都会一起参加。</p>`,
       { title: "一起玩" }
     );
     sh.body.addEventListener("click", (e) => {
       const b = e.target.closest("[data-g]");
+      if (b && b.dataset.g === "dress") {
+        sh.close();
+        return void shareDress(c);
+      }
       if (!b || R.game) return;
       sh.close();
       startGame(c, b.dataset.g);
     });
+  }
+  async function shareDress(c) {
+    let o = null;
+    try {
+      o = (await F.FunDB.get("dress_v1"))?.user || null;
+    } catch (_) {
+      o = null;
+    }
+    if (!o || !window.XXJ_DRESS) return toast("先去「换装小屋」给自己的小人搭一身吧");
+    const desc = window.XXJ_DRESS.describe(o);
+    const m = { id: rid(), at: Date.now(), text: `晒一下我今天的搭配：${desc}`, dress: o, from: { mid: S.mid, name: me().name } };
+    sendMsg(c, m);
+    void maybeCharReply(c, { ...m, text: m.text + "（大家快夸夸 / 点评一下）" });
   }
   function memberMenu(c, mid) {
     if (!mid || mid === S.mid) return;
@@ -1275,6 +1837,74 @@
       return act(c, "guess", n);
     }
     if (a === "truth" || a === "dare") return act(c, "choose", a);
+    if (a === "spydesc") {
+      const v = root.querySelector("#net-spy-in")?.value.trim();
+      if (!v) return toast("说一句描述吧");
+      return act(c, "desc", v);
+    }
+    if (a === "dguess") {
+      const inp = root.querySelector("#net-draw-in");
+      const v = inp?.value.trim();
+      if (!v) return;
+      inp.value = "";
+      return act(c, "guess", v);
+    }
+    if (a === "dskip") return act(c, "skip");
+    if (a === "dclear") {
+      const g = rt(c.gid).game;
+      if (!g) return;
+      const key = g.id + ":" + g.di;
+      const R = rt(c.gid);
+      R.strokes ||= {};
+      (R.strokes[key] ||= []).push({ clear: true });
+      post(c, { t: "draw", key, clear: true });
+      const cv = root.querySelector("canvas.net-cv");
+      if (cv) redrawCanvas(cv, key, c.gid);
+      return;
+    }
+    if (a === "unodraw") return act(c, "draw");
+    if (a === "chalgo") {
+      const g = rt(c.gid).game;
+      if (!g) return;
+      window.__mxNetChallenge = { gid: c.gid, gameId: g.id, kind: g.kind };
+      toast("玩完这一局，成绩会自动交回来");
+      return F.open(CHAL[g.kind]);
+    }
+    if (a === "chalend") return chalEnd(c);
+    const pen = e.target.closest("[data-pen]");
+    if (pen) {
+      curPen = pen.dataset.pen;
+      return;
+    }
+    const sv = e.target.closest("[data-spyvote]");
+    if (sv) return act(c, "vote", sv.dataset.spyvote);
+    const dg = e.target.closest("[data-dig]");
+    if (dg) {
+      const g = rt(c.gid).game;
+      const cur = g && g.players[g.turn % g.players.length];
+      if (!cur || cur.owner !== S.mid || cur.isChar) return toast("还没轮到你");
+      return act(c, "dig", Number(dg.dataset.dig));
+    }
+    const ub = e.target.closest("[data-uno]");
+    if (ub) {
+      const g = rt(c.gid).game;
+      const cur = g && g.players[g.turn];
+      if (!cur || cur.owner !== S.mid || cur.isChar) return toast("还没轮到你");
+      const i = Number(ub.dataset.uno);
+      const k = g.hands[S.mid]?.[i];
+      if (!k || !unoCan(k, g)) return toast("这张出不了：要同颜色或同数字，或者万能牌");
+      if (k[0] === "w") {
+        const sh = F.openSheet(`<div class="ww-row nu-pick">${UCOL.map((col) => `<button type="button" class="nu-card nu-${col}" data-col="${col}"><b>${UCN[col]}</b></button>`).join("")}</div>`, { title: "变成什么颜色？" });
+        sh.body.addEventListener("click", (ev) => {
+          const cb = ev.target.closest("[data-col]");
+          if (!cb) return;
+          sh.close();
+          act(c, "play", { i, color: cb.dataset.col });
+        });
+        return;
+      }
+      return act(c, "play", { i });
+    }
     if (a === "tdagain") return act(c, "again");
     if (a === "tdend") return act(c, "done");
     const mu = e.target.closest(".net-msg:not(.me) .fun-av, .net-mem")?.closest("[data-mid]");
@@ -1310,5 +1940,5 @@
       schedule();
     }
   });
-  window.XXJ_NET = { state: S, net: Net, uid: () => S.mid, addFriend, tick };
+  window.XXJ_NET = { state: S, net: Net, uid: () => S.mid, addFriend, tick, reportScore };
 })();

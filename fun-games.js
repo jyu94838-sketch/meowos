@@ -77,9 +77,12 @@
     kicker: "GAME CENTER",
     async mount(body) {
       body.innerHTML = `<div class="gh">
+        <button type="button" class="gh-net" data-net="1"><span>🌐</span><div><b>和联机好友一起玩</b><small>UNO、谁是卧底、你画我猜、扫雷对战、真心话大冒险、比分挑战……好友和 TA 们带来的角色都能一起玩</small></div><i>›</i></button>
         <div class="gh-grid">${GAMES.map((g) => `<button type="button" class="gh-card" data-g="${g.key}"><span class="gh-ico">${g.icon}</span><strong>${g.name}</strong><small>${g.desc}</small></button>`).join("")}</div>
       </div>`;
       body.querySelectorAll("[data-g]").forEach((b) => (b.onclick = () => F.open(b.dataset.g)));
+      const nb = body.querySelector("[data-net]");
+      if (nb) nb.onclick = () => F.open("联机");
     },
     unmount() {}
   });
