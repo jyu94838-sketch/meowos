@@ -11169,10 +11169,7 @@ async function parseWorldBookEntriesFromZipObject(path, zipFile) {
     ];
   }
   if (lower.endsWith(".docx")) {
-    const mammoth = window.mammoth;
-    if (!mammoth || typeof mammoth.extractRawText !== "function") {
-      throw new Error("mammoth");
-    }
+    const mammoth = await ensureMammothLoaded();
     const buf = await zipFile.async("arraybuffer");
     const result = await mammoth.extractRawText({ arrayBuffer: buf });
     const text = normalizeWorldBookImportedContent(String(result?.value ?? ""), false);
@@ -11190,6 +11187,70 @@ async function parseWorldBookEntriesFromZipObject(path, zipFile) {
     ];
   }
   return [];
+}
+
+/** Word 解析库是懒加载的：用到时没加载好就等一会儿 / 主动加载 */
+async function ensureMammothLoaded() {
+  if (window.mammoth?.extractRawText) return window.mammoth;
+  const src = "https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js";
+  if (!document.querySelector(`script[src="${src}"]`)) {
+    const sc = document.createElement("script");
+    sc.src = src;
+    sc.async = true;
+    document.body.appendChild(sc);
+  }
+  for (let i = 0; i < 50; i++) {
+    if (window.mammoth?.extractRawText) return window.mammoth;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  throw new Error("mammoth");
+}
+
+/** 直接用一份 Word / TXT / JSON 新建一本世界书（有好几个标题就拆成好几条） */
+async function importWorldBookVolumeFromDocFile(file) {
+  const name = String(file.name || "").toLowerCase();
+  let rows = [];
+  if (name.endsWith(".json") || file.type === "application/json") {
+    rows = parseWorldBookEntriesFromJson(await readPlainFileAsUtf8Text(file));
+  } else {
+    let text = "";
+    if (name.endsWith(".docx") || /wordprocessingml/.test(file.type)) {
+      const m = await ensureMammothLoaded();
+      const res = await m.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+      text = normalizeWorldBookImportedContent(String(res?.value ?? ""), false);
+    } else {
+      const isHtml = /\.html?$/.test(name);
+      text = normalizeWorldBookImportedContent(await readPlainFileAsUtf8Text(file), isHtml);
+    }
+    const base = worldBookImportBasenameFromPath(file.name);
+    const split = splitWorldBookTextIntoEntries(text);
+    if (split.length >= 2) rows = split.map((p) => ({ title: p.title || "未命名条目", content: p.content, keywords: p.title || "", enabled: true }));
+    else {
+      const det = detectWorldBookEntryTitleFromText(text);
+      if (String(text).trim()) rows = [{ title: det.title || base || "未命名条目", content: det.title ? det.content : text, keywords: "", enabled: true }];
+    }
+  }
+  if (!rows.length) {
+    showToast("文件里没有可导入的内容");
+    return;
+  }
+  const volTitle = worldBookImportBasenameFromPath(file.name) || "导入的世界书";
+  const preview = rows.length > 12 ? `${rows.length} 条` : rows.map((e) => e.title).join("、");
+  if (!window.confirm(`将新建世界书「${volTitle}」，导入 ${rows.length} 条：\n\n${preview}\n\n继续？`)) return;
+  const store = readWorldBookStore();
+  const vid = newWorldBookEntryId();
+  const entries = rows.map((row) => ({
+    id: newWorldBookEntryId(),
+    title: row.title || "未命名条目",
+    content: row.content || "",
+    keywords: row.keywords || "",
+    enabled: row.enabled !== false
+  }));
+  store.volumes.unshift({ id: vid, title: volTitle, scope: "local", entries });
+  writeWorldBookStore(store);
+  renderWorldBookList();
+  openWorldBookVolume(vid, entries[0]?.id);
+  showToast(`已导入 ${entries.length} 条`);
 }
 
 /**
@@ -56385,6 +56446,10 @@ document.getElementById("notify-settings-bg-test")?.addEventListener("click", ()
   void armBackgroundNotifyTest();
 });
 document.getElementById("world-book-add")?.addEventListener("click", () => addWorldBookVolumeOnShelf());
+(() => {
+  const el = document.getElementById("world-book-import-zip-file");
+  if (el instanceof HTMLInputElement) el.accept = ".zip,application/zip,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,.md,.json,application/json";
+})();
 document.getElementById("world-book-import-zip-file")?.addEventListener("change", async (e) => {
   const input = e.target;
   if (!(input instanceof HTMLInputElement)) return;
@@ -56396,9 +56461,18 @@ document.getElementById("world-book-import-zip-file")?.addEventListener("change"
     return;
   }
   try {
+    const lower = String(file.name || "").toLowerCase();
+    if (/\.(docx|txt|md|json|html?)$/.test(lower) || /wordprocessingml|^text\/|json/.test(file.type)) {
+      await importWorldBookVolumeFromDocFile(file);
+      return;
+    }
     await importWorldBookVolumeFromZip(file);
   } catch (err) {
     const msg = err && /** @type {{ message?: string }} */ (err).message;
+    if (msg === "mammoth") {
+      showToast("Word 解析库没加载上，检查一下网络再试");
+      return;
+    }
     if (msg === "zip_empty" || msg === "zip_parse") return;
     if (msg === "json_parse") {
       showToast("JSON 格式无效");
@@ -63679,6 +63753,76 @@ function importStickersFromLegacyArray(arr, categoryOverride) {
   return { ok, fail };
 }
 
+/** 大图压小一点（表情包不需要原图那么大；GIF 保留动图） */
+function shrinkStickerDataUrl(url, max) {
+  return new Promise((resolve) => {
+    if (!/^data:image\//.test(url) || /^data:image\/gif/.test(url) || url.length < 260000) return resolve(url);
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(img.naturalWidth * k));
+      c.height = Math.max(1, Math.round(img.naturalHeight * k));
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      resolve(c.toDataURL(/^data:image\/png/.test(url) ? "image/png" : "image/jpeg", 0.88));
+    };
+    img.onerror = () => resolve(url);
+    img.src = url;
+  });
+}
+
+/**
+ * 从 Word（.docx）/ TXT 导入表情包：
+ * - Word 里插的图片：用图片旁边（同一段，或者上一段 / 下一段很短的文字）当描述；
+ * - 文字里的「描述 链接」「描述:链接」一行一个也认；
+ * - 整份是 JSON 就按原来的 JSON 格式导。
+ */
+async function importStickersFromDocFile(file, categoryOverride) {
+  const lower = String(file.name || "").toLowerCase();
+  const isDocx = lower.endsWith(".docx") || /wordprocessingml/.test(file.type);
+  let rawText = "";
+  /** @type {{ url: string, description: string }[]} */
+  const rows = [];
+  if (isDocx) {
+    const m = await ensureMammothLoaded();
+    const buf = await file.arrayBuffer();
+    const res = await m.convertToHtml({ arrayBuffer: buf });
+    const doc = new DOMParser().parseFromString(`<div>${String(res?.value || "")}</div>`, "text/html");
+    const blocks = [...doc.body.firstElementChild.children];
+    const textOf = (el) => String(el?.textContent || "").replace(/\s+/g, " ").trim();
+    const shortText = (t) => (t && t.length <= 40 && !/https?:\/\//i.test(t) ? t : "");
+    let n = 0;
+    blocks.forEach((b, i) => {
+      for (const img of b.querySelectorAll("img")) {
+        const src = String(img.getAttribute("src") || "");
+        if (!/^data:image\/|^https?:\/\//i.test(src)) continue;
+        n++;
+        const next = blocks[i + 1] && !blocks[i + 1].querySelector("img") ? shortText(textOf(blocks[i + 1])) : "";
+        const prev = blocks[i - 1] && !blocks[i - 1].querySelector("img") ? shortText(textOf(blocks[i - 1])) : "";
+        const desc = String(img.getAttribute("alt") || "").trim() || shortText(textOf(b)) || next || prev || `表情${n}`;
+        rows.push({ url: src, description: desc });
+      }
+    });
+    rawText = blocks.filter((b) => !b.querySelector("img")).map(textOf).join("\n");
+  } else {
+    rawText = await readPlainFileAsUtf8Text(file);
+  }
+  const t = String(rawText || "").trim();
+  if (t.startsWith("[") || t.startsWith("{")) {
+    try {
+      const j = JSON.parse(t);
+      const arr = Array.isArray(j) ? j : Array.isArray(j.stickers) ? j.stickers : Array.isArray(j.items) ? j.items : [];
+      return importStickersFromLegacyArray(arr, categoryOverride);
+    } catch (_) {
+      /* 不是 JSON，当普通文字 */
+    }
+  }
+  for (const r of parseStickerBatchUrlLines(t)) if (r.url) rows.push({ url: r.url, description: r.description });
+  if (!rows.length) return { ok: 0, fail: 0 };
+  for (const r of rows) r.url = await shrinkStickerDataUrl(r.url, 360);
+  return importStickersFromLegacyArray(rows, categoryOverride);
+}
+
 function parseStickerBatchUrlLines(raw) {
   const text = String(raw || "");
   const lines = text.split(/[\n,，;；]/);
@@ -64839,6 +64983,18 @@ function wireStickerJsonExportImport() {
     if (!(inp instanceof HTMLInputElement)) return;
     const file = inp.files?.[0];
     if (!file) return;
+    const lower = String(file.name || "").toLowerCase();
+    // Word / TXT：图片 + 文字描述，或「描述 URL」一行一个
+    if (/\.(docx|txt|md)$/.test(lower) || /wordprocessingml|^text\/plain/.test(file.type)) {
+      const catEl = document.getElementById("sticker-category-input");
+      const cat = catEl && catEl instanceof HTMLInputElement ? catEl.value : "";
+      showToast("正在读取文件…");
+      void importStickersFromDocFile(file, cat)
+        .then((r) => showToast(r.ok ? `已导入 ${r.ok} 个${r.fail ? `（${r.fail} 个没认出来）` : ""}` : "没找到表情：Word 里放图片并在旁边写描述，或者一行写一个「描述 图片链接」"))
+        .catch((err) => showToast(err?.message === "mammoth" ? "Word 解析库没加载上，检查一下网络再试" : "导入失败：文件读不了"))
+        .finally(() => (inp.value = ""));
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       try {
@@ -64866,7 +65022,10 @@ function wireStickerJsonExportImport() {
     document.getElementById(btnId)?.addEventListener("click", onImportClick(inputId));
   }
   for (const inputId of ["sticker-import-input", "sticker-sheet-import-input"]) {
-    document.getElementById(inputId)?.addEventListener("change", onImportFileChange);
+    const el = document.getElementById(inputId);
+    // 旧缓存的页面也能选 Word / TXT
+    if (el instanceof HTMLInputElement) el.accept = "application/json,.json,.txt,.md,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    el?.addEventListener("change", onImportFileChange);
   }
 }
 wireStickerJsonExportImport();

@@ -1653,7 +1653,7 @@
                   <button type="button" class="chip ghost chip-xs" id="sticker-batch-delete-toggle">批量删除</button>
                   <button type="button" class="chip ghost chip-xs" id="sticker-export-json">导出</button>
                   <button type="button" class="chip ghost chip-xs" id="sticker-import-json">导入</button>
-                  <input id="sticker-import-input" type="file" accept="application/json" hidden />
+                  <input id="sticker-import-input" type="file" accept="application/json,.json,.txt,.md,.docx" hidden />
                 </div>
               </div>
 
@@ -3780,16 +3780,16 @@
                     <input
                       id="world-book-import-zip-file"
                       type="file"
-                      accept=".zip,application/zip"
+                      accept=".zip,application/zip,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,.md,.json,application/json"
                       hidden
                     />
                     <label
                       class="chip ghost chip-xs world-book-import-zip-label"
                       id="world-book-import-zip-btn"
                       for="world-book-import-zip-file"
-                      aria-label="从 ZIP 批量导入世界书条目"
+                      aria-label="从 ZIP、Word、TXT 导入世界书"
                     >
-                      <i class="ph ph-file-zip" aria-hidden="true"></i> 导入 ZIP
+                      <i class="ph ph-file-zip" aria-hidden="true"></i> 导入 ZIP/Word
                     </label>
                     <button type="button" class="chip ghost chip-xs mx-png-import" data-mxpng="worldbook" aria-label="导入 Meow 世界书卡">
                       <i class="ph ph-cat" aria-hidden="true"></i> 导入 PNG
@@ -7288,7 +7288,7 @@
             <div class="sticker-toolbar">
               <button type="button" class="chip ghost chip-xs" id="sticker-sheet-export-json">导出 JSON</button>
               <button type="button" class="chip ghost chip-xs" id="sticker-sheet-import-json">导入 JSON</button>
-              <input id="sticker-sheet-import-input" type="file" accept="application/json" hidden />
+              <input id="sticker-sheet-import-input" type="file" accept="application/json,.json,.txt,.md,.docx" hidden />
               <span class="sticker-toolbar-spacer" aria-hidden="true"></span>
               <button type="button" class="chip solid chip-xs" id="sticker-add-open">＋ 添加</button>
             </div>
