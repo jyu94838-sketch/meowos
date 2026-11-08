@@ -55587,7 +55587,7 @@ document.getElementById("my-open-about")?.addEventListener("click", () => {
   pg.id = "mx-about-page";
   pg.innerHTML = `<header class="mxa-bar"><button type="button" class="mxa-back">‹ 我的</button><b>关于</b><span></span></header>
     <div class="mxa-body"><div class="mxa-card">
-      <div class="mxa-head"><img src="icons/icon-192.png?v=9" alt=""><div><strong>关于 Meow</strong><span>Meow OS · 角色聊天与小世界</span></div></div>
+      <div class="mxa-head"><img src="icons/icon-192.png?v=10" alt=""><div><strong>关于 Meow</strong><span>Meow OS · 角色聊天与小世界</span></div></div>
       <p class="mxa-p">Meow 是在 <b>Ruiya</b> 的开源作品 <b>「没心机」</b> 的基础上二次创作的：桌面、聊天、角色、世界书这些最核心的部分都来自没心机，Meow 只是在上面加了一些自己喜欢的小玩意儿，换了一身新衣服。</p>
       <p class="mxa-p">没有没心机，就不会有 Meow。</p>
       <div class="mxa-thanks"><p>再次感谢 <b>Ruiya</b> 🌷</p><p>再次感谢 <b>没心机</b> 🤍</p></div>
