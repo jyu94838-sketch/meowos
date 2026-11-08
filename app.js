@@ -19038,8 +19038,9 @@ function normalizeChatInboxStore(raw, opts) {
         base.offlineDmLength = offlineDmLength;
       }
       const { charPov, userPov } = resolveThreadOfflineDmCharUserPov(t);
-      if (charPov !== OFFLINE_DM_DEFAULT_CHAR_POV) base.offlineDmCharPov = charPov;
-      if (userPov !== OFFLINE_DM_DEFAULT_USER_POV) base.offlineDmUserPov = userPov;
+      // 默认值也要存，不然读回来会落到旧版「角色第一人称」
+      base.offlineDmCharPov = charPov;
+      base.offlineDmUserPov = userPov;
       const offlineDmPov = String(t?.offlineDmPov || "").trim();
       if (offlineDmPov === "mixed_narrator" || offlineDmPov === "immersive_you") base.offlineDmPov = offlineDmPov;
       const offlineDmProseStyleText = sliceOfflineDmCustomField(t?.offlineDmProseStyleText);
@@ -60649,10 +60650,10 @@ function persistChatOfflineProseFromForm() {
     else delete t.offlineDmProseStyle;
     if (len === "short" || len === "long" || len === "xlarge") t.offlineDmLength = len;
     else delete t.offlineDmLength;
-    if (charPov !== OFFLINE_DM_DEFAULT_CHAR_POV) t.offlineDmCharPov = charPov;
-    else delete t.offlineDmCharPov;
-    if (userPov !== OFFLINE_DM_DEFAULT_USER_POV) t.offlineDmUserPov = userPov;
-    else delete t.offlineDmUserPov;
+    // 两个人称都明确存下来：以前选回默认值（角色第三人称 + 主控第二人称）时会把字段删掉，
+    // 读的时候就退回旧版的「角色第一人称」，看起来像选了又跳回去
+    t.offlineDmCharPov = charPov;
+    t.offlineDmUserPov = userPov;
     if (charPov === "third" && userPov === "third") t.offlineDmPov = "mixed_narrator";
     else if (charPov === "first" && userPov === "second") t.offlineDmPov = "immersive_you";
     else delete t.offlineDmPov;
