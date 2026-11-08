@@ -461,6 +461,297 @@
     return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
   };
   const br = (s) => esc(s).replace(/\n/g, "<br>");
+
+  /* ───── 路人帖 / 角色本地帖（只存在自己手机里，AI 生成） ───── */
+  const NP = { list: null, busy: false };
+  async function npLoad() {
+    if (NP.list) return NP.list;
+    try {
+      NP.list = (await F.FunDB.get("yz_forum_npc")) || [];
+    } catch (_) {
+      NP.list = [];
+    }
+    return NP.list;
+  }
+  const npSave = () => F.FunDB.set("yz_forum_npc", (NP.list || []).slice(0, 80)).catch(() => {});
+  const npId = () => "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const isLocalId = (id) => typeof id === "string" && /^n/.test(id);
+  const npFind = (id) => (NP.list || []).find((x) => x.id === id);
+  function npRows() {
+    const q = FS.q.trim();
+    return (NP.list || [])
+      .filter((x) => (FS.cat === "全部" || x.cat === FS.cat) && (!q || (x.title + x.body).includes(q)) && (FS.sort !== "mine" || x.mine))
+      .map((x) => ({
+        id: x.id,
+        local: true,
+        tag: x.tag,
+        cat: x.cat,
+        title: x.title,
+        preview: String(x.body || "").slice(0, 140),
+        nick: x.nick,
+        mine: !!x.mine,
+        created_at: x.created_at,
+        likes: x.likes || 0,
+        comments: (x.comments || []).length
+      }));
+  }
+  function mergedList() {
+    const all = npRows().concat(FS.list);
+    if (FS.sort === "hot") all.sort((a, b) => b.likes + b.comments * 2 - (a.likes + a.comments * 2));
+    else all.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    return all;
+  }
+  const sanitize = (t, n) => String(t || "").replace(/\s+$/g, "").slice(0, n);
+  /** 刷新出几条路人帖（每条带 1~3 条路人评论） */
+  async function refreshPasserby() {
+    if (NP.busy) return;
+    if (!F.hasApiKey()) return toast("先在设置里填好 API，路人才能来发帖");
+    NP.busy = true;
+    draw();
+    try {
+      await npLoad();
+      const cats = CATS.slice(1);
+      const want = FS.cat !== "全部" ? `这次都发在「${FS.cat}」分类。` : `分类从这些里挑，尽量不重复：${cats.join("、")}。`;
+      const recent = NP.list.slice(0, 12).map((x) => x.title).join("；");
+      const t = await F.aiText(
+        [
+          {
+            role: "system",
+            content: `你在模拟一个中文女性健康匿名论坛里的普通网友（路人）。生成 3 条新帖子，像真实网友：有人分享经验、有人提问求助、有人吐槽；语气口语、有生活细节（年龄段、学生/上班、试过的办法），可以带一点 emoji。内容要靠谱，不推销、不夸大偏方，涉及就医的要建议去看医生。${want}
+每条帖子再配 1~3 条其他路人的评论（真诚的经验 / 安慰 / 追问）。昵称要像网名（不要真名），每条不同。
+只输出 JSON 数组：[{"cat":"分类","nick":"发帖人网名","title":"标题(≤30字)","body":"正文(60~220字)","comments":[{"nick":"网名","body":"评论(≤80字)"}]}]`
+          },
+          { role: "user", content: `${recent ? "这些话题最近发过了，换点别的：" + recent : "开始吧"}` }
+        ],
+        { maxTokens: 1800, temperature: 1 }
+      );
+      const arr = F.parseJsonLoose(t);
+      if (!Array.isArray(arr) || !arr.length) throw new Error("路人这次没想好，再刷一下试试");
+      const now = Date.now();
+      const got = [];
+      arr.slice(0, 4).forEach((x, i) => {
+        if (!x || !x.title || !x.body) return;
+        const at = now - (i * 7 + Math.floor(Math.random() * 6)) * 60000;
+        got.push({
+          id: npId(),
+          tag: "路人",
+          cat: cats.includes(x.cat) ? x.cat : FS.cat !== "全部" ? FS.cat : "其他",
+          nick: sanitize(x.nick || "路过的网友", 16),
+          title: sanitize(x.title, 40),
+          body: sanitize(x.body, 2000),
+          created_at: new Date(at).toISOString(),
+          likes: Math.floor(Math.random() * 30),
+          comments: (Array.isArray(x.comments) ? x.comments : []).slice(0, 3).filter((c) => c && c.body).map((c, j) => ({
+            id: npId(),
+            nick: sanitize(c.nick || "热心网友", 16),
+            body: sanitize(c.body, 500),
+            created_at: new Date(at + (j + 1) * (3 + Math.floor(Math.random() * 20)) * 60000).toISOString(),
+            likes: Math.floor(Math.random() * 8)
+          }))
+        });
+      });
+      if (!got.length) throw new Error("路人这次没想好，再刷一下试试");
+      NP.list = got.concat(NP.list);
+      npSave();
+      toast(`来了 ${got.length} 条新帖`);
+    } catch (e) {
+      toast(e.message || "刷新失败");
+    } finally {
+      NP.busy = false;
+      if (tab === "forum") draw();
+    }
+  }
+  /** 本地帖下面：用户评论后，楼主 / 路人回一句 */
+  async function npReply(post) {
+    if (!F.hasApiKey()) return;
+    const user = await F.loadUser().catch(() => ({ name: "我" }));
+    const thread = (post.comments || []).slice(-8).map((c) => `${c.nick}：${c.body}`).join("\n");
+    try {
+      let who = post.nick;
+      let persona = "";
+      if (post.tag === "角色" && post.charId) {
+        const ch = (castCache.length ? castCache : await F.loadCast()).find((c) => c.id === post.charId);
+        if (ch) persona = ch.persona ? "你的人设：\n" + ch.persona + "\n" : "";
+      }
+      const t = await F.aiText(
+        [
+          {
+            role: "system",
+            content: `你是女性健康论坛里的网友「${who}」，你是这个帖子的楼主。${persona}帖子：《${post.title}》\n${post.body}\n刚才有人在下面评论了，回一句楼中楼：真诚、口语、≤60字，像真人。只输出回复内容。`
+          },
+          { role: "user", content: `评论区：\n${thread}\n（最新一条是「${yzNick}」发的）` }
+        ],
+        { maxTokens: 200, temperature: 0.9 }
+      );
+      const body = String(t || "").replace(/^["「]|["」]$/g, "").replace(/^[^：:]{1,16}[：:]\s*/, "").trim();
+      if (!body) return;
+      post.comments.push({ id: npId(), nick: who, body: `回复 @${yzNick}：${body}`.slice(0, 500), created_at: new Date().toISOString(), likes: 0, op: true });
+      npSave();
+      if (FS.open === post.id) {
+        FS.detail = npDetail(post);
+        draw();
+      }
+    } catch (_) {
+      /* 没回就算了 */
+    }
+    void user;
+  }
+  function npDetail(x) {
+    return {
+      local: true,
+      post: { id: x.id, cat: x.cat, title: x.title, body: x.body, nick: x.nick, mine: !!x.mine, created_at: x.created_at, likes: x.likes || 0, tag: x.tag },
+      comments: (x.comments || []).map((c) => ({ ...c, likes: c.likes || 0, mine: !!c.mine }))
+    };
+  }
+
+  /** 让角色来发帖求助：帮用户问 / TA 自己的问题 */
+  async function charAsk() {
+    if (!F.hasApiKey()) return toast("先在设置里填好 API，角色才能写帖子");
+    const cast = await F.loadCast();
+    if (!cast.length) return toast("还没有角色哦");
+    const picked = await F.pickCast(cast, { min: 1, max: 1, title: "让谁来发帖求助？" });
+    if (!picked || !picked.length) return;
+    const ch = cast.find((c) => c.id === (picked[0].id || picked[0])) || picked[0];
+    const sh = F.openSheet(
+      `<p class="fun-note">${esc(ch.name)} 要问点什么？</p>
+       <div class="fun-sheet-actions" style="flex-direction:column;gap:8px">
+         <button type="button" class="fun-btn solid wide" data-m="user">💗 帮我问（替你发帖问问大家）</button>
+         <button type="button" class="fun-btn ghost wide" data-m="self">🙋 TA 自己的问题</button>
+       </div>
+       <textarea id="yzf-hint" rows="2" maxlength="200" placeholder="可选：想问的方向，比如「最近痛经好严重」「怎么照顾经期的女朋友」" style="width:100%;margin-top:8px"></textarea>`,
+      { title: "角色求助" }
+    );
+    sh.body.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-m]");
+      if (!b) return;
+      const mode = b.dataset.m;
+      const hint = sh.body.querySelector("#yzf-hint").value.trim();
+      sh.body.querySelectorAll("[data-m]").forEach((x) => (x.disabled = true));
+      b.textContent = "✍️ " + ch.name + " 正在写…";
+      try {
+        const draft = await writeCharAsk(ch, mode, hint);
+        sh.close();
+        previewCharAsk(ch, mode, draft);
+      } catch (er) {
+        toast(er.message || "没写出来，再试一次");
+        sh.body.querySelectorAll("[data-m]").forEach((x) => (x.disabled = false));
+        b.textContent = mode === "user" ? "💗 帮我问（替你发帖问问大家）" : "🙋 TA 自己的问题";
+      }
+    });
+  }
+  async function writeCharAsk(ch, mode, hint) {
+    await load();
+    const user = await F.loadUser();
+    const p = predict();
+    const recentDays = Object.keys(S.daily).sort().slice(-14);
+    const logs = recentDays
+      .map((d) => {
+        const x = S.daily[d];
+        return [d.slice(5), x.flow ? "流量" + FLOW[x.flow] : "", x.pain ? PAIN[x.pain] : "", (x.syms || []).join("、"), x.note || ""].filter(Boolean).join(" ");
+      })
+      .filter((l) => l.length > 6)
+      .join("；");
+    const cyc = p.last ? `平均周期 ${p.st.cycle} 天，经期 ${p.st.plen} 天${p.inPeriod ? "，现在正在经期第 " + p.dayN + " 天" : p.until > 0 ? "，离下次大概 " + p.until + " 天" : ""}` : "（还没记录经期）";
+    const sys =
+      mode === "user"
+        ? `你是「${ch.name}」。${ch.persona ? "人设：\n" + ch.persona + "\n" : ""}你在一个女性健康匿名论坛，替「${user.name}」发帖向网友求助（你是 TA 身边的人，帖子里用“我对象/我朋友/我家那位”之类称呼，不写真名）。根据下面 TA 的身体情况，挑最值得问的点。语气符合你的性格，但要把情况说清楚、问题具体。`
+        : `你是「${ch.name}」。${ch.persona ? "人设：\n" + ch.persona + "\n" : ""}你在一个女性健康匿名论坛发帖，问一个你自己真正关心的问题（可以是你自己的身体/心理困扰，也可以是怎么照顾身边的人）。符合你的人设和性格，像真实网友。`;
+    const t = await F.aiText(
+      [
+        { role: "system", content: sys + `\n不写任何真实姓名、电话、地址。分类从这些里选一个：${CATS.slice(1).join("、")}。\n只输出 JSON：{"cat":"分类","title":"标题(≤30字)","body":"正文(60~250字)"}` },
+        { role: "user", content: (mode === "user" ? `${user.name}的情况：${cyc}${logs ? "。最近记录：" + logs : ""}` : "发帖吧") + (hint ? `\n想问的方向：${hint}` : "") }
+      ],
+      { maxTokens: 700, temperature: 0.9 }
+    );
+    const j = F.parseJsonLoose(t);
+    if (!j || !j.title || !j.body) throw new Error("没写出来，再试一次");
+    return { cat: CATS.slice(1).includes(j.cat) ? j.cat : "其他", title: sanitize(j.title, 40), body: sanitize(j.body, 2000) };
+  }
+  function previewCharAsk(ch, mode, d) {
+    const sh = F.openSheet(
+      `<div class="yzf-new">
+        <div class="yzf-cats">${CATS.slice(1).map((c) => `<button type="button" class="${c === d.cat ? "is-on" : ""}" data-pc="${c}">${c}</button>`).join("")}</div>
+        <input type="text" id="yzf-t" maxlength="40" value="${esc(d.title)}"/>
+        <textarea id="yzf-b" rows="8" maxlength="2000">${esc(d.body)}</textarea>
+        <p class="fun-note">以「${esc(ch.name)}」的名字发帖${mode === "user" ? "（帮你问的）" : ""}。可以先改改再发。<br>「发到社区」所有 Meow 用户都能看到、真人来回复；「只在我这儿」会有路人来回复，别人看不到。</p>
+        <div class="fun-sheet-actions"><button type="button" class="fun-btn ghost" data-x="local">只在我这儿</button><button type="button" class="fun-btn solid" data-x="ok">发到社区</button></div>
+      </div>`,
+      { title: ch.name + " 的求助帖" }
+    );
+    let cat = d.cat;
+    sh.body.addEventListener("click", async (e) => {
+      const pc = e.target.closest("[data-pc]");
+      if (pc) {
+        cat = pc.dataset.pc;
+        sh.body.querySelectorAll("[data-pc]").forEach((b) => b.classList.toggle("is-on", b === pc));
+        return;
+      }
+      const x = e.target.closest("[data-x]")?.dataset.x;
+      if (!x) return;
+      const title = sh.body.querySelector("#yzf-t").value.trim();
+      const body = sh.body.querySelector("#yzf-b").value.trim();
+      if (!title || body.length < 5) return toast("标题和内容都写一下");
+      const nick = String(ch.name || "TA").slice(0, 20);
+      sh.body.querySelectorAll("[data-x]").forEach((b) => (b.disabled = true));
+      if (x === "local") {
+        await npLoad();
+        const post = { id: npId(), tag: "角色", charId: ch.id, cat, nick, title, body, created_at: new Date().toISOString(), likes: 0, comments: [] };
+        NP.list.unshift(post);
+        npSave();
+        sh.close();
+        toast("发好啦，路人马上来回");
+        FS.open = post.id;
+        FS.detail = npDetail(post);
+        draw();
+        void npPasserbyComments(post);
+        return;
+      }
+      try {
+        const id = await yrpc("mx_yz_post", { p_token: yzToken, p_nick: nick, p_cat: cat, p_title: title, p_body: body });
+        if (id === -2) throw new Error("发得太快了，过几分钟再发");
+        if (!(id > 0)) throw new Error("发布失败");
+        sh.close();
+        toast(`${nick} 发好啦 🌷`);
+        FS.sort = "new";
+        FS.cat = "全部";
+        loadList(true);
+        openPost(id);
+      } catch (err) {
+        sh.body.querySelectorAll("[data-x]").forEach((b) => (b.disabled = false));
+        toast(err.message);
+      }
+    });
+  }
+  /** 给本地求助帖生成几条路人回复 */
+  async function npPasserbyComments(post) {
+    if (!F.hasApiKey()) return;
+    try {
+      const t = await F.aiText(
+        [
+          {
+            role: "system",
+            content: `你在模拟女性健康论坛里的 2~3 位不同的路人网友，给下面这个求助帖回复：真诚、具体、分享自己的经验或给建议，必要时建议就医；口语，每条 ≤80 字；网名像真实网名。只输出 JSON 数组：[{"nick":"网名","body":"回复"}]`
+          },
+          { role: "user", content: `《${post.title}》\n${post.body}` }
+        ],
+        { maxTokens: 600, temperature: 1 }
+      );
+      const arr = F.parseJsonLoose(t);
+      if (!Array.isArray(arr)) return;
+      const base = Date.now();
+      arr.slice(0, 3).forEach((c, j) => {
+        if (c && c.body) post.comments.push({ id: npId(), nick: sanitize(c.nick || "热心网友", 16), body: sanitize(c.body, 500), created_at: new Date(base + j * 1000).toISOString(), likes: 0 });
+      });
+      npSave();
+      if (FS.open === post.id) {
+        FS.detail = npDetail(post);
+        draw();
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
   async function loadList(reset) {
     if (FS.loading) return;
     FS.loading = true;
@@ -470,6 +761,7 @@
       FS.more = true;
     }
     if (tab === "forum") draw();
+    await npLoad();
     try {
       const rows = await yrpc("mx_yz_list", { p_cat: FS.cat, p_sort: FS.sort, p_offset: FS.list.length, p_q: FS.q, p_token: yzToken });
       FS.list = FS.list.concat(rows || []);
@@ -483,6 +775,14 @@
     }
   }
   async function openPost(id) {
+    if (isLocalId(id)) {
+      await npLoad();
+      const x = npFind(id);
+      if (!x) return toast("这个帖子不见了");
+      FS.open = id;
+      FS.detail = npDetail(x);
+      return draw();
+    }
     FS.open = id;
     FS.detail = null;
     draw();
@@ -502,17 +802,18 @@
     if (FS.open) return postHtml();
     return `<div class="yzf">
       <div class="yzf-top"><div class="yzf-search"><input type="search" id="yzf-q" placeholder="搜搜大家的经验…" value="${esc(FS.q)}" enterkeyhint="search"/></div><button type="button" class="fun-btn solid sm" data-fa="new">✏️ 发帖</button></div>
+      <div class="yzf-top" style="gap:6px"><button type="button" class="fun-btn ghost sm" data-fa="npc" style="flex:1"${NP.busy ? " disabled" : ""}>${NP.busy ? "⏳ 路人正在发帖…" : "🔄 刷新路人帖"}</button><button type="button" class="fun-btn ghost sm" data-fa="ask" style="flex:1">🙋 让 TA 来求助</button></div>
       <div class="yzf-cats">${CATS.map((c) => `<button type="button" class="${FS.cat === c ? "is-on" : ""}" data-fcat="${c}">${c}</button>`).join("")}</div>
       <div class="yzf-sort"><button type="button" class="${FS.sort === "new" ? "is-on" : ""}" data-fsort="new">最新</button><button type="button" class="${FS.sort === "hot" ? "is-on" : ""}" data-fsort="hot">热门</button><button type="button" class="${FS.sort === "mine" ? "is-on" : ""}" data-fsort="mine">我发的</button><span>我的昵称：<b>${esc(yzNick)}</b> <button type="button" class="yzf-mini" data-fa="nick">改</button></span></div>
       ${FS.err ? `<p class="yzf-err">${esc(FS.err)}</p>` : ""}
       <div class="yzf-list">${
-        FS.list
+        mergedList()
           .map(
-            (p) => `<button type="button" class="yzf-item" data-fpost="${p.id}"><span class="yzf-cat">${esc(p.cat)}</span><b>${esc(p.title)}</b><p>${esc(p.preview)}${p.preview.length >= 140 ? "…" : ""}</p><small>${esc(p.nick)}${p.mine ? "（我）" : ""} · ${ago(p.created_at)}<span>💗 ${p.likes}　💬 ${p.comments}</span></small></button>`
+            (p) => `<button type="button" class="yzf-item" data-fpost="${p.id}"><span class="yzf-cat">${esc(p.cat)}${p.local ? ` · ${p.tag === "角色" ? "角色·仅自己可见" : "路人"}` : ""}</span><b>${esc(p.title)}</b><p>${esc(p.preview)}${p.preview.length >= 140 ? "…" : ""}</p><small>${esc(p.nick)}${p.mine ? (p.nick === yzNick ? "（我）" : "（我发的）") : ""} · ${ago(p.created_at)}<span>💗 ${p.likes}　💬 ${p.comments}</span></small></button>`
           )
           .join("") || (FS.loading ? `<p class="fun-note yzf-empty">加载中…</p>` : FS.err ? "" : `<p class="fun-note yzf-empty">${FS.sort === "mine" ? "你还没发过帖子" : "这里还没有帖子，来发第一个吧～"}</p>`)
       }</div>
-      ${FS.more && FS.list.length ? `<button type="button" class="fun-btn ghost wide" data-fa="more">${FS.loading ? "加载中…" : "加载更多"}</button>` : ""}
+      ${FS.more && FS.list.length >= 30 ? `<button type="button" class="fun-btn ghost wide" data-fa="more">${FS.loading ? "加载中…" : "加载更多"}</button>` : ""}
       <p class="fun-note yz-foot">这里是大家匿名分享经验和互相提问的地方，彼此温柔一点 🌷。网友的经验不能代替医生的诊断，身体不舒服请及时就医。不要发手机号、住址等个人信息；看到不好的内容可以举报。</p>
     </div>`;
   }
@@ -523,15 +824,15 @@
     const lk = liked.has("p" + p.id);
     return `<div class="yzf yzf-detail">
       <button type="button" class="yzf-back" data-fa="back">‹ 返回</button>
-      <article class="yzf-post"><span class="yzf-cat">${esc(p.cat)}</span><h3>${esc(p.title)}</h3><small>${esc(p.nick)}${p.mine ? "（我）" : ""} · ${ago(p.created_at)}</small><p>${br(p.body)}</p>
-        <div class="yzf-acts"><button type="button" class="${lk ? "is-on" : ""}" data-flike="post:${p.id}">💗 ${p.likes}</button><button type="button" data-fa="focus">💬 评论</button>${p.mine ? `<button type="button" data-fdel="post:${p.id}">删除</button>` : `<button type="button" data-frep="post:${p.id}">举报</button>`}</div>
-      </article>
+      <article class="yzf-post"><span class="yzf-cat">${esc(p.cat)}</span><h3>${esc(p.title)}</h3><small>${esc(p.nick)}${p.mine ? (p.nick === yzNick ? "（我）" : "（我发的）") : ""} · ${ago(p.created_at)}</small><p>${br(p.body)}</p>
+        <div class="yzf-acts"><button type="button" class="${lk ? "is-on" : ""}" data-flike="post:${p.id}">💗 ${p.likes}</button><button type="button" data-fa="focus">💬 评论</button>${p.mine || d.local ? `<button type="button" data-fdel="post:${p.id}">删除</button>` : `<button type="button" data-frep="post:${p.id}">举报</button>`}</div>
+      </article>${d.local ? `<p class="fun-note" style="margin:4px 2px">${p.tag === "角色" ? "这是角色发在你本地的求助帖，只有你能看到" : "这是 AI 模拟的路人帖，只在你手机里"}，网友的话仅供参考～</p>` : ""}
       <h4 class="yzf-h4">评论 ${d.comments.length}</h4>
       <div class="yzf-cmts">${
         d.comments
           .map((c, i) => {
             const l = liked.has("c" + c.id);
-            return `<div class="yzf-cmt"><div class="yzf-cmt-h"><b>${esc(c.nick)}${c.mine ? "（我）" : ""}</b><small>${i + 1} 楼 · ${ago(c.created_at)}</small></div><p>${br(c.body)}</p><div class="yzf-acts sm"><button type="button" class="${l ? "is-on" : ""}" data-flike="comment:${c.id}">💗 ${c.likes}</button><button type="button" data-freply="${esc(c.nick)}">回复</button>${c.mine ? `<button type="button" data-fdel="comment:${c.id}">删除</button>` : `<button type="button" data-frep="comment:${c.id}">举报</button>`}</div></div>`;
+            return `<div class="yzf-cmt"><div class="yzf-cmt-h"><b>${esc(c.nick)}${c.mine ? "（我）" : ""}</b><small>${i + 1} 楼 · ${ago(c.created_at)}</small></div><p>${br(c.body)}</p><div class="yzf-acts sm"><button type="button" class="${l ? "is-on" : ""}" data-flike="comment:${c.id}">💗 ${c.likes}</button><button type="button" data-freply="${esc(c.nick)}">回复</button>${c.mine || d.local ? `<button type="button" data-fdel="comment:${c.id}">删除</button>` : `<button type="button" data-frep="comment:${c.id}">举报</button>`}</div></div>`;
           })
           .join("") || `<p class="fun-note yzf-empty">还没有评论，说说你的经验或者给 TA 一点鼓励吧</p>`
       }</div>
@@ -583,6 +884,18 @@
   async function sendComment(text, input) {
     const t = String(text || "").trim();
     if (!t || !FS.detail) return;
+    if (FS.detail.local) {
+      const x = npFind(FS.detail.post.id);
+      if (!x) return;
+      x.comments = x.comments || [];
+      x.comments.push({ id: npId(), nick: yzNick, body: t.slice(0, 500), created_at: new Date().toISOString(), likes: 0, mine: true });
+      npSave();
+      FS.detail = npDetail(x);
+      draw();
+      setTimeout(() => root?.querySelector(".yzf-cmts")?.lastElementChild?.scrollIntoView({ block: "center" }), 30);
+      if (Math.random() < 0.8) setTimeout(() => void npReply(x), 1500 + Math.random() * 2500);
+      return;
+    }
     input.disabled = true;
     try {
       const id = await yrpc("mx_yz_comment", { p_token: yzToken, p_nick: yzNick, p_post: FS.detail.post.id, p_body: t });
@@ -601,6 +914,8 @@
   async function forumClick(e) {
     const fa = e.target.closest("[data-fa]")?.dataset.fa;
     if (fa === "new") return newPost();
+    if (fa === "npc") return refreshPasserby();
+    if (fa === "ask") return charAsk();
     if (fa === "more") return loadList(false);
     if (fa === "back") {
       FS.open = null;
@@ -627,7 +942,7 @@
       return loadList(true);
     }
     const fp = e.target.closest("[data-fpost]");
-    if (fp) return openPost(Number(fp.dataset.fpost));
+    if (fp) return openPost(/^n/.test(fp.dataset.fpost) ? fp.dataset.fpost : Number(fp.dataset.fpost));
     const fr = e.target.closest("[data-freply]");
     if (fr) {
       const inp = root.querySelector("#yzf-cin");
@@ -645,7 +960,12 @@
       if (on) liked.add(key);
       else liked.delete(key);
       saveLiked();
-      yrpc("mx_yz_like", { p_kind: kind, p_id: Number(id), p_delta: on ? 1 : -1 }).catch(() => {});
+      if (FS.detail?.local) {
+        const x = npFind(FS.detail.post.id);
+        const o2 = kind === "post" ? x : (x?.comments || []).find((c) => String(c.id) === id);
+        if (o2) o2.likes = Math.max(0, (o2.likes || 0) + (on ? 1 : -1));
+        npSave();
+      } else yrpc("mx_yz_like", { p_kind: kind, p_id: Number(id), p_delta: on ? 1 : -1 }).catch(() => {});
       const obj = kind === "post" ? FS.detail?.post : FS.detail?.comments.find((c) => String(c.id) === id);
       if (obj) obj.likes = Math.max(0, obj.likes + (on ? 1 : -1));
       const li = FS.list.find((x) => String(x.id) === id);
@@ -664,6 +984,21 @@
     if (fd) {
       const [kind, id] = fd.dataset.fdel.split(":");
       if (!confirm(kind === "post" ? "删除这个帖子？评论也会一起删掉。" : "删除这条评论？")) return true;
+      if (FS.detail?.local) {
+        const x = npFind(FS.detail.post.id);
+        if (kind === "post") {
+          NP.list = NP.list.filter((y) => y.id !== id);
+          FS.open = null;
+          FS.detail = null;
+        } else if (x) {
+          x.comments = (x.comments || []).filter((c) => String(c.id) !== id);
+          FS.detail = npDetail(x);
+        }
+        npSave();
+        toast("已删除");
+        draw();
+        return true;
+      }
       try {
         const ok = await yrpc("mx_yz_delete", { p_token: yzToken, p_kind: kind, p_id: Number(id) });
         if (!ok) throw new Error("删除失败");
@@ -855,7 +1190,7 @@
 
   F.register("柚子", {
     title: "柚子",
-    kicker: "YUZU · 经期记录",
+    kicker: "YOUZI · 经期记录",
     async mount(body) {
       root = document.createElement("div");
       body.appendChild(root);

@@ -20504,6 +20504,86 @@ async function runMomentsCharReactionForChar(momentId, charId, scene) {
 
 let momentsCharReactChain = Promise.resolve();
 
+/** 朋友圈角色配图：auto=看角色自己（不一定每条都配）；off=关闭 */
+function readMomentsCharImgMode() {
+  try {
+    return localStorage.getItem("meowos_moments_img") === "off" ? "off" : "auto";
+  } catch (_) {
+    return "auto";
+  }
+}
+function writeMomentsCharImgMode(v) {
+  try {
+    localStorage.setItem("meowos_moments_img", v === "off" ? "off" : "auto");
+  } catch (_) {
+    /* ignore */
+  }
+}
+/** 人设里写的 NPC 自动评论（默认开） */
+function readMomentsNpcAutoOn() {
+  try {
+    return localStorage.getItem("meowos_moments_npc_auto") !== "off";
+  } catch (_) {
+    return true;
+  }
+}
+function writeMomentsNpcAutoOn(on) {
+  try {
+    localStorage.setItem("meowos_moments_npc_auto", on ? "on" : "off");
+  } catch (_) {
+    /* ignore */
+  }
+}
+window.XXJ_MOMENTS_OPTS = {
+  readImg: readMomentsCharImgMode,
+  writeImg: writeMomentsCharImgMode,
+  readNpc: readMomentsNpcAutoOn,
+  writeNpc: writeMomentsNpcAutoOn
+};
+
+/**
+ * 发动态后，先让人设「NPC 关系」里写到的 NPC 自动来评论（1～2 位，可能有人不评）。
+ * @param {string} momentId
+ * @param {{ noRender?: boolean }} [o]
+ */
+async function autoNpcCommentsOnMoment(momentId, o) {
+  if (!readMomentsNpcAutoOn()) return;
+  const ai = window.RP_AI;
+  if (!ai?.chatCompletions) return;
+  const mid = String(momentId || "").trim();
+  if (!mid) return;
+  const { maskId, bucket } = getActiveMomentsBucket();
+  if (!maskId) return;
+  const raw = (Array.isArray(bucket.moments) ? bucket.moments : []).find((m) => String(m?.id || "") === mid);
+  if (!raw) return;
+  const mm = normalizeMoment(raw);
+  let ctx;
+  try {
+    ctx = listMomentInviteRelationCandidates(maskId, mm);
+  } catch (_) {
+    return;
+  }
+  if (!ctx || !ctx.charId || !ctx.ident) return;
+  const npcs = ctx.entries.filter((e) => e.kind === "npc");
+  if (!npcs.length) return;
+  const n = Math.random() < 0.45 ? 1 : 2;
+  const batch = pickMomentInviteRelationBatch(npcs, n);
+  const npcRaw = String(ctx.ident.persona?.npcRelations || ctx.ident.charItem?.npcRelations || "");
+  const notes = new Map(parseNpcEntriesFromRelationsText(npcRaw).map((x) => [x.name, x.note]));
+  for (const entry of batch) {
+    await new Promise((r) => setTimeout(r, 700 + Math.floor(Math.random() * 1400)));
+    await runMomentsNpcCommentForNpc(mid, maskId, mm, { name: entry.name, note: notes.get(entry.name) || "" }, ctx);
+  }
+  if (!o?.noRender) {
+    try {
+      replaceMomentsPostInFeed(mid);
+      scheduleMomentsFeedRender(true);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+}
+
 function queueMomentsCharReactions(run) {
   momentsCharReactChain = momentsCharReactChain
     .then(() => run())
@@ -20527,6 +20607,11 @@ async function triggerMomentsReactionsOnUserPost(momentId) {
   let charIds = listMomentsReactorCharIds(maskId, mm);
   if (fromCharPhoto && sourceCharId && !charIds.includes(sourceCharId)) {
     charIds = [sourceCharId, ...charIds].slice(0, MOMENTS_REACTOR_MAX);
+  }
+  try {
+    await autoNpcCommentsOnMoment(momentId, { noRender: true });
+  } catch (_) {
+    /* ignore */
   }
   for (const cid of charIds) {
     await runMomentsCharReactionForChar(momentId, cid, { type: "user_post" });
@@ -20787,6 +20872,7 @@ async function requestMomentsNpcCommentAi(maskId, mm, npcEntry, ctx) {
   const system = [
     `你是「${npcEntry.name}」，在微信朋友圈时间线里给一条动态写评论。`,
     `你不是密谈角色「${charName}」，也不是主控用户；只以 ${npcEntry.name} 的身份说话。`,
+    npcEntry.note ? `【${npcEntry.name} 的人设（来自${charName}的设定）】${String(npcEntry.note).slice(0, 300)}` : "",
     wb ? `【世界设定参考】\n${wb.slice(0, 2400)}` : "",
     "用简体中文写评论：口语、一两到三句、单行不换行，把话说完整；像普通人随手评一句。",
     "不要在评论里说明或暗示你和发帖人的关系标签（如闺蜜、同事等）。",
@@ -21821,7 +21907,9 @@ async function requestMomentsCharPostAi(charId, preferredThreadId = "", opts = {
       : "";
   const genEnabled = opts?.genEnabled === true;
   const catalogue = buildMomentsCharPostImageCatalogue(candidates);
-  const imageRule = genEnabled
+  const imageRule = opts?.noImage === true
+    ? "[硬性] 这次不配图：最后一行固定写 [POST_IMAGE:none]，正文里也不要写（配图：…）之类的画面描述。"
+    : genEnabled
     ? candidates.length
       ? "最后一行任选：[POST_IMAGE:none]（不附图，**常用**）/ [POST_IMAGE:pick:序号]（复用上方素材）/ [POST_IMAGE:gen:画面描述]（新生图，偏风景美食静物日常，勿默认自拍人像）/ [POST_IMG:动态:英文提示词]。勿写 [POST_IMAGE:desc:…]。"
       : "最后一行任选：[POST_IMAGE:none]（不附图，**常用**）/ [POST_IMAGE:gen:画面描述]（偏风景美食静物日常，勿默认自拍人像）/ [POST_IMG:动态:英文提示词]。勿写 [POST_IMAGE:desc:…]。"
@@ -22313,8 +22401,9 @@ async function publishCharMomentFromAi(charId, opts) {
     const postPersonaSlot = momentIdent.slot;
     const name = momentIdent.displayName || "角色";
     if (!opts?.quiet) showToast(`${name} \u6b63\u5728\u5199\u52a8\u6001\u2026`);
-    const candidates = tid ? collectMomentsCharImageCandidates(maskId, tid, 10) : [];
-    const genEnabled = isSessionImageGenConfigured();
+    const momentsImgOff = readMomentsCharImgMode() === "off";
+    const candidates = tid && !momentsImgOff ? collectMomentsCharImageCandidates(maskId, tid, 10) : [];
+    const genEnabled = !momentsImgOff && isSessionImageGenConfigured();
     let text = "";
     let imagePlan = { mode: "none", pickIndex: 0, genCaption: "" };
     const skipMomentsAi = forcePost && momentTextLooksPublishable(directText);
@@ -22327,6 +22416,7 @@ async function publishCharMomentFromAi(charId, opts) {
           forcePost: mustPost,
           candidates,
           genEnabled,
+          noImage: momentsImgOff,
           momentHint,
           maskId,
           personaSlot: postPersonaSlot
@@ -22367,7 +22457,8 @@ async function publishCharMomentFromAi(charId, opts) {
       imagePlan = { ...imagePlan, genCaption: inlineDesc.caption };
     }
     imagePlan = normalizeMomentsCharPostImagePlan(imagePlan, candidates, genEnabled);
-    const capHint = String(imagePlan.genCaption || inlineDesc.caption || "").trim();
+    if (momentsImgOff) imagePlan = { mode: "none", pickIndex: 0, genCaption: "" };
+    const capHint = momentsImgOff ? "" : String(imagePlan.genCaption || inlineDesc.caption || "").trim();
     if (imagePlan.mode === "gen" && genEnabled && !opts?.quiet) {
       showToast(`${name} \u6b63\u5728\u914d\u56fe\u2026`);
     }
@@ -22378,6 +22469,7 @@ async function publishCharMomentFromAi(charId, opts) {
       console.warn("[moments] post images failed", name, e);
       images = [];
     }
+    if (momentsImgOff) images = [];
     if (!images.length && candidates.length && momentsPublishWantsUserChatImage(momentHint, directText, imagePlan)) {
       const userHit = pickLastUserMomentsImageCandidate(candidates);
       if (userHit) {
@@ -22406,7 +22498,7 @@ async function publishCharMomentFromAi(charId, opts) {
       }
     }
     let imageDescCards = [];
-    if (!images.length) {
+    if (!images.length && !momentsImgOff) {
       const cap = String(capHint || inlineDesc.caption || "").trim();
       if (cap) imageDescCards = [cap.slice(0, 500)];
     }
@@ -22473,6 +22565,12 @@ async function publishCharMomentFromAi(charId, opts) {
     }
     if (th && tid && isThreadCharMomentsProactiveEnabled(th)) {
       touchThreadCharMomentsProactiveLastAt(maskId, tid);
+    }
+    try {
+      const autoId = newId;
+      queueMomentsCharReactions(() => autoNpcCommentsOnMoment(autoId));
+    } catch (_) {
+      /* ignore */
     }
     return true;
   } catch (e) {
@@ -22679,8 +22777,62 @@ function openMomentsCharPostSheet() {
       list.appendChild(li);
     }
   }
+  try {
+    renderMomentsCharPostOpts(sheet, list);
+  } catch (e) {
+    console.warn("[moments] opts ui", e);
+  }
   sheet.hidden = false;
   sheet.setAttribute("aria-hidden", "false");
+}
+
+/** 发朋友圈面板里的「配图 / NPC 自动评论」选项（JS 注入，兼容旧缓存的 index.html） */
+function renderMomentsCharPostOpts(sheet, list) {
+  let box = sheet.querySelector("#mx-moments-opts");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "mx-moments-opts";
+    box.style.cssText = "margin:6px 0 10px;display:flex;flex-direction:column;gap:8px;font-size:13px;";
+    list.parentNode.insertBefore(box, list);
+  }
+  const img = readMomentsCharImgMode();
+  const npc = readMomentsNpcAutoOn();
+  const seg = (key, opts, cur) =>
+    `<div style="display:flex;gap:6px;flex:1">` +
+    opts
+      .map(
+        ([v, t]) =>
+          `<button type="button" data-mxo="${key}" data-v="${v}" style="flex:1;padding:6px 8px;border-radius:999px;border:1px solid ${
+            v === cur ? "transparent" : "rgba(0,0,0,.12)"
+          };background:${v === cur ? "#ffe3a6" : "transparent"};color:inherit;font:inherit;font-size:12.5px">${t}</button>`
+      )
+      .join("") +
+    `</div>`;
+  box.innerHTML =
+    `<div style="display:flex;align-items:center;gap:8px"><span style="flex:none;opacity:.75">配图</span>${seg(
+      "img",
+      [
+        ["auto", "看角色自己"],
+        ["off", "关闭"]
+      ],
+      img
+    )}</div>` +
+    `<div style="display:flex;align-items:center;gap:8px"><span style="flex:none;opacity:.75">NPC评论</span>${seg(
+      "npc",
+      [
+        ["on", "人设NPC先评"],
+        ["off", "关闭"]
+      ],
+      npc ? "on" : "off"
+    )}</div>` +
+    `<div style="opacity:.55;font-size:11.5px">看角色自己＝TA 想配才配，不是每条都有图；NPC 评论会从角色卡「NPC 关系」里挑人自动来评。</div>`;
+  box.onclick = (ev) => {
+    const b = ev.target.closest("[data-mxo]");
+    if (!b) return;
+    if (b.dataset.mxo === "img") writeMomentsCharImgMode(b.dataset.v);
+    else writeMomentsNpcAutoOn(b.dataset.v === "on");
+    renderMomentsCharPostOpts(sheet, list);
+  };
 }
 
 function closeMomentsCharPostSheet() {
@@ -24029,6 +24181,15 @@ function isThreadDescImageApiGenEnabled(thread) {
 /** 每轮线下（晤面）对方回复后自动根据剧情生图（默认关；仅 `chatThreadOfflineImageEveryRound === true` 为开；仍须全局生图已接入）。 */
 function isThreadOfflineEveryRoundSessionImage(thread) {
   return Boolean(thread && thread.chatThreadOfflineImageEveryRound === true);
+}
+
+/**
+ * 线下生图方式：auto=视情况自动生图（默认）；manual=用户自己点「生一张」；off=关闭生图。
+ * @returns {"auto" | "manual" | "off"}
+ */
+function getThreadOfflineImgMode(thread) {
+  const v = String(thread?.chatThreadOfflineImgMode || "").trim();
+  return v === "manual" || v === "off" ? v : "auto";
 }
 
 /** 旁白模式：仅 `narratorModeEnabled === true` 为开（默认关）。 */
@@ -44471,6 +44632,11 @@ function buildChatSystemPrompt(opts) {
       : []),
     ...(sceneOffline
       ? [
+          ...(!offlineImgEveryRound && imgGenSessionOn && getThreadOfflineImgMode(th) === "auto"
+            ? [
+                `[线下 · 视情况配图] 本密谈开了「视情况自动生图」：只有这一刻画面感很强、值得留下一张图时（比如换了新场景、特别的动作/氛围、关键剧情，大约 3～6 轮一次，**不要每轮**），才在 JSON 里加 **imageSceneCaption**：仅英文 danbooru 式 tags（约 10–16 个，含人物外貌表情姿势 + 地点光线）。平时不写这个字段。`
+              ]
+            : []),
           ...(offlineImgEveryRound
             ? [
                 ...buildCharImageGenPromptPersonaGuideLines(th),
@@ -54041,6 +54207,7 @@ function extractOfflineStoryBeatForImageGen(replyText, parsed) {
 function tryAttachOfflineAutoSessionImageOnEntry(entry, replyText, parsed, rawReply, thread) {
   if (!thread || thread.kind === "group") return false;
   if (!isSessionImageGenConfigured()) return false;
+  if (getThreadOfflineImgMode(thread) !== "auto" && !isThreadOfflineEveryRoundSessionImage(thread)) return false;
   if (!isThreadOfflineEveryRoundSessionImage(thread)) {
     let capOnly = String(parsed?.charImageCaption || "").trim();
     if (!capOnly) capOnly = extractOfflineImageTagCaptionFromRaw(rawReply);
@@ -59641,7 +59808,136 @@ function closeChatOfflineMoreDrawerSheet(sheetId, drawerId) {
   }, 160);
 }
 
+/** 线下菜单里注入「生图方式」三选一 + 「现在生一张」（JS 注入，兼容旧缓存的 index.html） */
+function syncChatOfflineImgModeUi(th) {
+  const old = document.getElementById("chat-offline-menu-image-every-round-toggle");
+  const anchor = old?.closest(".chat-offline-more-menu-item");
+  if (!anchor || !anchor.parentNode) return;
+  let box = document.getElementById("mx-offline-imgmode");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "mx-offline-imgmode";
+    box.className = "chat-offline-more-menu-item";
+    box.style.cssText = "display:flex;flex-direction:column;align-items:stretch;gap:8px;";
+    anchor.parentNode.insertBefore(box, anchor);
+    box.addEventListener("click", (ev) => {
+      const b = ev.target instanceof Element ? ev.target.closest("[data-oim]") : null;
+      if (!b) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const v = b.getAttribute("data-oim") || "";
+      if (v === "gen") {
+        void generateOfflineImageNow();
+        return;
+      }
+      if (v !== "off" && !isSessionImageGenConfigured()) {
+        showToast("请先在「我的 → 生图接入」中开启并填写 API Key");
+        return;
+      }
+      const ok = patchActiveThread((t2) => {
+        if (v === "auto") delete t2.chatThreadOfflineImgMode;
+        else t2.chatThreadOfflineImgMode = v;
+        if (v !== "auto") delete t2.chatThreadOfflineImageEveryRound;
+      });
+      if (!ok) {
+        showToast("无法保存");
+        return;
+      }
+      syncChatThreadDetailPanelPlaceholders();
+      showToast(v === "auto" ? "生图：视情况自动生图" : v === "manual" ? "生图：我自己点「生一张」" : "生图：已关闭");
+    });
+  }
+  const mode = getThreadOfflineImgMode(th);
+  const cfgOk = isSessionImageGenConfigured();
+  const seg = [
+    ["auto", "视情况自动"],
+    ["manual", "我自己生"],
+    ["off", "关闭"]
+  ]
+    .map(
+      ([v, t]) =>
+        `<button type="button" data-oim="${v}" style="flex:1;padding:6px 4px;border-radius:999px;border:1px solid ${
+          v === mode ? "transparent" : "rgba(127,127,127,.3)"
+        };background:${v === mode ? "#ffe3a6" : "transparent"};color:${v === mode ? "#5a4320" : "inherit"};font:inherit;font-size:12.5px">${t}</button>`
+    )
+    .join("");
+  box.innerHTML =
+    `<span class="chat-offline-more-menu-item-title">线下生图</span>` +
+    `<div style="display:flex;gap:6px">${seg}</div>` +
+    (mode !== "off"
+      ? `<button type="button" data-oim="gen" style="padding:8px;border-radius:12px;border:1px dashed rgba(127,127,127,.4);background:transparent;color:inherit;font:inherit;font-size:13px">📸 现在给这一幕生一张图</button>`
+      : "") +
+    `<span class="chat-offline-more-menu-item-desc">${
+      !cfgOk
+        ? "还没接入生图：去「我的 → 生图接入」填好就能用"
+        : mode === "auto"
+          ? "TA 觉得这一幕值得画时才自动出图，不会每轮都生"
+          : mode === "manual"
+            ? "不自动生图，想要时点上面「生一张」"
+            : "这个密谈的线下模式不再生图"
+    }</span>`;
+}
+
+async function generateOfflineImageNow() {
+  if (!isSessionImageGenConfigured()) {
+    showToast("请先在「我的 → 生图接入」中开启并填写 API Key");
+    return;
+  }
+  const th = readActiveThread();
+  const ref = readChatActiveThreadRef();
+  const maskId = String(ref?.maskId || "").trim();
+  const threadId = String(ref?.threadId || "").trim();
+  if (!th || !maskId || !threadId) return;
+  if (th.kind === "group") {
+    showToast("群聊里暂不支持");
+    return;
+  }
+  const log = readChatLogForMaskThread(maskId, threadId);
+  let idx = -1;
+  for (let i = log.length - 1; i >= 0; i--) {
+    const m = log[i];
+    if (m && m.role === "assistant" && !m.restoring && String(m.content || "").trim()) {
+      idx = i;
+      break;
+    }
+  }
+  if (idx < 0) {
+    showToast("先聊几句，TA 回复后再生图");
+    return;
+  }
+  const m = log[idx];
+  if (m.image && (String(m.image.url || "").trim() || m.image.imageGenPending)) {
+    if (m.image.imageGenPending) {
+      showToast("这一幕正在生图…");
+      return;
+    }
+    if (!confirm("这一幕已经有图了，重新生一张？")) return;
+  }
+  const parsed = { hvState: String(m.hvState || m.innerState || "").trim() };
+  const scene = resolveOfflineAutoSessionImageScenePrompt(String(m.content || ""), parsed, "", th);
+  if (!scene) {
+    showToast("没找到可以画的场面");
+    return;
+  }
+  attachOfflineSessionImageToAssistantMessage(m, scene, extractOfflineStoryBeatForImageGen(String(m.content || ""), parsed));
+  m.image.imageGenRev = (Number(m.image.imageGenRev) || 0) + 1;
+  saveChatLogForMaskThread(maskId, threadId, log);
+  try {
+    closeChatOfflineMoreDrawerSheet("chat-offline-more-menu-sheet", "chat-offline-more-menu-drawer");
+  } catch (_) {
+    /* ignore */
+  }
+  showToast("📸 正在给这一幕生图…");
+  const ok = await runSessionImageRegenUiFlow(idx, { maskId, threadId }, { silent: true });
+  showToast(ok ? "生好啦" : "生图失败，稍后再试");
+}
+
 function syncChatOfflineImageEveryRoundToggleUi(th) {
+  try {
+    syncChatOfflineImgModeUi(th);
+  } catch (e) {
+    console.warn("[offline img mode]", e);
+  }
   const btn = document.getElementById("chat-offline-menu-image-every-round-toggle");
   if (!(btn instanceof HTMLButtonElement)) return;
   const onOffImg = isThreadOfflineEveryRoundSessionImage(th);
@@ -63234,8 +63530,10 @@ document.getElementById("chat-offline-more-menu-sheet")?.addEventListener("click
     return;
   }
   const okOff = patchActiveThread((t2) => {
-    if (nextOff) t2.chatThreadOfflineImageEveryRound = true;
-    else delete t2.chatThreadOfflineImageEveryRound;
+    if (nextOff) {
+      t2.chatThreadOfflineImageEveryRound = true;
+      delete t2.chatThreadOfflineImgMode;
+    } else delete t2.chatThreadOfflineImageEveryRound;
   });
   if (!okOff) {
     showToast("无法保存");
