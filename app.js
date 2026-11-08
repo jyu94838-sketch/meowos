@@ -55548,22 +55548,22 @@ document.getElementById("xxji-import-file")?.addEventListener("change", async (e
   }
 });
 document.getElementById("my-open-about")?.addEventListener("click", () => {
-  // 「我的 → 关于」：直接弹出关于 Meow
-  if (document.getElementById("mx-about-pop")) return;
+  // 「我的 → 关于」：进入关于页（整页，左上角返回「我的」）
+  if (document.getElementById("mx-about-page")) return;
   const tpl = document.getElementById("mx-about-tpl");
-  const pop = document.createElement("div");
-  pop.id = "mx-about-pop";
-  pop.className = "mx-about-pop";
-  pop.innerHTML = `<div class="mx-about-mask"></div><div class="mx-about-card" role="dialog" aria-label="关于 Meow"><button type="button" class="mx-about-x" aria-label="关闭">×</button><div class="mx-about">${tpl ? tpl.innerHTML : ""}</div></div>`;
-  document.body.appendChild(pop);
-  requestAnimationFrame(() => pop.classList.add("is-open"));
-  const close = () => {
-    pop.classList.remove("is-open");
-    setTimeout(() => pop.remove(), 250);
+  const pg = document.createElement("section");
+  pg.id = "mx-about-page";
+  pg.className = "mx-about-page";
+  pg.innerHTML = `<header class="mx-about-bar"><button type="button" class="chip ghost chip-xs mx-about-back"><i class="ph ph-arrow-left"></i> 我的</button><b>关于</b><span></span></header><div class="mx-about-body"><div class="mx-about">${tpl ? tpl.innerHTML : ""}</div></div>`;
+  const host = document.getElementById("my-screen") || document.body;
+  host.appendChild(pg);
+  requestAnimationFrame(() => pg.classList.add("is-open"));
+  pg.querySelector(".mx-about-back").onclick = () => {
+    pg.classList.remove("is-open");
+    setTimeout(() => pg.remove(), 260);
   };
-  pop.querySelector(".mx-about-mask").onclick = close;
-  pop.querySelector(".mx-about-x").onclick = close;
 });
+
 document.getElementById("my-wallet-topup")?.addEventListener("click", () => {
   const maskId = getActiveMaskIdForInbox();
   const { store, bucket } = ensureMyMaskBucket(maskId);
