@@ -13528,7 +13528,12 @@ function getBackupZipModuleDefs() {
         K.GLOBAL_THINKING_CHAIN_OFFLINE,
         K.GLOBAL_THINKING_CHAIN_GROUP,
         K.GLOBAL_PROMPT_PACK,
-        "ls:meowos_mimi_api"
+        "ls:meowos_mimi_api",
+        // 资源站账号 / 上传凭证 / 点过的赞
+        "ls:mx_share_account",
+        "ls:mx_share_tokens",
+        "ls:mx_share_liked",
+        "ls:mx_share_author"
       ]
     },
     {

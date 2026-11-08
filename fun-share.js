@@ -813,7 +813,7 @@
   const catsOf = (kind) => CATS[kind] || ["其他"];
   let hasCat = true;
   let hasExtras = true;
-  const cols = () => (hasCat ? COLS0 + ",category" : COLS0) + (hasExtras ? ",extras" : "");
+  const cols = () => (hasCat ? COLS0 + ",category" : COLS0) + (hasExtras ? ",extras" : "") + (typeof hasOwner !== "undefined" && hasOwner ? ",owner_user,updated_at" : "");
   const isCatErr = (err) => /category/i.test(String(err && err.message));
   const isExtrasErr = (err) => /extras/i.test(String(err && err.message));
   const NEED_ATTACH_SQL = "站长需要先在 Supabase 里运行一次 share-attach.sql，才能在一个帖子里带多张图片和文件";
@@ -960,6 +960,9 @@
     } else rows = await insert(rowData);
     const row = Array.isArray(rows) ? rows[0] : rows;
     if (row?.id) saveToken(row.id, token);
+    // 有账号：马上归到账号下（署名也会变成账号昵称）
+    const me = acc();
+    if (row?.id && me) await rpc("mx_share_claim", { p_share: row.id, p_token: token, p_id: me.id, p_secret: me.secret }).catch(() => {});
     return row;
   }
 
@@ -982,7 +985,7 @@
           <button type="button" data-tab="make">制作卡片</button>
           <button type="button" data-tab="upload">批量上传</button>
           <button type="button" data-tab="import">导入</button>
-          <button type="button" data-tab="mine">我的上传</button>
+          <button type="button" data-tab="mine">我的</button>
         </div>
         <div class="sh-panel" id="sh-panel"></div>
       </div>`;
@@ -1035,10 +1038,12 @@
     loadGrid(p.querySelector("#sh-grid"));
   }
 
-  async function loadGrid(grid, onlyIds) {
+  let hasOwner = true;
+  async function loadGrid(grid, onlyIds, ownerId) {
     const order = { new: "created_at.desc", hot: "downloads.desc,created_at.desc", like: "likes.desc,created_at.desc" }[filter.sort];
     let q = `/rest/v1/mx_shares?select=${cols()}&order=${order}&limit=60`;
-    if (onlyIds) q += `&id=in.(${onlyIds.join(",")})`;
+    if (ownerId && hasOwner) q += onlyIds && onlyIds.length ? `&or=(owner_user.eq.${encodeURIComponent(ownerId)},id.in.(${onlyIds.join(",")}))` : `&owner_user=eq.${encodeURIComponent(ownerId)}`;
+    else if (onlyIds) q += `&id=in.(${onlyIds.length ? onlyIds.join(",") : "00000000-0000-0000-0000-000000000000"})`;
     else {
       if (filter.kind) q += `&kind=eq.${filter.kind}`;
       if (filter.cat && hasCat) q += `&category=eq.${encodeURIComponent(filter.cat)}`;
@@ -1054,22 +1059,26 @@
       } catch (err) {
         if (hasExtras && isExtrasErr(err)) {
           hasExtras = false; // 云端还没运行 share-attach.sql
-          return loadGrid(grid, onlyIds);
+          return loadGrid(grid, onlyIds, ownerId);
+        }
+        if (hasOwner && /owner_user|updated_at/i.test(String(err.message))) {
+          hasOwner = false; // 云端还没运行 share-account.sql
+          return loadGrid(grid, onlyIds, ownerId);
         }
         if (!hasCat || !isCatErr(err)) throw err;
         hasCat = false; // 云端还没运行 share-category.sql
-        return loadGrid(grid, onlyIds);
+        return loadGrid(grid, onlyIds, ownerId);
       }
       if (!grid.isConnected) return;
       if (!rows.length) {
-        grid.innerHTML = `<div class="sh-empty"><div class="sh-empty-ico">🪹</div><p>${onlyIds ? "你还没有上传过" : "这里还空空的"}</p><small>去「制作卡片」上传第一个吧</small></div>`;
+        grid.innerHTML = `<div class="sh-empty"><div class="sh-empty-ico">🪹</div><p>${onlyIds || ownerId ? "你还没有上传过" : "这里还空空的"}</p><small>去「制作卡片」上传第一个吧</small></div>`;
         return;
       }
       grid.innerHTML = rows
         .map(
-          (r) => `<button type="button" class="sh-item${liked.has(r.id) || myTokens()[r.id] ? " is-liked" : ""}" data-id="${esc(r.id)}" style="position:relative">
+          (r) => `<button type="button" class="sh-item${liked.has(r.id) || isMine(r) ? " is-liked" : ""}" data-id="${esc(r.id)}" style="position:relative">
             <img src="${esc(publicUrl(r.thumb_path || r.file_path))}" alt="" loading="lazy" />
-            <span class="sh-badges" style="position:absolute;top:8px;right:8px;display:flex;gap:4px;pointer-events:none">${Array.isArray(r.extras) && r.extras.length ? `<span class="sh-badge" style="padding:2px 8px;border-radius:99px;background:rgba(0,0,0,.55);color:#fff;font-size:11px">📎 ${r.extras.length}</span>` : ""}${liked.has(r.id) || myTokens()[r.id] ? "" : `<span class="sh-badge sh-lock" style="padding:2px 7px;border-radius:99px;background:rgba(0,0,0,.55);color:#fff;font-size:11px">🔒</span>`}</span>
+            <span class="sh-badges" style="position:absolute;top:8px;right:8px;display:flex;gap:4px;pointer-events:none">${Array.isArray(r.extras) && r.extras.length ? `<span class="sh-badge" style="padding:2px 8px;border-radius:99px;background:rgba(0,0,0,.55);color:#fff;font-size:11px">📎 ${r.extras.length}</span>` : ""}${liked.has(r.id) || isMine(r) ? "" : `<span class="sh-badge sh-lock" style="padding:2px 7px;border-radius:99px;background:rgba(0,0,0,.55);color:#fff;font-size:11px">🔒</span>`}</span>
             <span class="sh-item-meta"><strong>${esc(r.title)}</strong><small>${KIND_META[r.kind]?.icon || ""}${r.category ? " " + esc(r.category) + " ·" : ""} ${esc(r.author)} · ⬇${r.downloads || 0} · ♥${r.likes || 0}</small></span>
           </button>`
         )
@@ -1107,13 +1116,16 @@
     }`;
   }
 
+  const isMine = (r) => !!myTokens()[r.id] || (!!r.owner_user && r.owner_user === acc()?.id);
   function openDetail(r, grid) {
-    const mine = !!myTokens()[r.id];
+    const mine = isMine(r);
+    const ownedByAcc = !!r.owner_user && r.owner_user === acc()?.id;
     const unlocked = () => mine || liked.has(r.id); // 自己上传的不用点赞
     const sh = F.openSheet(
       `<div class="sh-detail">
         <img src="${esc(publicUrl(r.file_path))}" alt="" />
-        <p class="fun-note">${KIND_META[r.kind]?.icon} ${KIND_META[r.kind]?.name}${r.category ? " · " + esc(r.category) : ""} · by ${esc(r.author)} · ${new Date(r.created_at).toLocaleDateString()} · ${(r.size / 1024).toFixed(0)}KB</p>
+        <div class="sh-author" style="display:flex;align-items:center;gap:8px;margin:8px 0 2px" data-owner="${esc(r.owner_user || "")}">${avHtmlS("", r.author, 30)}<b style="font-size:14px">${esc(r.author)}</b>${r.updated_at ? `<small style="color:var(--text-sub);font-size:11px">· 编辑于 ${new Date(r.updated_at).toLocaleDateString()}</small>` : ""}</div>
+        <p class="fun-note">${KIND_META[r.kind]?.icon} ${KIND_META[r.kind]?.name}${r.category ? " · " + esc(r.category) : ""} · ${new Date(r.created_at).toLocaleDateString()} · ${(r.size / 1024).toFixed(0)}KB</p>
         ${r.description ? `<p class="sh-desc">${esc(r.description)}</p>` : ""}
         ${extrasHtml(r, unlocked())}
         <div class="fun-sheet-actions">
@@ -1122,11 +1134,19 @@
           <button type="button" class="fun-btn solid${unlocked() ? "" : " is-locked"}" data-a="import">${unlocked() ? "" : "🔒 "}导入</button>
         </div>
         ${unlocked() ? "" : `<p class="fun-note sh-like-tip">先点个赞支持一下作者，才能下载和导入哦</p>`}
-        <div class="sh-detail-foot">${mine ? `<button type="button" class="sh-link" data-a="del">删除我的上传</button>` : `<button type="button" class="sh-link" data-a="report">举报</button>`}</div>
+        <div class="sh-detail-foot">${mine ? `<button type="button" class="sh-link" data-a="edit">编辑</button>　<button type="button" class="sh-link" data-a="del">删除我的上传</button>` : `<button type="button" class="sh-link" data-a="report">举报</button>`}</div>
       </div>`,
       { title: r.title }
     );
     sh.el.classList.add("fun-sheet--tall");
+    // 作者头像
+    if (r.owner_user) {
+      void loadProfiles([r.owner_user]).then(() => {
+        const pf = profCache.get(r.owner_user);
+        const box = sh.body.querySelector(".sh-author");
+        if (pf && box) box.innerHTML = `${avHtmlS(pf.avatar_path, pf.nick, 30)}<b style="font-size:14px">${esc(pf.nick)}</b>${pf.bio ? `<small style="color:var(--text-sub);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(pf.bio)}</small>` : ""}${r.updated_at ? `<small style="color:var(--text-sub);font-size:11px;flex:none">· 编辑于 ${new Date(r.updated_at).toLocaleDateString()}</small>` : ""}`;
+      });
+    }
     const fetchBlob = async () => {
       const res = await fetch(publicUrl(r.file_path));
       if (!res.ok) throw new Error("文件下载失败");
@@ -1210,9 +1230,34 @@
           await api("/rest/v1/rpc/mx_share_report", { method: "POST", json: { p_id: r.id } });
           toast("已举报，被多人举报后会自动隐藏");
         }
+        if (a === "edit") {
+          const me = acc();
+          if (!me) {
+            toast("先在「我的」里创建资源站账号，就能编辑了（会自动认领你在这台手机上传的东西）");
+            return;
+          }
+          if (!ownedByAcc) {
+            // 这台手机用凭证传的、还没归到账号下：先认领
+            const tok = myTokens()[r.id];
+            const ok = tok ? await rpcAcc("mx_share_claim", { p_share: r.id, p_token: tok, p_id: me.id, p_secret: me.secret }).catch(() => false) : false;
+            if (!ok) throw new Error("这个上传不在你的账号下");
+            r.owner_user = me.id;
+          }
+          sh.close();
+          editSheet(r, () => {
+            if (grid?.isConnected) {
+              if (tab === "mine") switchTab("mine");
+              else loadGrid(grid);
+            }
+          });
+          return;
+        }
         if (a === "del") {
           if (!(await confirmSheet("确定删除这个上传吗？"))) return;
-          const ok = await api("/rest/v1/rpc/mx_share_delete", { method: "POST", json: { p_id: r.id, p_token: myTokens()[r.id] } });
+          const me = acc();
+          const ok = ownedByAcc && me
+            ? await rpcAcc("mx_share_delete_user", { p_share: r.id, p_id: me.id, p_secret: me.secret })
+            : await api("/rest/v1/rpc/mx_share_delete", { method: "POST", json: { p_id: r.id, p_token: myTokens()[r.id] } });
           if (!ok) throw new Error("删除失败");
           toast("已删除");
           sh.close();
@@ -1315,7 +1360,7 @@
         <p class="fun-kicker">3 · 填写信息</p>
         <label class="fun-field"><span>标题</span><input id="sh-title" maxlength="40" value="${esc(defTitle)}" /></label>
         <label class="fun-field"><span>简介（选填）</span><textarea id="sh-desc" rows="2" maxlength="200" placeholder="风格、适用场景、注意事项…"></textarea></label>
-        <label class="fun-field"><span>作者署名</span><input id="sh-author" maxlength="20" value="${esc(localStorage.getItem("mx_share_author") || user.name)}" /></label>
+        ${acc() ? `<p class="fun-note">以资源站账号「${esc(acc().nick)}」发布，上传后可以在「我的」里反复编辑。</p><input id="sh-author" type="hidden" value="${esc(acc().nick)}" />` : `<label class="fun-field"><span>作者署名</span><input id="sh-author" maxlength="20" value="${esc(localStorage.getItem("mx_share_author") || user.name)}" /></label><p class="fun-note">建个资源站账号（「我的」里）就能用自己的头像昵称发布，还能随时编辑上传。</p>`}
         <p class="fun-kicker">4 · 选择分类</p>
         ${catChips(makeState.cat, "data-mcat", false, makeState.kind)}
         <p class="fun-kicker">5 · 附图 / 附件（可选）</p>
@@ -1624,20 +1669,411 @@
     }
   }
 
+  /* ═════════ 资源站个人账号：昵称 / 头像 / 上传跟着账号走 ═════════ */
+  const ACC_KEY = "mx_share_account";
+  const NEED_ACC_SQL = "站长需要先在 Supabase 里运行一次 share-account.sql，才能用资源站账号";
+  function acc() {
+    try {
+      const a = JSON.parse(localStorage.getItem(ACC_KEY) || "null");
+      return a && a.id && a.secret ? a : null;
+    } catch (_) {
+      return null;
+    }
+  }
+  function saveAcc(a) {
+    try {
+      if (a) localStorage.setItem(ACC_KEY, JSON.stringify(a));
+      else localStorage.removeItem(ACC_KEY);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  const rpc = (fn, args) => api(`/rest/v1/rpc/${fn}`, { method: "POST", json: args });
+  const missingFn = (err) => /could not find|PGRST202|does not exist|404/i.test(String(err && err.message));
+  async function rpcAcc(fn, args) {
+    try {
+      return await rpc(fn, args);
+    } catch (err) {
+      if (missingFn(err)) throw new Error(NEED_ACC_SQL);
+      throw err;
+    }
+  }
+  const loginCode = (a) => `MEOW-${a.id}-${a.secret}`;
+  function parseLoginCode(s) {
+    const t = String(s || "").trim();
+    const m = t.match(/MEOW-([A-Z0-9]{6,12})-([a-f0-9]{24,})/i) || t.match(/^([A-Z0-9]{6,12})\s+([a-f0-9]{24,})$/i);
+    return m ? { id: m[1].toUpperCase(), secret: m[2].toLowerCase() } : null;
+  }
+  const randSecret = () => {
+    const a = new Uint8Array(20);
+    crypto.getRandomValues(a);
+    return [...a].map((b) => b.toString(16).padStart(2, "0")).join("");
+  };
+  const avatarUrl = (p) => (p ? publicUrl(p) : "");
+  const avHtmlS = (path, nick, size) =>
+    path
+      ? `<img src="${esc(avatarUrl(path))}" alt="" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex:none;margin:0"/>`
+      : `<span style="width:${size}px;height:${size}px;border-radius:50%;flex:none;display:grid;place-items:center;background:linear-gradient(135deg,#ffd6e4,#d9c8ff);color:#7a4f68;font-weight:700;font-size:${Math.round(size * 0.42)}px">${esc(String(nick || "?").slice(0, 1))}</span>`;
+  async function uploadAvatar(file) {
+    const url = URL.createObjectURL(file);
+    const img = await loadImg(url);
+    URL.revokeObjectURL(url);
+    if (!img) throw new Error("这张图片打不开");
+    const S = 256;
+    const c = document.createElement("canvas");
+    c.width = c.height = S;
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    const m = Math.min(w, h);
+    c.getContext("2d").drawImage(img, (w - m) / 2, (h - m) / 2, m, m, 0, 0, S, S);
+    const blob = await new Promise((res) => c.toBlob((b) => res(b), "image/jpeg", 0.86));
+    const path = `avatar/${Date.now()}-${uid()}.jpg`;
+    try {
+      await api(`/storage/v1/object/${BUCKET}/${path}`, { method: "POST", body: blob, headers: { "Content-Type": "image/jpeg", "x-upsert": "false" } });
+    } catch (err) {
+      if (/policy|row-level|403|unauthorized/i.test(err.message)) throw new Error(NEED_ACC_SQL);
+      throw err;
+    }
+    return path;
+  }
+  /** 这台手机上用凭证传过的帖子，认领到账号下 */
+  async function claimLocal(a) {
+    const toks = myTokens();
+    let n = 0;
+    for (const [id, tok] of Object.entries(toks)) {
+      if (!/^[0-9a-f-]{36}$/i.test(id)) continue;
+      try {
+        if (await rpc("mx_share_claim", { p_share: id, p_token: tok, p_id: a.id, p_secret: a.secret })) n++;
+      } catch (_) {
+        /* 已经认领过 / 不是自己的 */
+      }
+    }
+    return n;
+  }
+  /** 头像 / 昵称缓存（广场和详情里显示作者头像用） */
+  const profCache = new Map();
+  async function loadProfiles(ids) {
+    const need = [...new Set(ids.filter((x) => x && !profCache.has(x)))];
+    if (!need.length) return;
+    try {
+      const rows = await api(`/rest/v1/mx_share_users?select=id,nick,avatar_path,bio&id=in.(${need.map(encodeURIComponent).join(",")})`);
+      for (const r of rows || []) profCache.set(r.id, r);
+    } catch (_) {
+      /* 没开账号功能 */
+    }
+    for (const id of need) if (!profCache.has(id)) profCache.set(id, null);
+  }
+
+  /** 创建账号 / 登录 / 编辑资料 */
+  function accountSheet(mode, done) {
+    const a = acc();
+    const editing = mode === "edit" && a;
+    let avatarFile = null;
+    const sh = F.openSheet(
+      mode === "login"
+        ? `<div class="sh-acc">
+            <p class="fun-note">在原来的手机上打开「资源站 → 我的 → 登录码」复制，粘贴到这里。也可以直接用 Meow 的备份恢复，账号会一起回来。</p>
+            <label class="fun-field"><span>登录码</span><textarea id="sha-code" rows="3" placeholder="MEOW-XXXXXXXX-……"></textarea></label>
+            <button type="button" class="fun-btn solid wide" data-x="login">登录</button>
+          </div>`
+        : `<div class="sh-acc" style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;gap:14px">
+              <button type="button" data-x="av" style="border:0;background:none;padding:0;position:relative" aria-label="换头像"><span id="sha-av">${avHtmlS(editing ? a.avatar_path : "", editing ? a.nick : "?", 72)}</span><small style="position:absolute;right:-4px;bottom:-2px;background:var(--bg-card);border:1px solid var(--line);border-radius:99px;padding:1px 6px;font-size:11px">换</small></button>
+              <p class="fun-note" style="margin:0">点头像可以换一张，会自动裁成圆形。</p>
+            </div>
+            <input type="file" id="sha-file" accept="image/*" hidden />
+            <label class="fun-field"><span>昵称</span><input id="sha-nick" maxlength="20" value="${esc(editing ? a.nick : localStorage.getItem("mx_share_author") || "")}" placeholder="在资源站显示的名字" /></label>
+            <label class="fun-field"><span>一句话简介（可不填）</span><input id="sha-bio" maxlength="80" value="${esc(editing ? a.bio || "" : "")}" placeholder="比如：做美化的小猫" /></label>
+            <button type="button" class="fun-btn solid wide" data-x="save">${editing ? "保存" : "创建账号"}</button>
+            ${editing ? "" : `<p class="fun-note">创建后你在这台手机上传过的东西会自动归到账号下。账号存在 Meow 的备份里，换手机用备份或「登录码」就能找回。</p>`}
+          </div>`,
+      { title: mode === "login" ? "登录资源站账号" : editing ? "编辑资料" : "创建资源站账号" }
+    );
+    const fileInp = sh.body.querySelector("#sha-file");
+    fileInp?.addEventListener("change", () => {
+      const f = fileInp.files[0];
+      if (!f) return;
+      avatarFile = f;
+      const u = URL.createObjectURL(f);
+      sh.body.querySelector("#sha-av").innerHTML = `<img src="${u}" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin:0"/>`;
+    });
+    sh.body.addEventListener("click", async (e) => {
+      const x = e.target.closest("[data-x]")?.dataset.x;
+      if (!x) return;
+      if (x === "av") return fileInp.click();
+      const btn = e.target.closest("button");
+      btn.disabled = true;
+      const old = btn.textContent;
+      btn.textContent = "请稍等…";
+      try {
+        if (x === "login") {
+          const c = parseLoginCode(sh.body.querySelector("#sha-code").value);
+          if (!c) throw new Error("登录码格式不对");
+          const prof = await rpcAcc("mx_su_login", { p_id: c.id, p_secret: c.secret });
+          if (!prof || !prof.id) throw new Error("登录码不对，或者账号不存在");
+          const na = { id: prof.id, secret: c.secret, nick: prof.nick, avatar_path: prof.avatar_path || "", bio: prof.bio || "" };
+          saveAcc(na);
+          const n = await claimLocal(na);
+          sh.close();
+          toast(`欢迎回来，${na.nick}${n ? `（又认领了 ${n} 个上传）` : ""}`);
+          done?.();
+          return;
+        }
+        const nick = sh.body.querySelector("#sha-nick").value.trim();
+        const bio = sh.body.querySelector("#sha-bio").value.trim();
+        if (!nick) throw new Error("起个昵称吧");
+        const avatarPath = avatarFile ? await uploadAvatar(avatarFile) : null;
+        if (editing) {
+          const ok = await rpcAcc("mx_su_update", { p_id: a.id, p_secret: a.secret, p_nick: nick, p_avatar: avatarPath, p_bio: bio });
+          if (!ok) throw new Error("保存失败：账号验证没通过");
+          saveAcc({ ...a, nick, bio, avatar_path: avatarPath == null ? a.avatar_path : avatarPath });
+          profCache.delete(a.id);
+          sh.close();
+          toast("资料已更新，你发过的帖子署名也一起改了");
+        } else {
+          const secret = randSecret();
+          const id = await rpcAcc("mx_su_register", { p_secret: secret, p_nick: nick, p_avatar: avatarPath || "" });
+          if (!id) throw new Error("创建失败");
+          const na = { id: String(id), secret, nick, bio, avatar_path: avatarPath || "" };
+          if (bio) await rpc("mx_su_update", { p_id: na.id, p_secret: secret, p_nick: nick, p_avatar: null, p_bio: bio }).catch(() => {});
+          saveAcc(na);
+          localStorage.setItem("mx_share_author", nick);
+          const n = await claimLocal(na);
+          sh.close();
+          toast(`账号建好啦${n ? `，已把之前的 ${n} 个上传归到你名下` : ""}`);
+        }
+        done?.();
+      } catch (err) {
+        toast(err.message);
+        btn.disabled = false;
+        btn.textContent = old;
+      }
+    });
+  }
+
+  /** 把一个本地文件变成附件（附图压缩；资源卡原样；其他文件原样） */
+  async function fileToAtt(f) {
+    if (f.size > 10 * 1024 * 1024) {
+      toast(`「${f.name}」超过 10MB 了`);
+      return null;
+    }
+    const isImg = /^image\//.test(f.type) || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
+    if (!isImg) return { type: "file", name: f.name, blob: f, url: "" };
+    if (/png/i.test(f.type) || /\.png$/i.test(f.name)) {
+      let isCard = false;
+      try {
+        isCard = !!(await extractPayload(f));
+      } catch (_) {
+        isCard = false;
+      }
+      if (isCard) return { type: "card", name: f.name, blob: f, url: URL.createObjectURL(f) };
+    }
+    const small = await shrinkForShare(f);
+    if (!small) {
+      toast(`「${f.name}」打不开`);
+      return null;
+    }
+    return { type: "image", name: f.name, blob: small, url: URL.createObjectURL(small) };
+  }
+  async function uploadAtts(kind, list) {
+    const base = `${kind}/${Date.now()}-${uid()}`;
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      const a = list[i];
+      const ext = a.type === "image" ? (a.blob.type === "image/png" ? "png" : "jpg") : a.type === "card" ? "png" : (String(a.name).match(/\.([a-z0-9]{1,6})$/i)?.[1] || "bin").toLowerCase();
+      const ctype = a.type === "image" ? a.blob.type || "image/jpeg" : a.type === "card" ? "image/png" : "application/octet-stream";
+      const pth = `${base}-a${i + 1}.${ext}`;
+      try {
+        await api(`/storage/v1/object/${BUCKET}/${pth}`, { method: "POST", body: a.blob, headers: { "Content-Type": ctype, "x-upsert": "false" } });
+      } catch (err) {
+        if (/mime|type/i.test(err.message) && a.type === "file") throw new Error(NEED_ATTACH_SQL);
+        throw new Error(`附件「${a.name}」上传失败：${err.message}`);
+      }
+      out.push({ type: a.type, path: pth, name: String(a.name || "").slice(0, 80), size: a.blob.size });
+    }
+    return out;
+  }
+
+  /** 编辑自己的帖子：标题 / 简介 / 分类 / 附件 / 换主卡片，可以改很多次 */
+  function editSheet(r, onDone) {
+    const a = acc();
+    if (!a) {
+      toast("先在「我的」里创建资源站账号，就能编辑自己的上传了");
+      return;
+    }
+    let cat = r.category || "";
+    let keep = (Array.isArray(r.extras) ? r.extras : []).slice();
+    let adds = [];
+    let newCard = null;
+    const sh = F.openSheet(
+      `<div class="sh-edit" style="display:flex;flex-direction:column;gap:10px">
+        <label class="fun-field"><span>标题</span><input id="she-title" maxlength="40" value="${esc(r.title)}" /></label>
+        <label class="fun-field"><span>简介</span><textarea id="she-desc" rows="3" maxlength="200">${esc(r.description || "")}</textarea></label>
+        ${hasCat ? `<p class="fun-kicker">分类</p>${catChips(cat, "data-ecat", false, r.kind)}` : ""}
+        <p class="fun-kicker">附图 / 附件</p>
+        <div id="she-atts" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="fun-btn ghost sm" data-x="add">＋ 添加图片或文件</button><button type="button" class="fun-btn ghost sm" data-x="card">🔁 换主卡片</button></div>
+        <input type="file" id="she-file" multiple hidden accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.json,.css,.docx,.zip,.ttf,.otf,.woff,.woff2" />
+        <input type="file" id="she-card" hidden accept="image/png" />
+        <p class="fun-note" id="she-card-note">${esc(KIND_META[r.kind]?.name || "")}卡：不换就保留原来的。</p>
+        <button type="button" class="fun-btn solid wide" data-x="save">保存修改</button>
+      </div>`,
+      { title: "编辑上传" }
+    );
+    sh.el.classList.add("fun-sheet--tall");
+    const drawAtts = () => {
+      const chip = (label, thumb, key) =>
+        `<span style="position:relative;display:inline-flex;align-items:center;gap:6px;max-width:160px;padding:4px 26px 4px 4px;border-radius:12px;border:1px solid var(--line);background:var(--bg-card);font-size:12px">${thumb}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span><button type="button" data-rm="${key}" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;color:inherit;opacity:.6">✕</button></span>`;
+      const th = (x, url) => (x.type === "file" ? `<span style="font-size:20px;padding:0 4px">📄</span>` : `<img src="${esc(url)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:8px;margin:0"/>`);
+      const box = sh.body.querySelector("#she-atts");
+      box.innerHTML =
+        keep.map((x, i) => chip(`${x.type === "card" ? "🎴 " : ""}${esc(x.name || "附件")}`, th(x, publicUrl(x.path)), "k" + i)).join("") +
+        adds.map((x, i) => chip(`<b style="color:#e0864a">新</b> ${esc(x.name)}`, th(x, x.url), "a" + i)).join("") ||
+        `<p class="fun-note" style="margin:0">还没有附件</p>`;
+    };
+    drawAtts();
+    const fi = sh.body.querySelector("#she-file");
+    const ci = sh.body.querySelector("#she-card");
+    fi.addEventListener("change", async () => {
+      for (const f of [...fi.files]) {
+        if (keep.length + adds.length >= 12) {
+          toast("一个帖子最多 12 个附件");
+          break;
+        }
+        const x = await fileToAtt(f);
+        if (x) adds.push(x);
+      }
+      fi.value = "";
+      drawAtts();
+    });
+    ci.addEventListener("change", async () => {
+      const f = ci.files[0];
+      ci.value = "";
+      if (!f) return;
+      const pl = await extractPayload(f).catch(() => null);
+      if (!pl) return toast("这不是 Meow 资源卡");
+      if (pl.kind !== r.kind) return toast(`要换成同类型的卡（${KIND_META[r.kind]?.name}）`);
+      newCard = f;
+      sh.body.querySelector("#she-card-note").textContent = `新主卡片：${f.name}（保存后生效）`;
+    });
+    sh.body.addEventListener("click", async (e) => {
+      const ec = e.target.closest("[data-ecat]");
+      if (ec) {
+        cat = ec.dataset.ecat;
+        sh.body.querySelectorAll("[data-ecat]").forEach((b) => b.classList.toggle("is-on", b === ec));
+        return;
+      }
+      const rm = e.target.closest("[data-rm]");
+      if (rm) {
+        const k = rm.dataset.rm;
+        if (k[0] === "k") keep.splice(Number(k.slice(1)), 1);
+        else adds.splice(Number(k.slice(1)), 1);
+        return drawAtts();
+      }
+      const x = e.target.closest("[data-x]")?.dataset.x;
+      if (x === "add") return fi.click();
+      if (x === "card") return ci.click();
+      if (x !== "save") return;
+      const title = sh.body.querySelector("#she-title").value.trim();
+      if (!title) return toast("标题不能空");
+      const btn = e.target.closest("button");
+      btn.disabled = true;
+      btn.textContent = "保存中…";
+      try {
+        const newEx = adds.length ? await uploadAtts(r.kind, adds) : [];
+        let filePath = "";
+        let thumbPath = "";
+        if (newCard) {
+          const base = `${r.kind}/${Date.now()}-${uid()}`;
+          filePath = base + ".png";
+          await api(`/storage/v1/object/${BUCKET}/${filePath}`, { method: "POST", body: newCard, headers: { "Content-Type": "image/png", "x-upsert": "false" } });
+          const t = await makeThumb(newCard).catch(() => null);
+          if (t) {
+            await api(`/storage/v1/object/${BUCKET}/${base}.jpg`, { method: "POST", body: t, headers: { "Content-Type": "image/jpeg", "x-upsert": "false" } }).catch(() => {});
+            thumbPath = base + ".jpg";
+          }
+        }
+        const extras = keep.concat(newEx);
+        const ok = await rpcAcc("mx_share_edit", {
+          p_share: r.id,
+          p_id: a.id,
+          p_secret: a.secret,
+          p_title: title,
+          p_desc: sh.body.querySelector("#she-desc").value.trim(),
+          p_category: cat,
+          p_extras: extras,
+          p_file_path: filePath,
+          p_thumb_path: thumbPath,
+          p_size: newCard ? newCard.size : null
+        });
+        if (!ok) throw new Error("保存失败：这个帖子不在你的账号下");
+        Object.assign(r, { title, description: sh.body.querySelector("#she-desc").value.trim(), category: cat, extras, ...(filePath ? { file_path: filePath, thumb_path: thumbPath || r.thumb_path, size: newCard.size } : {}) });
+        sh.close();
+        toast("改好啦");
+        onDone?.();
+      } catch (err) {
+        toast(err.message);
+        btn.disabled = false;
+        btn.textContent = "保存修改";
+      }
+    });
+  }
+
   function renderMine(p) {
     if (!cfg()) {
       p.innerHTML = noCloudHtml();
       return;
     }
-    const ids = Object.keys(myTokens()).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
-    p.innerHTML = `<p class="fun-note">只记录在这台设备上传的；换设备或清缓存后就不能删除了。</p><div class="sh-grid" id="sh-grid"></div>`;
+    const a = acc();
+    const tokIds = Object.keys(myTokens()).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+    p.innerHTML = `${
+      a
+        ? `<div class="sh-me" style="display:flex;align-items:center;gap:14px;padding:14px;border-radius:18px;border:1px solid var(--line);background:var(--bg-card);margin-bottom:12px">
+            ${avHtmlS(a.avatar_path, a.nick, 58)}
+            <div style="flex:1;min-width:0"><b style="font-size:1.05rem">${esc(a.nick)}</b><small style="display:block;color:var(--text-sub);font-size:12px">资源站 ID：${esc(a.id)}</small>${a.bio ? `<small style="display:block;font-size:12px;margin-top:2px">${esc(a.bio)}</small>` : ""}</div>
+          </div>
+          <div class="sh-chips" style="margin-bottom:10px"><button type="button" class="fun-chip-btn" data-me="edit">✏️ 编辑资料</button><button type="button" class="fun-chip-btn" data-me="code">🔑 登录码</button><button type="button" class="fun-chip-btn" data-me="out">退出登录</button></div>`
+        : `<div class="sh-me" style="padding:16px;border-radius:18px;border:1px solid var(--line);background:var(--bg-card);margin-bottom:12px;text-align:center">
+            <div style="font-size:34px">🐾</div><b>还没有资源站账号</b>
+            <p class="fun-note">建个账号：自己起昵称、换头像，上传的东西跟着账号走，上传后还能反复编辑。</p>
+            <div style="display:flex;gap:8px;justify-content:center"><button type="button" class="fun-btn solid" data-me="new">创建账号</button><button type="button" class="fun-btn ghost" data-me="login">已有账号，登录</button></div>
+          </div>`
+    }<p class="fun-kicker">我的上传</p><div class="sh-grid" id="sh-grid"></div>`;
     const grid = p.querySelector("#sh-grid");
-    if (!ids.length) {
+    p.querySelectorAll("[data-me]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          const m = b.dataset.me;
+          const again = () => renderMine(p);
+          if (m === "new") accountSheet("new", again);
+          if (m === "login") accountSheet("login", again);
+          if (m === "edit") accountSheet("edit", again);
+          if (m === "code") {
+            const code = loginCode(acc());
+            const sh = F.openSheet(
+              `<p class="fun-note">换手机时在「资源站 → 我的 → 已有账号，登录」里粘贴这串登录码。<b>它就是你的账号密码，别发给别人。</b>（Meow 的备份里也会带上账号）</p><textarea readonly rows="3" style="width:100%;font-family:monospace;font-size:12px">${esc(code)}</textarea><div class="fun-sheet-actions"><button type="button" class="fun-btn solid" data-c="1">复制</button></div>`,
+              { title: "登录码" }
+            );
+            sh.body.querySelector("[data-c]").onclick = () => {
+              navigator.clipboard?.writeText(code).then(() => toast("已复制"), () => toast("复制失败，长按上面的文字复制吧"));
+            };
+          }
+          if (m === "out") {
+            void confirmSheet("退出后这台手机就不能编辑账号下的上传了，记得先保存好「登录码」。确定退出？").then((ok) => {
+              if (!ok) return;
+              saveAcc(null);
+              again();
+            });
+          }
+        })
+    );
+    if (!a && !tokIds.length) {
       grid.innerHTML = `<div class="sh-empty"><div class="sh-empty-ico">📦</div><p>你还没有上传过</p></div>`;
       return;
     }
-    loadGrid(grid, ids);
+    loadGrid(grid, tokIds, a ? a.id : "");
   }
+
 
   F.register("资源站", {
     title: "资源站",
