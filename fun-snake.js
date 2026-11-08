@@ -88,7 +88,7 @@
       const x = Math.floor(Math.random() * N);
       const y = Math.floor(Math.random() * N);
       if (!occ.has(key(x, y))) {
-        g.food.push({ x, y, e: kind.e, v: kind.v, gold: !!kind.gold, ttl: kind.gold ? 28 : 0 });
+        g.food.push({ x, y, e: kind.e, v: kind.v, gold: !!kind.gold, ttl: kind.gold ? 20 : 0 });
         return;
       }
     }
@@ -191,7 +191,7 @@
     draw();
     schedule();
   }
-  const SPEED = 165;
+  const SPEED = 260;
   function schedule() {
     clearTimeout(timer);
     if (G && !G.over && !G.paused) timer = setTimeout(step, SPEED);
