@@ -8136,3 +8136,7 @@ img.cp-pet-img.is-sleepy { filter: brightness(0.85) saturate(0.8); }
 .net-back { border: 0; background: transparent; color: var(--text-main); font-size: 1.8rem; line-height: 1; padding: 0 6px 0 0; cursor: pointer; }
 .net-mem.is-off { opacity: 0.4; }
 .net-join input#net-addid { letter-spacing: 0.15em; }
+.net-stbox { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.net-st.error::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #e5484d; margin-right: 5px; vertical-align: 1px; }
+.net-diag p { margin: 0 0 8px; font-size: 0.86rem; line-height: 1.55; }
+.net-diag p.bad { color: #d23c3c; }

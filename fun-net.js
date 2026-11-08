@@ -127,7 +127,10 @@
       this.ws = ws;
       ws.onopen = () => {
         this.tries = 0;
-        this.setStatus("online");
+        this.lastOpen = Date.now();
+        this.joinErr = "";
+        // 真正能收发要等自己的收件频道加入成功，这里先算「连接中」
+        this.setStatus(this.topics.has(inboxName(S.mid)) ? "connecting" : "online");
         for (const t of this.topics.values()) this.rawJoin(t);
         clearInterval(this.hb);
         this.hb = setInterval(() => this.raw({ topic: "phoenix", event: "heartbeat", payload: {}, ref: String(++this.ref) }), 25000);
@@ -142,7 +145,18 @@
         const t = this.topics.get(String(m.topic || "").replace(/^realtime:/, ""));
         if (!t) return;
         if (m.event === "phx_reply" && m.ref === t.joinRef) {
+          if (m.payload?.status !== "ok") {
+            const why = String(m.payload?.response?.reason || m.payload?.response?.message || JSON.stringify(m.payload?.response || {}) || "加入失败");
+            t.err = why;
+            if (t.name === inboxName(S.mid)) {
+              this.joinErr = why;
+              this.setStatus("error");
+            }
+            return;
+          }
           if (m.payload?.status === "ok") {
+            t.err = "";
+            if (t.name === inboxName(S.mid)) this.setStatus("online");
             t.joined = true;
             if (t.meta) this.track(t.name, t.meta);
             t.queue.splice(0).forEach(([e, p]) => this.send(t.name, e, p));
@@ -171,7 +185,8 @@
           setTimeout(() => this.topics.has(t.name) && this.ws?.readyState === 1 && this.rawJoin(t), 2000);
         }
       };
-      ws.onclose = () => {
+      ws.onclose = (ev) => {
+        this.lastClose = { code: ev?.code || 0, reason: String(ev?.reason || ""), at: Date.now() };
         clearInterval(this.hb);
         for (const t of this.topics.values()) {
           t.joined = false;
@@ -186,7 +201,17 @@
     retry() {
       this.setStatus("reconnecting");
       const wait = Math.min(20000, 800 * 2 ** this.tries++);
-      setTimeout(() => this.connect(), wait);
+      clearTimeout(this.rt);
+      this.rt = setTimeout(() => this.connect(), wait);
+    },
+    /** 切回前台 / 网络恢复：别等退避，马上重连 */
+    kick() {
+      if (!this.started) return;
+      const st = this.ws ? this.ws.readyState : 3;
+      if (st === 0 || st === 1) return;
+      clearTimeout(this.rt);
+      this.tries = 0;
+      this.connect();
     },
     setStatus(s) {
       this.status = s;
@@ -245,6 +270,10 @@
       return this.topics.get(name)?.pres || new Map();
     }
   };
+
+  document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && Hub.kick());
+  window.addEventListener("online", () => Hub.kick());
+  window.addEventListener("pageshow", () => Hub.kick());
 
   const inboxName = (mid) => "meow-u-" + mid;
   const groupName = (gid) => "meow-g-" + gid;
@@ -787,7 +816,7 @@
     const now = new Date();
     return d.toDateString() === now.toDateString() ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : `${d.getMonth() + 1}/${d.getDate()}`;
   };
-  const stText = () => ({ online: "在线", connecting: "连接中…", reconnecting: "重新连接中…", nocfg: "没配置资源站" })[Hub.status] || "";
+  const stText = () => ({ online: "在线", connecting: "连接中…", reconnecting: "重新连接中…", error: "连接被拒绝", nocfg: "没配置资源站" })[Hub.status] || "";
 
   function render() {
     if (!root) return;
@@ -855,7 +884,7 @@
         }`;
     }
     root.innerHTML = `<div class="net-home">
-      <div class="net-me">${F.avHtml({ name: me().name, avatar: me().av }, "fun-av")}<div><b>${esc(me().name)} <button type="button" class="net-mini" data-a="nick">改名</button></b><small>Meow 号 <code>${esc(S.mid)}</code> <button type="button" class="net-mini" data-a="copyid">复制</button></small></div><span class="net-st ${Hub.status}" data-st>${stText()}</span></div>
+      <div class="net-me">${F.avHtml({ name: me().name, avatar: me().av }, "fun-av")}<div><b>${esc(me().name)} <button type="button" class="net-mini" data-a="nick">改名</button></b><small>Meow 号 <code>${esc(S.mid)}</code> <button type="button" class="net-mini" data-a="copyid">复制</button></small></div><span class="net-stbox"><span class="net-st ${Hub.status}" data-st>${stText()}</span><button type="button" class="net-mini" data-a="diag">检测</button></span></div>
       <div class="net-tabs"><button type="button" data-tab="msgs" class="${V.tab === "msgs" ? "is-on" : ""}">消息${unread ? `<u>${unread > 99 ? "99+" : unread}</u>` : ""}</button><button type="button" data-tab="friends" class="${V.tab === "friends" ? "is-on" : ""}">好友${S.reqIn.length ? `<u>${S.reqIn.length}</u>` : ""}</button></div>
       <div class="net-pane">${body}</div>
       <p class="fun-note">通知类消息（好友申请、拉群）对方不在线时会先存在你手机上，等 TA 打开 Meow 自动送达。聊天记录只存在各自的手机里，不经过服务器保存；有人离线漏掉的消息，等大家同时在线时会自动补齐。角色说话用的是 TA 主人自己的 AI。</p>
@@ -1166,6 +1195,92 @@
     });
   }
 
+  /** 连接检测：一步步看卡在哪 */
+  async function diagnose() {
+    const sh = F.openSheet(`<div class="net-diag" id="net-diag"><p>检测中…</p></div>`, { title: "联机连接检测" });
+    const box = sh.body.querySelector("#net-diag");
+    const lines = [];
+    const put = (ok, t) => {
+      lines.push(`<p class="${ok === true ? "ok" : ok === false ? "bad" : ""}">${ok === true ? "✅" : ok === false ? "❌" : "…"} ${t}</p>`);
+      box.innerHTML = lines.join("");
+    };
+    const url = rtUrl();
+    if (!url) return put(false, "没有资源站（Supabase）配置，联机用不了");
+    put(true, "资源站配置已读到");
+    put(null, `当前状态：${stText() || Hub.status}${Hub.lastClose ? `（上次断开代码 ${Hub.lastClose.code}${Hub.lastClose.reason ? "：" + esc(Hub.lastClose.reason) : ""}）` : ""}`);
+    // 1) https 能不能到 Supabase
+    const base = String(window.MX_SHARE_CONFIG.url).replace(/\/+$/, "");
+    const t0 = Date.now();
+    let httpsOk = false;
+    try {
+      const ctl = new AbortController();
+      const tm = setTimeout(() => ctl.abort(), 8000);
+      await fetch(base + "/auth/v1/health", { headers: { apikey: window.MX_SHARE_CONFIG.anonKey }, signal: ctl.signal });
+      clearTimeout(tm);
+      httpsOk = true;
+      put(true, `能访问 Supabase 服务器（${Date.now() - t0}ms）`);
+    } catch (e) {
+      put(false, "访问不到 Supabase 服务器：当前网络连不上 supabase.co（国内移动数据网络经常这样）");
+    }
+    // 2) WebSocket + 加入频道
+    const res = await new Promise((done) => {
+      let ws;
+      const tm = setTimeout(() => {
+        try {
+          ws.close();
+        } catch (_) {
+          /* ignore */
+        }
+        done({ step: "timeout" });
+      }, 10000);
+      try {
+        ws = new WebSocket(url);
+      } catch (e) {
+        clearTimeout(tm);
+        return done({ step: "ws", why: String(e?.message || e) });
+      }
+      ws.onopen = () => {
+        put(true, "实时连接（WebSocket）已打开");
+        ws.send(JSON.stringify({ topic: "realtime:meow-diag-" + S.mid, event: "phx_join", payload: { config: { broadcast: { self: true }, presence: { key: S.mid }, private: false } }, ref: "1", join_ref: "1" }));
+      };
+      ws.onmessage = (ev) => {
+        let m;
+        try {
+          m = JSON.parse(ev.data);
+        } catch (_) {
+          return;
+        }
+        if (m.event === "phx_reply" && m.ref === "1") {
+          clearTimeout(tm);
+          try {
+            ws.close();
+          } catch (_) {
+            /* ignore */
+          }
+          done(m.payload?.status === "ok" ? { step: "ok" } : { step: "join", why: JSON.stringify(m.payload?.response || {}) });
+        }
+      };
+      ws.onclose = (ev) => {
+        clearTimeout(tm);
+        done({ step: "closed", code: ev.code, why: ev.reason });
+      };
+    });
+    if (res.step === "ok") put(true, "频道加入成功，联机通道是好的");
+    else if (res.step === "join") put(false, `服务器拒绝加入频道：${esc(res.why)}。需要在 Supabase 后台 Realtime 设置里打开「允许公开频道」（关掉 Private only）。`);
+    else if (res.step === "timeout") put(false, "实时连接超时：网络能连但 WebSocket 一直连不上，换个网络（WiFi / 关掉或打开加速器）再试");
+    else put(false, `实时连接被断开（代码 ${res.code || "?"}${res.why ? "：" + esc(res.why) : ""}）${httpsOk ? "：网络能到服务器但 WebSocket 被拦了，换个网络试试" : ""}`);
+    if (res.step === "ok" && Hub.status !== "online") {
+      put(null, "检测通过，正在重新连接…");
+      try {
+        Hub.ws?.close();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    lines.push(`<p class="fun-note">加好友要两边都显示「在线」。一边在线、一边一直「重新连接中」，就是那一边的网络连不上 Supabase。</p>`);
+    box.innerHTML = lines.join("");
+  }
+
   function onClick(e) {
     const tab = e.target.closest("[data-tab]")?.dataset.tab;
     if (tab) {
@@ -1214,6 +1329,7 @@
       }
       return drawHome();
     }
+    if (a === "diag") return void diagnose();
     if (a === "addfriend") return addFriend(root.querySelector("#net-addid")?.value);
     if (a === "newgroup") return createGroup();
     if (a === "back") {
