@@ -8310,3 +8310,16 @@ body.dark .gh-net { background: linear-gradient(135deg, #24304a, #33284a); color
 .gh-net small { display: block; font-size: 0.72rem; opacity: .75; margin-top: 2px; line-height: 1.5; }
 .gh-net i { font-style: normal; font-size: 1.4rem; opacity: .5; }
 .net-charbar .fun-av { flex: none; width: 28px !important; height: 28px !important; }
+
+/* 我的 · 关于 Meow 弹窗 */
+.mx-about-pop { position: fixed; inset: 0; z-index: 10070; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; transition: opacity .25s; }
+.mx-about-pop.is-open { opacity: 1; }
+.mx-about-mask { position: absolute; inset: 0; background: rgba(30, 20, 15, .35); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.mx-about-card { position: relative; width: 100%; max-width: 380px; max-height: 86vh; overflow-y: auto; border-radius: 24px; background: var(--bg-card, #fff); color: var(--text-main, #222); box-shadow: 0 18px 50px rgba(0,0,0,.2); transform: translateY(14px); transition: transform .25s; }
+.mx-about-pop.is-open .mx-about-card { transform: none; }
+.mx-about-card .mx-about { padding: 22px 20px 12px !important; }
+.mx-about-card .settings-row { display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line, #eee); font-size: 0.86rem; }
+.mx-about-card .settings-row-r { color: var(--text-sub, #888); }
+.mx-about-x { position: absolute; right: 12px; top: 10px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: rgba(0,0,0,.05); color: inherit; font-size: 1.3rem; cursor: pointer; z-index: 1; }
+.mx-about-card .settings-row + .settings-row { border-top: 0; }
+.mx-about-card .settings-row { border-bottom: 0 !important; }

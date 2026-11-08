@@ -55548,11 +55548,21 @@ document.getElementById("xxji-import-file")?.addEventListener("change", async (e
   }
 });
 document.getElementById("my-open-about")?.addEventListener("click", () => {
-  // 打开设置并滚到「关于 Meow」
-  document.getElementById("my-open-settings")?.click();
-  setTimeout(() => {
-    document.getElementById("settings-about")?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, 450);
+  // 「我的 → 关于」：直接弹出关于 Meow
+  if (document.getElementById("mx-about-pop")) return;
+  const tpl = document.getElementById("mx-about-tpl");
+  const pop = document.createElement("div");
+  pop.id = "mx-about-pop";
+  pop.className = "mx-about-pop";
+  pop.innerHTML = `<div class="mx-about-mask"></div><div class="mx-about-card" role="dialog" aria-label="关于 Meow"><button type="button" class="mx-about-x" aria-label="关闭">×</button><div class="mx-about">${tpl ? tpl.innerHTML : ""}</div></div>`;
+  document.body.appendChild(pop);
+  requestAnimationFrame(() => pop.classList.add("is-open"));
+  const close = () => {
+    pop.classList.remove("is-open");
+    setTimeout(() => pop.remove(), 250);
+  };
+  pop.querySelector(".mx-about-mask").onclick = close;
+  pop.querySelector(".mx-about-x").onclick = close;
 });
 document.getElementById("my-wallet-topup")?.addEventListener("click", () => {
   const maskId = getActiveMaskIdForInbox();
