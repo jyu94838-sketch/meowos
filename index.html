@@ -2,12 +2,9 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <!-- 开屏小猫出来之前先盖一层黑底，避免闪一下浅色桌面 -->
-  <style>html.mx-boot,html.mx-boot body{background:#0b0b0e!important}html.mx-boot body::before{content:"";position:fixed;inset:0;z-index:10059;background:#0b0b0e;box-shadow:0 0 0 400px #0b0b0e}html.mx-boot #phone{visibility:hidden}</style>
-  <script>document.documentElement.classList.add("mx-boot");setTimeout(function(){document.documentElement.classList.remove("mx-boot")},30000);</script>
   <script src="oauth-bootstrap.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta name="theme-color" content="#0b0b0e">
+  <meta name="theme-color" content="#f0f1f3">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Meow">
@@ -101,8 +98,8 @@
       if (ok) navigator.serviceWorker.register("./sw.js", { scope: "./", updateViaCache: "none" }).catch(function () {});
     })();
   </script>
-  <link rel="icon" href="icons/icon-192.png?v=3" type="image/png" sizes="192x192">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=3">
+  <link rel="icon" href="icons/icon-192.png?v=4" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=4">
   <title>Meow</title>
   <!-- 首帧与浅色开屏同色，避免 style.css 加载前闪色 -->
   <style>
@@ -130,7 +127,7 @@
   <link rel="stylesheet" href="fun.css?v=45">
 </head>
 <body>
-  <div class="boot-splash" id="boot-splash" aria-live="polite" aria-busy="true" aria-label="Meow · 开屏画面，请稍后点击进入">
+  <div class="boot-splash" id="boot-splash" aria-live="polite" aria-busy="true" aria-label="Meow OS · 开屏画面，请稍后点击进入">
     <div class="boot-splash-bg" aria-hidden="true">
       <div class="boot-splash-orbit"></div>
       <div class="boot-splash-aurora-mount" aria-hidden="true">
@@ -198,7 +195,7 @@
     <div class="boot-splash-stage">
       <div class="boot-splash-title-shell">
         <span class="boot-splash-title-glare" aria-hidden="true"></span>
-        <h1 class="boot-splash-title">Meow</h1>
+        <h1 class="boot-splash-title">Meow OS</h1>
       </div>
       <p class="boot-splash-eyebrow">Desktop narrative</p>
       <div class="boot-splash-meta-row">
@@ -223,7 +220,12 @@
       <p class="boot-splash-hint" id="boot-splash-hint">正在准备桌面与数据…</p>
     </div>
   </div>
-  <script src="boot-cat.js?v=10"></script>
+  <script>
+    /* 设置里「隐藏状态栏」的开关，开屏前就生效 */
+    try {
+      if (localStorage.getItem("meowos_hide_status") === "1") document.documentElement.classList.add("mx-hide-status");
+    } catch (_) {}
+  </script>
   <script>
     /* 开屏时序（不等 app.js）；点击关闭由 db.js 内加载器接管 */
     (function () {
@@ -243,7 +245,7 @@
         window.__xxjBootSplashArmed = true;
         root.classList.add("boot-splash--ready");
         root.setAttribute("aria-busy", "false");
-        root.setAttribute("aria-label", "Meow · 点击按钮或画面任意处进入");
+        root.setAttribute("aria-label", "Meow OS · 点击按钮或画面任意处进入");
         var load = document.getElementById("boot-splash-load");
         if (load) {
           load.hidden = true;
