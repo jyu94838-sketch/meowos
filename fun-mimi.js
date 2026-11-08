@@ -142,31 +142,82 @@
     const a = readApi();
     const rows = window.XXJ_DB?.profilesList?.() || [];
     const sh = F.openSheet(
-      `<style>.mimi-api{display:flex;flex-direction:column;gap:10px;font-size:14px}.mimi-api label{display:flex;align-items:center;gap:8px}.mimi-api input[type=url],.mimi-api input[type=password],.mimi-api input[type=text],.mimi-api select{box-sizing:border-box;width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(127,127,127,.3);background:transparent;color:inherit;font:inherit;font-size:14px}</style><div class="mimi-api">
-        <label><input type="radio" name="mm-mode" value="main" ${a.mode === "main" ? "checked" : ""}/> 跟随「设置」里的主 API</label>
-        <label><input type="radio" name="mm-mode" value="profile" ${a.mode === "profile" ? "checked" : ""}/> 用已保存的 API 档</label>
-        <select id="mm-prof" ${rows.length ? "" : "disabled"}>${rows.length ? rows.map((r) => `<option value="${esc(r.id)}" ${r.id === a.profileId ? "selected" : ""}>${esc(r.name || r.model || r.baseUrl)}</option>`).join("") : `<option>还没有保存的 API 档</option>`}</select>
-        <label><input type="radio" name="mm-mode" value="custom" ${a.mode === "custom" ? "checked" : ""}/> 给弥弥单独接一个</label>
-        <input id="mm-base" type="url" placeholder="API 地址，例如 https://api.xxx.com/v1" value="${esc(a.baseUrl)}"/>
-        <input id="mm-key" type="password" placeholder="API Key" value="${esc(a.apiKey)}" autocomplete="off"/>
-        <input id="mm-model" type="text" placeholder="模型名，例如 gpt-4o-mini" value="${esc(a.model)}"/>
-        <p class="fun-note">弥弥要帮你改人设、世界书、美化，建议用聪明一点的模型。Key 只存在这台手机里。</p>
-        <div class="fun-sheet-actions"><button type="button" class="fun-btn ghost" data-x="test">测试一下</button><button type="button" class="fun-btn solid" data-x="ok">保存</button></div>
+      `<div class="settings-panel settings-panel-api settings-panel--shine mimi-api" style="margin:0">
+        <p class="settings-ai-blurb">弥弥要帮你改人设、世界书、美化，建议接一个聪明一点的模型。OpenAI 兼容接口，Key 只存在这台手机里。</p>
+        <div class="settings-api-field">
+          <label class="settings-api-field-k" for="mm-mode">接法</label>
+          <select id="mm-mode" class="settings-ai-select">
+            <option value="main" ${a.mode === "main" ? "selected" : ""}>跟随「设置」里的主 API</option>
+            <option value="profile" ${a.mode === "profile" ? "selected" : ""}>用已保存的配置档案</option>
+            <option value="custom" ${a.mode === "custom" ? "selected" : ""}>给弥弥单独接一个</option>
+          </select>
+        </div>
+        <div class="settings-api-field" data-for="profile">
+          <label class="settings-api-field-k" for="mm-prof">配置档案</label>
+          <select id="mm-prof" class="settings-ai-select" ${rows.length ? "" : "disabled"}>${rows.length ? rows.map((r) => `<option value="${esc(r.id)}" ${r.id === a.profileId ? "selected" : ""}>${esc(r.name || r.model || r.baseUrl)}</option>`).join("") : `<option>还没有保存的配置档案</option>`}</select>
+          <p class="settings-ai-key-note">配置档案在「设置 → 连接 API」里保存。</p>
+        </div>
+        <div class="settings-api-field" data-for="custom">
+          <label class="settings-api-field-k" for="mm-base">API Base（含 /v1）</label>
+          <input id="mm-base" class="settings-api-input" type="url" placeholder="https://api.openai.com/v1" autocomplete="off" spellcheck="false" value="${esc(a.baseUrl)}"/>
+        </div>
+        <div class="settings-api-field" data-for="custom">
+          <label class="settings-api-field-k" for="mm-key">API Key</label>
+          <input id="mm-key" class="settings-api-input" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false" value="${esc(a.apiKey)}"/>
+        </div>
+        <div class="settings-api-field" data-for="custom">
+          <label class="settings-api-field-k" for="mm-model">模型 model</label>
+          <input id="mm-model" class="settings-api-input" type="text" list="mm-model-list" placeholder="gpt-4o-mini" autocomplete="off" spellcheck="false" value="${esc(a.model)}"/>
+          <datalist id="mm-model-list"></datalist>
+          <div class="settings-ai-model-tools"><button type="button" class="chip ghost chip-xs" data-x="models">拉取模型列表</button><span class="settings-ai-model-tools-k">GET /v1/models · 结果进联想</span></div>
+        </div>
+        <div class="settings-api-actions">
+          <button type="button" class="chip solid chip-xs" data-x="ok">保存配置</button>
+          <button type="button" class="chip ghost chip-xs" data-x="test">测试对话</button>
+        </div>
+        <p class="settings-api-line" id="mm-status">${resolveApi() ? "弥弥现在用的是单独的 API" : "弥弥现在跟随主 API"}</p>
       </div>`,
       { title: "给弥弥接 API" }
     );
+    const $ = (q) => sh.body.querySelector(q);
+    const sync = () => {
+      const m = $("#mm-mode").value;
+      sh.body.querySelectorAll("[data-for]").forEach((el) => (el.style.display = el.dataset.for === m ? "" : "none"));
+    };
+    sync();
+    $("#mm-mode").addEventListener("change", sync);
     const collect = () => ({
-      mode: sh.body.querySelector("[name=mm-mode]:checked")?.value || "main",
-      profileId: rows.length ? sh.body.querySelector("#mm-prof").value : "",
-      baseUrl: sh.body.querySelector("#mm-base").value.trim(),
-      apiKey: sh.body.querySelector("#mm-key").value.trim(),
-      model: sh.body.querySelector("#mm-model").value.trim()
+      mode: $("#mm-mode").value || "main",
+      profileId: rows.length ? $("#mm-prof").value : "",
+      baseUrl: $("#mm-base").value.trim(),
+      apiKey: $("#mm-key").value.trim(),
+      model: $("#mm-model").value.trim()
     });
+    const status = (t) => ($("#mm-status").textContent = t);
     sh.body.addEventListener("click", async (e) => {
-      const x = e.target.closest("[data-x]")?.dataset.x;
+      const btn = e.target.closest("[data-x]");
+      const x = btn?.dataset.x;
       if (!x) return;
       const v = collect();
-      if (v.mode === "custom" && (!v.baseUrl || !v.apiKey)) return toast("地址和 Key 都要填");
+      if (x === "models") {
+        if (!v.baseUrl || !v.apiKey) return toast("先填 API Base 和 Key");
+        status("正在拉取模型…");
+        try {
+          const base = v.baseUrl.replace(/\/+$/, "").replace(/\/chat\/completions$/, "");
+          const res = await fetch(base + "/models", { headers: { Authorization: "Bearer " + v.apiKey } });
+          const d = await res.json();
+          const ids = (d.data || d.models || []).map((m) => m.id || m.name).filter(Boolean);
+          if (!ids.length) throw new Error(d.error?.message || "没拉到模型");
+          $("#mm-model-list").innerHTML = ids.map((id) => `<option value="${esc(id)}"></option>`).join("");
+          if (!$("#mm-model").value) $("#mm-model").value = ids[0];
+          status(`拉到 ${ids.length} 个模型，点模型框可以选`);
+        } catch (err) {
+          status("拉取失败：" + err.message);
+        }
+        return;
+      }
+      if (v.mode === "custom" && (!v.baseUrl || !v.apiKey)) return toast("API Base 和 Key 都要填");
+      if (v.mode === "profile" && !rows.length) return toast("还没有保存的配置档案");
       const old = lsGet(API_LS);
       lsSet(API_LS, JSON.stringify(v));
       if (x === "ok") {
@@ -175,17 +226,16 @@
         drawHead();
         return;
       }
-      e.target.disabled = true;
-      e.target.textContent = "测试中…";
+      btn.disabled = true;
+      status("测试中…");
       try {
         const t = await mimiAi([{ role: "user", content: "回复两个字：在呢" }], 20);
-        toast("通了：" + t.slice(0, 20));
+        status("✅ 通了：" + t.slice(0, 30));
       } catch (err) {
-        toast("没通：" + err.message);
+        status("❌ 没通：" + err.message);
       } finally {
         lsSet(API_LS, old);
-        e.target.disabled = false;
-        e.target.textContent = "测试一下";
+        btn.disabled = false;
       }
     });
   }
@@ -285,6 +335,7 @@
 · type=css：{"type":"css","mode":"append 或 replace","css":"CSS 代码"}，用来改界面美化；append=加在之前的后面，replace=整个换掉；"mode":"clear" 是清掉弥弥写的美化。
 3. 改人设 / 世界书要在原来基础上改，保留用户原有设定，只动用户要求的部分；字段值写完整的新内容，不要只写“同上”“略”。
 4. JSON 必须合法（字符串里的换行写成 \\n），不要用代码块包。
+5. 用户可能会发图片或文件给你：截图就看图帮他找问题、说在哪里点；角色卡 / 设定文档 / 世界书 JSON 可以按内容帮他整理成角色（type=persona 加 "new":true）或世界书；想要某种风格的图可以参考图里的配色写美化 CSS。
 ${CSS_GUIDE}
 ${overview()}`;
   }
@@ -565,7 +616,17 @@ ${GUIDE.map(([k, v]) => `· ${k.split(" ")[0]}：${v}`).join("\n")}`;
   }
   async function save() {
     try {
-      await F.FunDB.set(KV, hist.slice(-60));
+      // 只给最近 20 条留原图，更早的图和长文件内容不存，省空间
+      const keep = hist.slice(-60);
+      const cut = keep.length - 20;
+      await F.FunDB.set(
+        KV,
+        keep.map((m, i) =>
+          i < cut && m.atts
+            ? { ...m, atts: m.atts.map((a) => (a.kind === "image" ? { kind: "image", url: "", name: a.name } : { ...a, text: String(a.text || "").slice(0, 2000) })) }
+            : m
+        )
+      );
     } catch (_) {
       /* ignore */
     }
@@ -577,7 +638,7 @@ ${GUIDE.map(([k, v]) => `· ${k.split(" ")[0]}：${v}`).join("\n")}`;
       if (OPEN[n] && !acts.includes(n)) acts.push(n);
       return "";
     });
-    return `<div class="mimi-msg${m.me ? " is-me" : ""}">${m.me ? "" : avHtml()}<div class="mimi-b"${m.changes && m.changes.length ? ' style="min-width:0;flex:1"' : ""}><p>${esc(text.trim()).replace(/\n/g, "<br>")}</p>${acts
+    return `<div class="mimi-msg${m.me ? " is-me" : ""}">${m.me ? "" : avHtml()}<div class="mimi-b"${m.changes && m.changes.length ? ' style="min-width:0;flex:1"' : ""}>${attHtml(m.atts)}<p>${esc(text.trim()).replace(/\n/g, "<br>")}</p>${acts
       .map((n) => `<button type="button" class="mimi-open" data-open="${esc(n)}">打开「${esc(n)}」 →</button>`)
       .join("")}${(m.changes || []).map((c, ci) => changeHtml(c, mi, ci)).join("")}</div></div>`;
   }
@@ -587,11 +648,164 @@ ${GUIDE.map(([k, v]) => `· ${k.split(" ")[0]}：${v}`).join("\n")}`;
     list.innerHTML = hist.map((m, i) => bubble(m, i)).join("") + (busy ? `<div class="mimi-msg">${avHtml()}<div class="mimi-b"><p class="mimi-typing">弥弥在想…</p></div></div>` : "");
     list.scrollTop = list.scrollHeight;
   }
+
+  /* ───── 给弥弥发图片 / 文件 ───── */
+  let pending = []; // [{ kind: "image", url, name } | { kind: "file", name, text, cut }]
+  const TEXT_EXT = /\.(txt|md|markdown|json|css|html?|csv|tsv|js|ts|yaml|yml|xml|ini|log|srt|lrc)$/i;
+  const MAX_TEXT = 60000;
+  function shrinkImage(file, max) {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(img.naturalWidth * k));
+        c.height = Math.max(1, Math.round(img.naturalHeight * k));
+        const ctx = c.getContext("2d");
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve("");
+      };
+      img.src = url;
+    });
+  }
+  /** PNG 角色卡 / 世界书卡：读出 tEXt 里的 chara / ccv3 / 其他文字块 */
+  async function pngText(file) {
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      const dv = new DataView(buf.buffer);
+      let p = 8;
+      const out = [];
+      while (p + 8 < buf.length) {
+        const len = dv.getUint32(p);
+        const type = String.fromCharCode(...buf.slice(p + 4, p + 8));
+        if (type === "tEXt" || type === "iTXt") {
+          const data = buf.slice(p + 8, p + 8 + len);
+          const z = data.indexOf(0);
+          const kw = new TextDecoder().decode(data.slice(0, z));
+          let rest = data.slice(z + 1);
+          if (type === "iTXt") {
+            // 压缩标志、压缩方法、语言、翻译关键词
+            rest = rest.slice(2);
+            for (let i = 0; i < 2; i++) rest = rest.slice(rest.indexOf(0) + 1);
+          }
+          let txt = new TextDecoder().decode(rest);
+          if (/^[A-Za-z0-9+/=\s]{40,}$/.test(txt)) {
+            try {
+              txt = new TextDecoder().decode(Uint8Array.from(atob(txt.replace(/\s+/g, "")), (ch) => ch.charCodeAt(0)));
+            } catch (_) {
+              /* 不是 base64 */
+            }
+          }
+          if (txt.trim().length > 20) out.push(`[${kw}]\n${txt}`);
+        }
+        if (type === "IEND") break;
+        p += 12 + len;
+      }
+      return out.join("\n\n");
+    } catch (_) {
+      return "";
+    }
+  }
+  async function addFiles(files) {
+    for (const f of [...(files || [])].slice(0, 6)) {
+      if (pending.length >= 6) {
+        toast("一次最多 6 个附件");
+        break;
+      }
+      const isImg = /^image\//.test(f.type) || /\.(png|jpe?g|gif|webp|heic|bmp)$/i.test(f.name);
+      if (isImg) {
+        const url = await shrinkImage(f, 1280);
+        if (!url) {
+          toast(`「${f.name}」打不开`);
+          continue;
+        }
+        pending.push({ kind: "image", url, name: f.name });
+        if (/\.png$/i.test(f.name) || f.type === "image/png") {
+          const t = await pngText(f);
+          if (t) pending.push({ kind: "file", name: f.name + "（卡片里的数据）", text: t.slice(0, MAX_TEXT), cut: t.length > MAX_TEXT });
+        }
+        continue;
+      }
+      if (f.size > 3 * 1024 * 1024 && !TEXT_EXT.test(f.name)) {
+        toast(`「${f.name}」太大了，弥弥只看得懂文字文件和图片`);
+        continue;
+      }
+      let text = "";
+      try {
+        text = await f.slice(0, MAX_TEXT * 4).text();
+      } catch (_) {
+        text = "";
+      }
+      // 看起来是二进制（大量乱码 / 0 字节）就不收
+      const bad = (text.slice(0, 2000).match(/[\u0000-\u0008�]/g) || []).length;
+      if (!text.trim() || bad > 20) {
+        toast(`「${f.name}」不是文字文件，弥弥看不懂`);
+        continue;
+      }
+      pending.push({ kind: "file", name: f.name, text: text.slice(0, MAX_TEXT), cut: text.length > MAX_TEXT });
+    }
+    drawPending();
+  }
+  function drawPending() {
+    const box = root?.querySelector(".mimi-pend");
+    if (!box) return;
+    box.hidden = !pending.length;
+    box.innerHTML = pending
+      .map(
+        (a, i) =>
+          `<span style="position:relative;display:inline-flex;align-items:center;gap:6px;max-width:170px;padding:4px 26px 4px 4px;border-radius:12px;border:1px solid var(--line);background:var(--bg-card);font-size:12px">${
+            a.kind === "image" ? `<img src="${a.url}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:8px"/>` : `<span style="font-size:22px;padding:0 2px 0 6px">📄</span>`
+          }<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name)}</span><button type="button" data-unpend="${i}" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;color:inherit;font-size:14px;opacity:.6">✕</button></span>`
+      )
+      .join("");
+  }
+  function attHtml(atts) {
+    if (!atts || !atts.length) return "";
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px">${atts
+      .map((a) =>
+        a.kind === "image" && !a.url
+          ? `<span style="display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:10px;background:rgba(127,127,127,.12);font-size:12px">🖼 ${esc(a.name || "图片")}</span>`
+          : a.kind === "image"
+          ? `<img src="${a.url}" alt="" data-zoom style="max-width:160px;max-height:160px;border-radius:10px;object-fit:cover;cursor:zoom-in"/>`
+          : `<span style="display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:10px;background:rgba(127,127,127,.12);font-size:12px">📄 ${esc(a.name)}${a.cut ? "（太长，只读了前面）" : ""}</span>`
+      )
+      .join("")}</div>`;
+  }
+  /** 组装发给模型的内容：最近两条带图的消息带原图，更早的只说「[图片]」 */
+  function contentFor(m, recentImg, isLast) {
+    const atts = m.atts || [];
+    if (!atts.length) return m.text;
+    const files = atts.filter((a) => a.kind === "file");
+    const imgs = atts.filter((a) => a.kind === "image");
+    let text = m.text || "";
+    for (const f of files) {
+      const body = isLast ? f.text : String(f.text || "").slice(0, 2000) + (f.text.length > 2000 ? "\n……（之前发过，这里省略）" : "");
+      text += `\n\n【用户发来的文件：${f.name}${f.cut ? "（太长，只截了前面一部分）" : ""}】\n${body}`;
+    }
+    if (!imgs.length) return text;
+    if (!recentImg) return text + `\n（之前发过 ${imgs.length} 张图片）`;
+    if (!imgs.some((a) => a.url)) return text + `\n（之前发过 ${imgs.length} 张图片）`;
+    return [{ type: "text", text: text || "看看这张图" }, ...imgs.filter((a) => a.url).map((a) => ({ type: "image_url", image_url: { url: a.url } }))];
+  }
+
   let busy = false;
   async function ask(q) {
     q = String(q || "").trim();
-    if (!q || busy) return;
-    hist.push({ me: true, text: q });
+    if (busy) return;
+    const atts = pending;
+    if (!q && !atts.length) return;
+    pending = [];
+    drawPending();
+    if (!q) q = atts.some((x) => x.kind === "image") ? "看看这个" : "帮我看看这个文件";
+    hist.push(atts.length ? { me: true, text: q, atts } : { me: true, text: q });
     busy = true;
     draw();
     let a = "";
@@ -600,7 +814,9 @@ ${GUIDE.map(([k, v]) => `· ${k.split(" ")[0]}：${v}`).join("\n")}`;
       try {
         const user = await F.loadUser();
         const msgs = [{ role: "system", content: sysPrompt(user) }];
-        for (const m of hist.slice(-12)) msgs.push({ role: m.me ? "user" : "assistant", content: m.text });
+        const recent = hist.slice(-12);
+        const imgIdx = recent.map((m, i) => (m.me && (m.atts || []).some((x) => x.kind === "image") ? i : -1)).filter((i) => i >= 0).slice(-2);
+        recent.forEach((m, i) => msgs.push({ role: m.me ? "user" : "assistant", content: m.me ? contentFor(m, imgIdx.includes(i), i === recent.length - 1) : m.text }));
         for (let round = 0; round < 4; round++) {
           a = await mimiAi(msgs, 3000);
           const reads = [...a.matchAll(/\[\[查看[:：]\s*(人设|我的人设|世界书|美化)(?:[:：]\s*([^\]]*?))?\s*\]\]/g)];
@@ -615,9 +831,11 @@ ${GUIDE.map(([k, v]) => `· ${k.split(" ")[0]}：${v}`).join("\n")}`;
         a = pc.text || (pc.changes.length ? "弥弥想好怎么改啦，看看下面，没问题就点「确认修改」喵~" : a);
         changes = pc.changes;
       } catch (err) {
-        a = offlineAnswer(q) + `\n（AI 暂时连不上：${err.message}）`;
+        a = atts.some((x) => x.kind === "image")
+          ? `弥弥没看成这张图喵…可能是现在用的模型不支持看图片，换一个能看图的模型试试（比如带 vision / 4o / gemini 的）。\n（${err.message}）`
+          : offlineAnswer(q) + `\n（AI 暂时连不上：${err.message}）`;
       }
-    } else a = offlineAnswer(q);
+    } else a = atts.length ? "要先接上 API，弥弥才能看图片和文件喵～点右上角「API」就能接。" : offlineAnswer(q);
     busy = false;
     if (!root) return;
     hist.push(changes.length ? { me: false, text: a, changes } : { me: false, text: a });
@@ -635,7 +853,8 @@ ${GUIDE.map(([k, v]) => `· ${k.split(" ")[0]}：${v}`).join("\n")}`;
       root.className = "mimi";
       root.innerHTML = `<div class="mimi-head"></div><div class="mimi-list"></div>
         <div class="mimi-quick">${QUICK.map((q) => `<button type="button" class="fun-chip-btn" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>
-        <form class="mimi-bar"><input type="text" placeholder="问问弥弥，比如：怎么换字体" enterkeyhint="send" /><button type="submit" class="fun-btn solid">发送</button></form>`;
+        <div class="mimi-pend" hidden style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 14px 0"></div>
+        <form class="mimi-bar"><button type="button" class="fun-btn ghost" data-attach title="发图片或文件" style="flex:none;padding:0 12px;font-size:18px">＋</button><input type="file" class="mimi-file" multiple accept="image/*,.txt,.md,.json,.css,.html,.htm,.csv,.js,.yaml,.yml,.xml,.srt,.lrc,.log" hidden /><input type="text" placeholder="问问弥弥，比如：怎么换字体" enterkeyhint="send" /><button type="submit" class="fun-btn solid">发送</button></form>`;
       body.appendChild(root);
       try {
         hist = (await F.FunDB.get(KV)) || [];
@@ -651,7 +870,11 @@ ${GUIDE.map(([k, v]) => `· ${k.split(" ")[0]}：${v}`).join("\n")}`;
         hist.push({ me: false, text: `${nm}好呀，我是弥弥，这台 Meow 的小管家喵~\n哪里不会用、找不到在哪，都可以问我；想打开哪个应用也可以直接跟我说。\n接上 API 以后，我还能帮你改角色人设、世界书和界面美化哦（每次都会先给你看，点确认才改）。` });
       }
       draw();
-      const inp = root.querySelector(".mimi-bar input");
+      const inp = root.querySelector(".mimi-bar input[type=text]");
+      const fileInp = root.querySelector(".mimi-file");
+      fileInp.addEventListener("change", () => {
+        void addFiles(fileInp.files).then(() => (fileInp.value = ""));
+      });
       root.querySelector(".mimi-bar").addEventListener("submit", (e) => {
         e.preventDefault();
         const v = inp.value;
@@ -659,6 +882,17 @@ ${GUIDE.map(([k, v]) => `· ${k.split(" ")[0]}：${v}`).join("\n")}`;
         void ask(v);
       });
       root.addEventListener("click", (e) => {
+        if (e.target.closest("[data-attach]")) return void fileInp.click();
+        const up = e.target.closest("[data-unpend]");
+        if (up) {
+          pending.splice(Number(up.dataset.unpend), 1);
+          return drawPending();
+        }
+        const zm = e.target.closest("img[data-zoom]");
+        if (zm) {
+          const sh = F.openSheet(`<img src="${zm.src}" alt="" style="width:100%;border-radius:12px"/>`, { title: "图片" });
+          return void sh;
+        }
         const chg = e.target.closest("[data-chg]");
         if (chg) return void onChangeClick(chg);
         if (e.target.closest("[data-api]")) return void apiSheet();
