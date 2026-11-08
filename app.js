@@ -13590,6 +13590,7 @@ function getBackupZipModuleDefs() {
         K.GLOBAL_THINKING_CHAIN_GROUP,
         K.GLOBAL_PROMPT_PACK,
         "ls:meowos_mimi_api",
+        "ls:meowos_diet_v1",
         // 资源站账号 / 上传凭证 / 点过的赞
         "ls:mx_share_account",
         "ls:mx_share_tokens",

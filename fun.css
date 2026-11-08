@@ -8464,3 +8464,86 @@ body.dark .ua-pill { background: #3a2a22; color: #f0b890; }
   border-radius: 12px !important;
   font-size: 22px;
 }
+
+/* ───── Pocket Town · 关系 / 镇民圈 / TA 的一天 ───── */
+.pt-tabs button { font-size: 0.8rem; }
+.pt-chance { background: color-mix(in srgb, #ffb347 12%, var(--bg-card)); }
+.pt-relnews { text-align: center; }
+.pt-rels { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.pt-rel { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px 4px 4px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 0.78rem; cursor: pointer; }
+.pt-rel em { font-style: normal; font-size: 0.7rem; color: var(--text-sub); background: color-mix(in srgb, var(--text-main) 7%, transparent); border-radius: 6px; padding: 1px 5px; }
+.pt-day { margin: 4px 0 8px; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.pt-day li { font-size: 0.82rem; line-height: 1.55; padding: 7px 10px; border-radius: 10px; background: color-mix(in srgb, var(--text-main) 4%, transparent); }
+.pt-day li b { display: block; font-size: 0.72rem; color: var(--text-sub); font-weight: 600; margin-bottom: 1px; }
+.pt-diary { margin: 6px 0; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, #f5d78e 18%, var(--bg-card)); border: 1px dashed color-mix(in srgb, #c9a24a 45%, transparent); }
+.pt-diary small { color: var(--text-sub); font-size: 0.72rem; }
+.pt-diary p { margin: 4px 0 0; font-size: 0.84rem; line-height: 1.7; white-space: pre-wrap; }
+.pt-diary-old { margin: 8px 0; font-size: 0.82rem; }
+.pt-diary-old summary { cursor: pointer; color: var(--text-sub); }
+.pt-circle-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 8px; font-size: 0.8rem; color: var(--text-sub); }
+.pt-post { display: flex; gap: 10px; padding: 12px 2px; border-bottom: 1px solid var(--line); }
+.pt-post-av { border: 0; background: none; padding: 0; cursor: pointer; flex-shrink: 0; align-self: flex-start; }
+.pt-post-main { flex: 1; min-width: 0; }
+.pt-post-main > b { font-size: 0.88rem; color: #5b6b9a; }
+.pt-post-main > small { margin-left: 6px; font-size: 0.7rem; color: var(--text-sub); }
+.pt-post-main > p { margin: 4px 0 6px; font-size: 0.88rem; line-height: 1.6; word-break: break-word; }
+.pt-post-meta { display: flex; align-items: center; gap: 10px; font-size: 0.72rem; color: var(--text-sub); }
+.pt-post-meta span { flex: 1; }
+.pt-post-meta button { border: 0; background: none; color: var(--text-sub); font: inherit; cursor: pointer; padding: 2px 0; }
+.pt-post-box { margin-top: 6px; padding: 7px 9px; border-radius: 8px; background: color-mix(in srgb, var(--text-main) 5%, transparent); font-size: 0.8rem; line-height: 1.55; }
+.pt-post-box p { margin: 0 0 3px; word-break: break-word; }
+.pt-post-box b { color: #5b6b9a; font-weight: 600; }
+.pt-post-likes { color: #5b6b9a; }
+.pt-post-input { display: flex; gap: 6px; margin-top: 6px; }
+.pt-post-input input { flex: 1; min-width: 0; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 0.82rem; }
+
+/* ───── 饮食 ───── */
+.dt-root { flex: 1; min-height: 0; overflow-y: auto; }
+.dt-panel { padding: 6px 16px 28px; }
+.dt-hero { display: flex; align-items: center; gap: 16px; padding: 12px 4px 10px; }
+.dt-ring { --p: 0deg; width: 112px; height: 112px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; background: conic-gradient(#5cc58a var(--p), color-mix(in srgb, var(--text-main) 8%, transparent) 0); }
+.dt-ring.is-over { background: conic-gradient(#ef7a5a 360deg, transparent 0); }
+.dt-ring > div { width: 88px; height: 88px; border-radius: 50%; background: var(--bg-card, #fff); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.dt-ring b { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.dt-ring small { font-size: 0.66rem; color: var(--text-sub); }
+.dt-hero-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dt-hero-txt strong { font-size: 1.4rem; }
+.dt-hero-txt small { font-size: 0.74rem; color: var(--text-sub); }
+.dt-note { font-size: 0.8rem; line-height: 1.6; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, #5cc58a 10%, transparent); margin: 4px 0 10px; }
+.dt-meal { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-bottom: 10px; background: var(--bg-card); }
+.dt-meal.is-done { border-color: color-mix(in srgb, #5cc58a 60%, transparent); background: color-mix(in srgb, #5cc58a 7%, var(--bg-card)); }
+.dt-meal.is-today { border-color: var(--text-main); }
+.dt-meal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.9rem; }
+.dt-meal-head small { color: var(--text-sub); font-size: 0.74rem; font-weight: 400; }
+.dt-check { border: 1px solid var(--line); background: none; color: var(--text-main); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 0.76rem; cursor: pointer; }
+.dt-meal.is-done .dt-check { background: #5cc58a; border-color: #5cc58a; color: #fff; }
+.dt-meal ul, .dt-extra { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.dt-meal li, .dt-extra li { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; }
+.dt-meal li span, .dt-extra li span { flex: 1; min-width: 0; }
+.dt-meal li small, .dt-extra li small { margin-left: 6px; color: var(--text-sub); font-size: 0.72rem; }
+.dt-meal li em, .dt-extra li em { font-style: normal; font-size: 0.78rem; color: var(--text-sub); font-variant-numeric: tabular-nums; }
+.dt-extra li button { border: 0; background: none; color: var(--text-sub); cursor: pointer; font-size: 0.8rem; }
+.dt-tip { margin: 8px 0 0; font-size: 0.74rem; color: var(--text-sub); line-height: 1.5; }
+.dt-tips { margin: 0; padding-left: 18px; font-size: 0.8rem; line-height: 1.7; }
+.dt-empty { text-align: center; color: var(--text-sub); font-size: 0.84rem; padding: 18px 0 6px; }
+.dt-row { display: flex; justify-content: center; margin: 10px 0 14px; }
+.dt-add { display: flex; gap: 6px; align-items: center; margin: 8px 0; }
+.dt-add input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 0.84rem; }
+.dt-add input[type="number"]:not(:only-of-type) { flex: 0 0 72px; }
+.dt-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+.dt-stats > div { border: 1px solid var(--line); border-radius: 14px; padding: 10px 6px; text-align: center; display: flex; flex-direction: column; gap: 2px; background: var(--bg-card); }
+.dt-stats small, .dt-stats em { font-size: 0.7rem; color: var(--text-sub); font-style: normal; }
+.dt-stats b { font-size: 1.15rem; }
+.dt-chart { width: 100%; height: auto; display: block; margin: 4px 0; }
+.dt-chart polyline { fill: none; stroke: #5cc58a; stroke-width: 2; stroke-linejoin: round; }
+.dt-chart circle { fill: #5cc58a; }
+.dt-chart .dt-goal { stroke: #ef7a5a; stroke-dasharray: 4 4; stroke-width: 1; }
+.dt-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; width: 100%; }
+.dt-modes button { border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); border-radius: 14px; padding: 12px 10px; font: inherit; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
+.dt-modes button small { font-size: 0.7rem; color: var(--text-sub); }
+.dt-modes button.is-on { border-color: var(--text-main); box-shadow: inset 0 0 0 1px var(--text-main); }
+.dt-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; width: 100%; }
+.dt-form [hidden] { display: none !important; }
+.dt-preview { text-align: center; line-height: 1.7; }
+.dt-form .fun-field, .dt-form .fun-field input, .dt-form .fun-field select { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.dt-form .fun-field input, .dt-form .fun-field select { width: 100%; }
