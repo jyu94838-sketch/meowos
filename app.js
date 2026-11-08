@@ -21419,7 +21419,14 @@ function normalizeMomentsCharPostBodyForPublish(raw) {
 }
 
 function parseMomentsCharPostResponse(raw) {
-  const blob = String(raw || "").trim();
+  let blob = String(raw || "").trim();
+  // 朋友圈：英文思维链段落一律去掉；只剩推理没有正文就不发
+  const isReason = window.RP_AI?.looksLikeReasoningPara;
+  if (typeof isReason === "function" && blob) {
+    const lines = blob.split(/\n/);
+    const kept = lines.filter((l) => !isReason(l));
+    if (kept.length !== lines.length) blob = kept.join("\n").trim();
+  }
   if (!blob) return emptyMomentsCharPostAiResult(true);
   if (/^\[IGNORE\]\s*$/i.test(blob)) {
     return emptyMomentsCharPostAiResult(true);

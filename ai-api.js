@@ -521,6 +521,47 @@
    * @param {Record<string, unknown>} body
    * @param {{ completionConfig?: { baseUrl?: string, apiKey?: string, model?: string, temperature?: number } }} [opts]
    */
+  /* ───── 思维链泄漏清理：有些中转 / 模型会把英文推理过程直接写进正文 ───── */
+  const CJK_RE = /[\u3400-\u9fff]/g;
+  const REASON_RE =
+    /\b(?:persona|character(?:'s)? (?:analysis|persona|voice)|the user|user's|the update|the goal|the post|the reply|the response|need to|i'll|i will|i need|i should|i'm going|let me|should be|focus(?:ing)? on|craft(?:ing)?|tone|instruction|context|analy[sz](?:is|e|ing)|consider(?:ing)?|draft(?:ing)?|output|respond|moments update|aesthetic|leaning into|aim(?:ing)? (?:to|for)|ensure|okay,? so|alright|first,? i|step \d)\b/i;
+  function looksLikeReasoningPara(line) {
+    const t = String(line || "").trim();
+    if (!t) return false;
+    if (/^(?:\*\*)?(?:thinking|thought|reasoning|analysis|思考过程|思维链)(?:\*\*)?\s*[:：]?\s*$/i.test(t)) return true;
+    const latin = (t.match(/[A-Za-z]/g) || []).length;
+    // 英文推理里常引用几句中文候选，引号里的中文不算
+    const bare = t.replace(/"[^"]*"|“[^”]*”|「[^」]*」/g, " ");
+    const cjk = (bare.match(CJK_RE) || []).length;
+    if (latin < 30 || latin < cjk * 3) return false;
+    return REASON_RE.test(t) || /^\*\*[A-Z][^*]{2,60}\*\*/.test(t);
+  }
+  /** 去掉 <think> 块和英文推理段落；去掉后还得剩下中文正文才生效（全英文角色扮演不受影响） */
+  function stripReasoningLeak(text) {
+    const src = String(text || "");
+    let s = src
+      .replace(/<(think|thinking|reasoning|thought)>[\s\S]*?<\/\1>/gi, "")
+      .replace(/^[\s\S]*?<\/(?:think|thinking|reasoning)>/i, "");
+    const paras = s.split(/\n/);
+    const kept = paras.filter((p) => !looksLikeReasoningPara(p));
+    if (kept.length !== paras.length) {
+      const joined = kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+      if ((joined.match(CJK_RE) || []).length >= 4) s = joined;
+    }
+    return s === src ? src : s.trim();
+  }
+  function cleanCompletionData(data) {
+    try {
+      const msg = data && data.choices && data.choices[0] && data.choices[0].message;
+      if (msg && typeof msg.content === "string") msg.content = stripReasoningLeak(msg.content);
+      const ch0 = data && data.choices && data.choices[0];
+      if (ch0 && typeof ch0.text === "string") ch0.text = stripReasoningLeak(ch0.text);
+    } catch (_) {
+      /* ignore */
+    }
+    return data;
+  }
+
   async function chatCompletions(body, opts) {
     const cfg =
       opts && opts.completionConfig && typeof opts.completionConfig === "object"
@@ -558,7 +599,7 @@
         err.__httpStatus = res.status;
         throw err;
       }
-      return data;
+      return cleanCompletionData(data);
     };
 
     try {
@@ -645,7 +686,7 @@
     const ct = String(res.headers.get("content-type") || "").toLowerCase();
     if (ct.includes("application/json") && !ct.includes("event-stream")) {
       const data = await res.json().catch(() => ({}));
-      return completionJsonToStreamResult(data);
+      return completionJsonToStreamResult(cleanCompletionData(data));
     }
     if (!res.body || typeof res.body.getReader !== "function") {
       throw new Error("当前环境不支持流式响应");
@@ -740,7 +781,7 @@
       }
     }
 
-    return { content: fullContent, usage, finishReason };
+    return { content: stripReasoningLeak(fullContent), usage, finishReason };
   }
 
   window.RP_AI = {
@@ -765,6 +806,8 @@
     listModels,
     chatCompletions,
     chatCompletionsStream,
+    stripReasoningLeak,
+    looksLikeReasoningPara,
     getStreamCapability,
     setStreamCapability,
     clearStreamCapabilityForConfig,

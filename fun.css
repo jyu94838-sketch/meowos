@@ -8101,3 +8101,38 @@ img.cp-pet-img.is-sleepy { filter: brightness(0.85) saturate(0.8); }
   width: 100% !important;
   min-height: 200px;
 }
+
+/* 联机：好友 / 群聊 */
+.net-home { display: flex; flex-direction: column; gap: 12px; padding: 6px 2px 12px; overflow-y: auto; min-height: 0; flex: 1; }
+.net-me { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 18px; background: color-mix(in srgb, var(--text-main) 5%, transparent); }
+.net-me > div { flex: 1; min-width: 0; }
+.net-me b { display: block; font-size: 1rem; }
+.net-me small { color: var(--text-sub); font-size: 0.76rem; }
+.net-me code { font-size: 0.9rem; letter-spacing: 0.12em; color: var(--text-main); font-weight: 700; }
+.net-mini { border: 1px solid var(--line); background: var(--bg-card); color: var(--text-sub); border-radius: 99px; padding: 1px 8px; font: inherit; font-size: 0.68rem; cursor: pointer; vertical-align: 1px; }
+.net-tabs { display: flex; gap: 6px; padding: 4px; border-radius: 14px; background: color-mix(in srgb, var(--text-main) 5%, transparent); }
+.net-tabs button { flex: 1; border: 0; background: transparent; color: var(--text-sub); border-radius: 10px; padding: 8px; font: inherit; font-size: 0.88rem; cursor: pointer; position: relative; }
+.net-tabs button.is-on { background: var(--bg-card); color: var(--text-main); font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.net-home u, .net-cmeta u { text-decoration: none; display: inline-block; min-width: 18px; height: 18px; line-height: 18px; padding: 0 5px; border-radius: 99px; background: #f04f4f; color: #fff; font-size: 0.66rem; text-align: center; margin-left: 4px; box-sizing: border-box; }
+.net-pane { display: flex; flex-direction: column; gap: 10px; }
+.net-convs { display: flex; flex-direction: column; }
+.net-conv { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--text-main); font: inherit; text-align: left; cursor: pointer; }
+.net-conv > div { flex: 1; min-width: 0; }
+.net-conv b { display: block; font-size: 0.94rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.net-conv b i { font-style: normal; font-weight: 400; color: var(--text-sub); font-size: 0.78rem; margin-left: 3px; }
+.net-conv small { display: block; color: var(--text-sub); font-size: 0.76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.net-cmeta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+.net-cmeta small { font-size: 0.66rem; color: var(--text-sub); }
+.net-on { font-style: normal; font-size: 0.64rem; color: #2a9d55; margin-left: 5px; font-weight: 500; }
+.net-gav { display: inline-flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--text-main) 8%, transparent); font-size: 1.1rem; }
+.net-h4 { margin: 6px 2px 0; font-size: 0.78rem; color: var(--text-sub); font-weight: 600; }
+.net-frow { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.net-frow > div { flex: 1; min-width: 0; }
+.net-frow b { display: block; font-size: 0.92rem; }
+.net-frow small { display: block; font-size: 0.72rem; color: var(--text-sub); }
+.net-frow input[type=checkbox] { width: 20px; height: 20px; }
+.net-pick { display: flex; flex-direction: column; max-height: 48vh; overflow-y: auto; }
+.net-input { width: 100%; box-sizing: border-box; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-main); font: inherit; margin-bottom: 8px; }
+.net-back { border: 0; background: transparent; color: var(--text-main); font-size: 1.8rem; line-height: 1; padding: 0 6px 0 0; cursor: pointer; }
+.net-mem.is-off { opacity: 0.4; }
+.net-join input#net-addid { letter-spacing: 0.15em; }
