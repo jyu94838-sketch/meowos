@@ -55548,7 +55548,11 @@ document.getElementById("xxji-import-file")?.addEventListener("change", async (e
   }
 });
 document.getElementById("my-open-about")?.addEventListener("click", () => {
-  showToast("关于 · 敬请期待");
+  // 打开设置并滚到「关于 Meow」
+  document.getElementById("my-open-settings")?.click();
+  setTimeout(() => {
+    document.getElementById("settings-about")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, 450);
 });
 document.getElementById("my-wallet-topup")?.addEventListener("click", () => {
   const maskId = getActiveMaskIdForInbox();

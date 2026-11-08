@@ -133,7 +133,7 @@
   <!-- 图标字体放在自己的仓库里：国内（尤其安卓）连不上 jsdelivr 时图标会全白 -->
   <link rel="stylesheet" href="vendor/phosphor/regular/style.css?v=1">
   <link rel="stylesheet" href="vendor/phosphor/fill/style.css?v=1">
-  <link rel="stylesheet" href="fun.css?v=45">
+  <link rel="stylesheet" href="fun.css?v=47">
 </head>
 <body>
   <div class="boot-splash" id="boot-splash" aria-live="polite" aria-busy="true" aria-label="Meow OS · 开屏画面，请稍后点击进入">
@@ -827,10 +827,28 @@
                   <p class="widget-label">About</p>
                 </div>
               </div>
-              <div class="settings-panel settings-panel--soft">
+              <div class="settings-panel settings-panel--soft mx-about" id="settings-about">
+                <div class="mx-about-head">
+                  <img src="icons/icon-192.png?v=8" alt="" class="mx-about-icon" width="64" height="64">
+                  <div>
+                    <strong class="mx-about-name">关于 Meow</strong>
+                    <span class="mx-about-sub">Meow OS · 角色聊天与小世界</span>
+                  </div>
+                </div>
+                <p class="mx-about-p">Meow 是在 <b>Ruiya</b> 的开源作品 <b>「没心机」</b> 的基础上二次创作的：桌面、聊天、角色、世界书这些最核心的部分都来自没心机，Meow 只是在上面加了一些自己喜欢的小玩意儿，换了一身新衣服。</p>
+                <p class="mx-about-p">没有没心机，就不会有 Meow。</p>
+                <div class="mx-about-thanks">
+                  <p>再次感谢 <b>Ruiya</b> 🌷</p>
+                  <p>再次感谢 <b>没心机</b> 🤍</p>
+                </div>
+                <p class="mx-about-note">没心机以 AGPL-3.0 协议开源，Meow 同样遵守这个协议并公开全部源代码。</p>
                 <div class="settings-row settings-row-static">
-                  <span class="settings-row-l">版本</span>
-                  <span class="settings-row-r">Meow · UI</span>
+                  <span class="settings-row-l">原作</span>
+                  <span class="settings-row-r">没心机 · Ruiya</span>
+                </div>
+                <div class="settings-row settings-row-static">
+                  <span class="settings-row-l">Meow 源代码</span>
+                  <span class="settings-row-r"><a href="https://github.com/jyu94838-sketch/meowos" target="_blank" rel="noopener">GitHub</a></span>
                 </div>
               </div>
             </section>

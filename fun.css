@@ -8147,3 +8147,17 @@ img.cp-pet-img.is-sleepy { filter: brightness(0.85) saturate(0.8); }
 .net-warn { margin: 0; padding: 10px 12px; border-radius: 12px; background: #fff3e0; color: #8a5300; font-size: 0.8rem; line-height: 1.55; }
 body.dark .net-warn { background: #3a2c18; color: #f0c88a; }
 .net-pend { display: block; font-style: normal; font-size: 0.64rem; color: var(--text-sub); margin: 2px 4px 0; text-align: right; }
+
+/* 设置 · 关于 Meow */
+.mx-about { display: flex; flex-direction: column; gap: 10px; padding: 16px 16px 4px !important; }
+.mx-about .settings-row { margin: 0 -16px; }
+.mx-about-head { display: flex; align-items: center; gap: 12px; }
+.mx-about-icon { width: 56px; height: 56px; border-radius: 15px; box-shadow: 0 4px 12px rgba(185, 133, 82, .22); flex-shrink: 0; }
+.mx-about-name { display: block; font-size: 1.05rem; }
+.mx-about-sub { display: block; font-size: 0.74rem; color: var(--text-sub, #8a8a8a); margin-top: 2px; }
+.mx-about-p { margin: 0; font-size: 0.86rem; line-height: 1.75; }
+.mx-about-thanks { padding: 12px 14px; border-radius: 14px; background: linear-gradient(135deg, #fff7ec, #fdeee4); color: #7a5440; text-align: center; }
+.mx-about-thanks p { margin: 2px 0; font-size: 0.95rem; }
+body.dark .mx-about-thanks { background: linear-gradient(135deg, #3a2e24, #3a2a2c); color: #f0d9c4; }
+.mx-about-note { margin: 0; font-size: 0.72rem; color: var(--text-sub, #8a8a8a); line-height: 1.6; }
+.mx-about a { color: inherit; text-decoration: underline; }
