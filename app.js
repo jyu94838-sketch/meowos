@@ -17683,6 +17683,9 @@ function syncChatDetailFaceLockSelect(th) {
   if (sel instanceof HTMLSelectElement) sel.value = threadFaceLockLevel(th);
   const av = document.getElementById("chat-detail-hide-avatars-toggle");
   if (av) av.setAttribute("aria-pressed", th && th.hideAvatars ? "true" : "false");
+  ensureChatDetailAvatarFirstUi();
+  const af = document.getElementById("chat-detail-avatar-first-toggle");
+  if (af) af.setAttribute("aria-pressed", th && th.avatarFirstOnly ? "true" : "false");
   ensureChatDetailMusicShareUi();
   const mu = document.getElementById("chat-detail-music-share-toggle");
   if (mu) mu.setAttribute("aria-pressed", isThreadMomentsMusicShareOn(th) ? "true" : "false");
@@ -17732,7 +17735,91 @@ function ensureChatDetailMusicShareUi() {
 }
 /** 聊天设置「隐藏头像」：给聊天界面加 class */
 function applyChatHideAvatarsClass(th) {
-  document.getElementById("chat-screen")?.classList.toggle("mx-hide-av", !!(th && th.hideAvatars));
+  const scr = document.getElementById("chat-screen");
+  scr?.classList.toggle("mx-hide-av", !!(th && th.hideAvatars));
+  scr?.classList.toggle("mx-av-first", !!(th && th.avatarFirstOnly));
+  // 关着时也要有效：美化里自带的「连发隐藏头像」会被盖掉，每条都显示
+  scr?.classList.toggle("mx-av-all", !!th && !th.avatarFirstOnly);
+  markChatAvatarRuns();
+}
+
+/* ───── 连发只显示首条头像 ─────
+ * 同一个人连着发的几条，只有第一条显示头像；后面几条头像位置留空（visibility:hidden，气泡不错位）
+ * 用 class 标记 + 高优先级 CSS，盖得过风格包和自定义美化 */
+function chatRowSpeakerKey(row) {
+  if (!(row instanceof HTMLElement) || !row.classList.contains("chat-msg")) return "";
+  const role = row.classList.contains("chat-msg--user") ? "u" : row.classList.contains("chat-msg--assistant") ? "a" : "";
+  if (!role) return "";
+  if (!row.querySelector(".chat-msg-avatar, .chat-msg-avatar-col")) return "";
+  const spk = row.querySelector(".chat-msg-group-speaker")?.textContent?.trim() || "";
+  const av = row.querySelector(".chat-msg-avatar");
+  const img = av?.querySelector("img")?.getAttribute("src") || av?.getAttribute("src") || "";
+  return role + "|" + spk + "|" + (spk ? "" : img.slice(0, 120));
+}
+function markChatAvatarRuns() {
+  const scr = document.getElementById("chat-screen");
+  const box = document.getElementById("chat-messages");
+  if (!scr || !box) return;
+  const on = true; // 开关两种状态都要标出连发，CSS 再按 mx-av-first / mx-av-all 决定藏还是强制显示
+  let prevKey = "";
+  for (const el of box.children) {
+    if (!(el instanceof HTMLElement)) continue;
+    if (!el.classList.contains("chat-msg")) {
+      // 时间条、系统提示把连发断开
+      prevKey = "";
+      continue;
+    }
+    const key = on ? chatRowSpeakerKey(el) : "";
+    const cont = !!(on && key && key === prevKey);
+    if (el.classList.contains("mx-av-cont") !== cont) el.classList.toggle("mx-av-cont", cont);
+    prevKey = key;
+    // 玻璃主题里一条消息拆成好几行时，后面几行也只留第一行头像
+    const lines = el.querySelectorAll(":scope > .chat-msg-inner > .chat-msg-glass-line");
+    let lineKey = cont ? "same" : "";
+    lines.forEach((ln, i) => {
+      const k = ln.querySelector(".chat-msg-group-speaker")?.textContent?.trim() || "same";
+      const c = on && (i > 0 ? k === lineKey : cont);
+      if (ln.classList.contains("mx-av-cont-line") !== c) ln.classList.toggle("mx-av-cont-line", c);
+      lineKey = k;
+    });
+  }
+}
+(function watchChatAvatarRuns() {
+  const box = document.getElementById("chat-messages");
+  if (!box || !window.MutationObserver) return;
+  let raf = 0;
+  new MutationObserver((muts) => {
+    if (muts.every((m) => m.type === "attributes")) return;
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(markChatAvatarRuns);
+  }).observe(box, { childList: true, subtree: true });
+})();
+
+/** 聊天设置：「连发只显示首条头像」开关（从 JS 插，旧缓存的页面也有） */
+function ensureChatDetailAvatarFirstUi() {
+  if (document.getElementById("chat-detail-avatar-first-toggle")) return;
+  const anchor = document.getElementById("chat-detail-hide-avatars-toggle")?.closest(".chat-detail-field");
+  if (!anchor) return;
+  const field = document.createElement("div");
+  field.className = "chat-detail-field chat-detail-field--switch";
+  field.id = "chat-detail-avatar-first-field";
+  field.innerHTML =
+    '<span class="chat-detail-field-k">连发只显示首条头像</span>' +
+    '<button type="button" class="chat-detail-switch" id="chat-detail-avatar-first-toggle" aria-pressed="false"><span class="visually-hidden">连发只显示首条头像</span></button>' +
+    '<p class="chat-detail-lead chat-detail-lead--compact mx-hint">同一个人连着发好几条时，只有第一条带头像，后面的只留气泡（像 QQ / 微信那样）。套了美化也有效，只对这个聊天生效。</p>';
+  anchor.insertAdjacentElement("afterend", field);
+  document.getElementById("chat-detail-avatar-first-toggle")?.addEventListener("click", (e) => {
+    const btn = e.currentTarget;
+    if (!readActiveThread()) return;
+    const on = btn.getAttribute("aria-pressed") !== "true";
+    patchActiveThread((t) => {
+      if (on) t.avatarFirstOnly = true;
+      else delete t.avatarFirstOnly;
+    });
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    applyChatHideAvatarsClass(readActiveThread());
+    showToast(on ? "连发只显示第一条的头像" : "每条消息都显示头像");
+  });
 }
 
 function syncChatDetailLinkedGroupSelect(th) {

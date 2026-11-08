@@ -8560,3 +8560,43 @@ body.dark .ua-pill { background: #3a2a22; color: #f0b890; }
 .pt-relrow button { border: 0; background: none; color: var(--text-sub); cursor: pointer; }
 .pt-npcform > .fun-btn.sm { align-self: flex-start; }
 .pt-circle-head > span:last-child { display: flex; gap: 6px; }
+
+/* 聊天设置：连发只显示首条头像（优先级高过风格包和自定义美化） */
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-first .chat-msg.mx-av-cont .chat-msg-avatar,
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-first .chat-msg.mx-av-cont .chat-msg-avatar-col,
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-first .chat-msg-glass-line.mx-av-cont-line .chat-msg-avatar,
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-first .chat-msg-glass-line.mx-av-cont-line .chat-msg-avatar-col,
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-first .mx-av-rep {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-first .chat-msg.mx-av-cont .chat-msg-avatar::before,
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-first .chat-msg.mx-av-cont .chat-msg-avatar::after,
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-first .chat-msg.mx-av-cont:not(.is-swipe-quote-active) .chat-msg-inner::before,
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-first .chat-msg.mx-av-cont:not(.is-swipe-quote-active) .chat-msg-inner::after {
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+/* 连发的几条挨近一点 */
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-first .chat-messages > .chat-msg:has(+ .chat-msg.mx-av-cont) {
+  margin-bottom: 4px !important;
+}
+/* 关着：美化里自带的「连发隐藏头像」也盖掉，每条都显示 */
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-all:not(.mx-hide-av) .chat-msg.mx-av-cont .chat-msg-avatar,
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-all:not(.mx-hide-av) .chat-msg.mx-av-cont .chat-msg-avatar-col,
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-all:not(.mx-hide-av) .chat-msg-glass-line.mx-av-cont-line .chat-msg-avatar,
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-all:not(.mx-hide-av) .chat-msg-glass-line.mx-av-cont-line .chat-msg-avatar-col {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-all:not(.mx-hide-av) .mx-av-rep {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-all:not(.mx-hide-av) .chat-msg.mx-av-cont > .chat-msg-inner::before,
+html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-av-all:not(.mx-hide-av) .chat-msg.mx-av-cont > .chat-msg-inner::after {
+  display: block !important;
+  visibility: visible !important;
+}
