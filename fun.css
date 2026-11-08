@@ -8600,3 +8600,8 @@ html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-a
   display: block !important;
   visibility: visible !important;
 }
+/* 线下文风：立即改写人称 */
+.mx-pov-rewrite { margin-top: 8px; }
+.mx-pov-rewrite-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.mx-pov-rewrite-row select { flex: 1; min-width: 0; }
+.mx-pov-rewrite-row button { flex-shrink: 0; white-space: nowrap; }

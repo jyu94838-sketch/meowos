@@ -25830,10 +25830,209 @@ function buildOfflineDmSplitPovPromptText(name, userCall, charPov, userPov) {
   const charClause = offlineDmPovPersonPromptClause(charPov, name);
   const userClause = offlineDmPovPersonPromptClause(userPov, userCall);
   return (
+    `[人称 · 硬性要求]\n` +
+    buildOfflineDmPovHardRuleText(name, userCall, charPov, userPov) +
+    `\n` +
     `**人称**：写「${name}」的叙事与说出口的字——${charClause}（对白在「」内，${charPov === "third" ? `引号内仍可按人设用「我」或第三人称` : `与叙事人称一致`}）。` +
     `写「${userCall}」/主控的可见动作与神态——${userClause}。` +
     `**禁止** JSON 键 \`narration\`（场面织入 lines）。**禁止**编造主控未流露的内心全知读白。`
   );
+}
+
+/** 「」/“”/"" 以外的叙事部分（判断人称用） */
+function offlineDmNarrationOnly(text) {
+  return String(text || "")
+    .replace(/「[^」]*」/g, "")
+    .replace(/『[^』]*』/g, "")
+    .replace(/“[^”]*”/g, "")
+    .replace(/"[^"]*"/g, "")
+    .replace(/\*[^*]*\*/g, "");
+}
+
+/** 人称的硬规则 + 一句示例（写进系统提示的开头和结尾） */
+function buildOfflineDmPovHardRuleText(name, userCall, charPov, userPov) {
+  const nm = String(name || "").trim() || "角色";
+  const uc = String(userCall || "").trim() || "对方";
+  const charRef = charPov === "first" ? "我" : charPov === "second" ? "你" : `${nm}／他（她）`;
+  const userRef = userPov === "first" ? "我" : userPov === "second" ? "你" : `${uc}／她（他）`;
+  const conflict = charPov === userPov && charPov !== "third";
+  const ex =
+    charPov === "third" && userPov === "second"
+      ? `${nm}被你推得往旁边一歪，顺势倒进沙发里，抬手捂住额头。「你这是蓄意谋杀。」`
+      : charPov === "third" && userPov === "third"
+        ? `${nm}被${uc}推得往旁边一歪，顺势倒进沙发里，抬手捂住额头。「你这是蓄意谋杀。」`
+        : charPov === "first" && userPov === "second"
+          ? `我被你推得往旁边一歪，顺势倒进沙发里，抬手捂住额头。「你这是蓄意谋杀。」`
+          : charPov === "first" && userPov === "third"
+            ? `我被${uc}推得往旁边一歪，顺势倒进沙发里，抬手捂住额头。「你这是蓄意谋杀。」`
+            : charPov === "second" && userPov === "third"
+              ? `你被${uc}推得往旁边一歪，顺势倒进沙发里，抬手捂住额头。「你这是蓄意谋杀。」`
+              : "";
+  return [
+    `lines 里**引号以外的叙事**：「${nm}」一律写成「${charRef}」，「${uc}」一律写成「${userRef}」。`,
+    charPov !== "first" ? `叙事里**不许出现指代「${nm}」的「我」**（「我」只能出现在「」引号里的对白中）。` : "",
+    userPov !== "second" && charPov !== "second" ? `叙事里**不许用「你」指「${uc}」**（「你」只能出现在对白中）。` : "",
+    `「」里的对白照常按说话人的口吻用「我」「你」，不受叙事人称影响。thinking 和 heartVoice 是内心草稿，可以用第一人称，**但不许把这种口吻带进 lines**。`,
+    `前文（包括历史里你自己写过的段落）如果用了别的人称，**不要因袭**，从本轮起按这里的人称写。`,
+    ex ? `示例（只看人称，勿抄内容）：${ex}` : "",
+    conflict ? `（两人都用同一人称时，按上下文分清谁是谁。）` : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** 这段正文的人称是不是明显不对（用来自动纠正） */
+function offlineDmPovLooksWrong(text, charPov, userPov) {
+  const nar = offlineDmNarrationOnly(text);
+  if (!nar.trim()) return false;
+  const iCount = (nar.match(/我/g) || []).length;
+  const youCount = (nar.match(/你/g) || []).length;
+  if (charPov !== "first" && userPov !== "first" && iCount >= 2) return true;
+  if (charPov !== "second" && userPov !== "second" && youCount >= 3) return true;
+  if (charPov === "first" && iCount === 0 && nar.length > 120) return true;
+  return false;
+}
+
+/** AI 把一段线下正文改成指定人称（只改人称，不改情节、对白、分段） */
+async function rewriteOfflineDmTextPov(text, name, userCall, charPov, userPov, signal) {
+  const ai = window.RP_AI;
+  if (!ai || typeof ai.chatCompletions !== "function") throw new Error("AI 没准备好");
+  const segs = String(text || "").split("|||");
+  const sys = [
+    `你是小说编辑，只做一件事：把下面这段小说正文的**叙事人称**改对。`,
+    buildOfflineDmPovHardRuleText(name, userCall, charPov, userPov),
+    `要求：情节、动作、对白内容、分段、段首空格、标点和长度都**保持原样**，只改引号外叙事里的人称代词（必要时把「我/你/他/她」换成名字让句子通顺）。「」和“”里的对白一个字都不要改。`,
+    segs.length > 1 ? `正文用 ||| 分成了 ${segs.length} 段，输出时也用 ||| 分开，段数不变。` : "",
+    `只输出改好的正文，不要解释、不要加标题。`
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const data = await ai.chatCompletions({
+    messages: [
+      { role: "system", content: sys },
+      { role: "user", content: String(text || "") }
+    ],
+    temperature: 0.2,
+    max_tokens: Math.min(6000, Math.max(600, Math.ceil(String(text || "").length * 2.2))),
+    ...(signal ? { signal } : {})
+  });
+  // 只去掉半角空白，段首的全角空格「　　」要留着
+  const trimAscii = (x) => x.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "");
+  let out = trimAscii(String(readMomentsPostCompletionText(data) || ""));
+  out = trimAscii(out.replace(/^```[a-z]*[ \t]*\n?/i, "").replace(/```[ \t\r\n]*$/, ""));
+  if (/^\u3000/.test(String(text || "")) && !/^\u3000/.test(out)) out = "\u3000\u3000" + out.replace(/^\u3000+/, "");
+  if (!out) throw new Error("没改出来");
+  if (out.length < String(text).length * 0.6) throw new Error("改写结果不完整");
+  const outSegs = out.split("|||");
+  if (segs.length > 1 && outSegs.length !== segs.length) return out.replace(/\|\|\|/g, "\n");
+  return out;
+}
+
+/** 某个线下回合写完后：人称明显不对就自动改一遍 */
+async function autoFixOfflineEntryPov(maskId, threadId, entry) {
+  try {
+    if (!entry || entry.role !== "assistant" || entry.dmSurface !== "offline") return;
+    const th = findChatThreadInInbox(maskId, threadId)?.thread || readActiveThread();
+    if (!th || th.kind === "group" || getThreadOfflineDmPovText(th)) return;
+    const { charPov, userPov } = resolveThreadOfflineDmCharUserPov(th);
+    const orig = String(entry.content || "");
+    if (!offlineDmPovLooksWrong(orig, charPov, userPov)) return;
+    const { name, userCall } = resolveOfflinePovNames(th);
+    showToast("正文人称不对，正在自动改成你选的人称…");
+    const fixed = await rewriteOfflineDmTextPov(orig, name, userCall, charPov, userPov);
+    const log = readChatLogForMaskThread(maskId, threadId);
+    const hit = log.find((m) => m && m.role === "assistant" && m.at === entry.at && String(m.content || "") === orig);
+    if (!hit) return;
+    hit.content = fixed;
+    hit.povFixed = true;
+    saveChatLogForMaskThread(maskId, threadId, log);
+    const ref = readChatActiveThreadRef();
+    if (ref && ref.maskId === maskId && ref.threadId === threadId) {
+      preserveChatMessagesScrollForNextRender();
+      renderChatMessages();
+    }
+    showToast("人称已改好");
+  } catch (err) {
+    console.warn("[offline pov fix]", err);
+  }
+}
+
+function resolveOfflinePovNames(th) {
+  const char = readCharPersonaForThread(th) || emptyCharPersona();
+  const personaName = (char.displayName && String(char.displayName).trim()) || "角色";
+  const name = String(th?.charThreadRemarkName || "").trim() ? personaName : getThreadCharDisplayAlias(th) || personaName;
+  const mask = readUserMask();
+  const userCall = (mask.displayName && String(mask.displayName).trim()) || "对方";
+  return { name, userCall };
+}
+
+/** 设置里「立即改写已有正文」：把这个聊天线下的段落都按当前人称改一遍 */
+async function rewriteActiveThreadOfflinePov(btn) {
+  const th = readActiveThread();
+  const ref = readChatActiveThreadRef();
+  if (!th || !ref) return showToast("先打开一个聊天");
+  if (!window.RP_AI) return showToast("请先在设置里填写 API");
+  const charSel = document.getElementById("chat-offline-prose-char-pov-preset");
+  const userSel = document.getElementById("chat-offline-prose-user-pov-preset");
+  const cur = resolveThreadOfflineDmCharUserPov(th);
+  const charPov = normalizeOfflineDmPovPerson(charSel?.value, cur.charPov);
+  const userPov = normalizeOfflineDmPovPerson(userSel?.value, cur.userPov);
+  const { name, userCall } = resolveOfflinePovNames(th);
+  const log = readChatLogForMaskThread(ref.maskId, ref.threadId);
+  const scope = document.getElementById("chat-offline-pov-rewrite-scope")?.value || "recent";
+  let targets = log.filter((m) => m && m.role === "assistant" && m.dmSurface === "offline" && String(m.content || "").trim());
+  if (scope === "recent") targets = targets.slice(-5);
+  else if (scope === "wrong") targets = targets.filter((m) => offlineDmPovLooksWrong(String(m.content), charPov, userPov));
+  if (!targets.length) return showToast(scope === "wrong" ? "没找到人称不对的段落" : "这个聊天还没有线下正文");
+  // 先把选的人称存下来，之后写的也按这个来
+  patchActiveThread((t) => {
+    t.offlineDmCharPov = charPov;
+    t.offlineDmUserPov = userPov;
+  });
+  const label = btn ? btn.textContent : "";
+  if (btn) btn.disabled = true;
+  let ok = 0;
+  try {
+    for (let i = 0; i < targets.length; i++) {
+      if (btn) btn.textContent = `改写中 ${i + 1}/${targets.length}…`;
+      const m = targets[i];
+      try {
+        m.content = await rewriteOfflineDmTextPov(String(m.content), name, userCall, charPov, userPov);
+        m.povFixed = true;
+        ok++;
+        saveChatLogForMaskThread(ref.maskId, ref.threadId, log);
+        preserveChatMessagesScrollForNextRender();
+        renderChatMessages();
+      } catch (err) {
+        console.warn("[offline pov rewrite]", err);
+      }
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  }
+  showToast(ok ? `已改好 ${ok} 段${ok < targets.length ? `，${targets.length - ok} 段没改成` : ""}` : "没改成，稍后再试");
+}
+
+/** 线下文风面板：人称下面插「立即改写已有正文」（从 JS 插，旧缓存页面也有） */
+function ensureOfflinePovRewriteUi() {
+  if (document.getElementById("chat-offline-pov-rewrite")) return;
+  const anchor = document.getElementById("chat-offline-prose-user-pov-preset");
+  if (!anchor) return;
+  const box = document.createElement("div");
+  box.className = "mx-pov-rewrite";
+  box.id = "chat-offline-pov-rewrite";
+  box.innerHTML =
+    '<p class="chat-detail-lead chat-detail-lead--compact mx-hint">选好的人称从下一段开始生效；AI 偶尔没照做时会自动改一遍。想把已经写出来的段落也改掉，点下面：</p>' +
+    '<div class="mx-pov-rewrite-row"><select id="chat-offline-pov-rewrite-scope" class="settings-ai-select chat-detail-wb-select" aria-label="改写范围">' +
+    '<option value="recent">最近 5 段</option><option value="wrong">所有人称不对的段落</option><option value="all">这个聊天全部线下正文</option></select>' +
+    '<button type="button" class="chip primary chip-xs" id="chat-offline-pov-rewrite-btn">立即改写人称</button></div>';
+  anchor.insertAdjacentElement("afterend", box);
+  document.getElementById("chat-offline-pov-rewrite-btn")?.addEventListener("click", (e) => {
+    void rewriteActiveThreadOfflinePov(e.currentTarget);
+  });
 }
 
 /**
@@ -25859,6 +26058,7 @@ function buildOfflineDmProsePromptLinesFromLegacyEnums(th, name, userCall) {
   const customPov = getThreadOfflineDmPovText(th);
   const povText = customPov ? "" : buildOfflineDmSplitPovPromptText(name, userCall, charPov, userPov);
   return [
+    ...(povText ? [`[人称 · 先看这条] ` + buildOfflineDmPovHardRuleText(name, userCall, charPov, userPov)] : []),
     `[线下 · 小说续写（本密谈）]`,
     `本轮任务：**小说接力续写**，不是即时聊天。正文写在 JSON **\`lines\`**（**默认每轮只 1 个元素**厚段落，段内用换行分段：场面→神态→对白；勿拆成多条「拼接块」）。`,
     `[lines 结构 · 一项厚段] 晤面是**小说一段**，不是线上连发气泡。**默认 lines 数组只有 1 个字符串**；场面→动作→对白用**项内换行**（空一行）分段。程序只按 array 长度拆屏，**拆成多项会在界面顶出无关首段**——勿把「知道」「……」、单独对白、外文一句等占成 lines[0] 再另起 lines[1]。若开启对照翻译：译本**写在正文里**紧跟每个「」后，见对照翻译说明；**不要**为对照翻译拆 lines。`,
@@ -44144,7 +44344,7 @@ function buildBuiltinImOfflineThinkingChainBeatLines(opts) {
       `**read · 进身体**：话进身体后先于命名的紧/松/烫/绷/空；可选误读/投射（仅人设或关系里常这样时）；多种 drive 可同时存在、都在 settling；**settling ≠ resolving**；别从上一段 3 档跳到 9 档，也别每轮都 9 档；近几轮是否越写越像标准霸总/标准软萌包？`,
       `**feel · 内天气**：whole interior 在 settle；本轮一种主反应（愣/短/退/岔/贴近/顶一句 择一）；为了什么（贴近/试探/填沉默/仅关系已到时才顶回去）；嘴笨/慢热可半句、改口、词不达意——**只给这种人**。`,
       `**shape · 出口**：预演 1～2 句「」像卡面真人句（非网文模板）；2～4 可见节拍可含沉默/小动作。`,
-      `**check · 成稿**：Still「${name}」？遮住名字套任意角色都成立吗？太及时/太暖/太懂？空间时间体力与上段一致？硬凑对峙/命令口气/说教/OOC/标签进 lines？lines 默认 1 项。确认后写 lines。`,
+      `**check · 成稿**：Still「${name}」？遮住名字套任意角色都成立吗？太及时/太暖/太懂？空间时间体力与上段一致？硬凑对峙/命令口气/说教/OOC/标签进 lines？lines 默认 1 项。**人称对不对**（按上文「人称」要求，引号外的叙事别写成另一种人称）？确认后写 lines。`,
       `lines 以 thinking 为准；文学正文；不破墙。`
     ];
   }
@@ -45539,6 +45739,11 @@ function buildChatSystemPrompt(opts) {
           ]),
   ].filter(Boolean);
   let sys = roleBlock.join("\n\n");
+  if (sceneOffline && th && th.kind !== "group" && !theaterSeparateGen) {
+    const pv = resolveThreadOfflineDmCharUserPov(th);
+    const ptx = getThreadOfflineDmPovText(th);
+    sys += `\n\n[人称 · 写 lines 前最后确认]\n${ptx ? `主控指定的人称：${ptx}\n` : buildOfflineDmPovHardRuleText(name, userCall, pv.charPov, pv.userPov)}`;
+  }
   if (charLockLiveSession) {
     const live = buildCharLockLiveChatSystemAppend(charLockLiveSession);
     if (live) sys = `${sys}\n\n${live}`;
@@ -60387,6 +60592,7 @@ async function importOfflineDmProseFromDocxArrayBuffer(buf) {
 }
 
 function syncChatOfflineProseFormFromThread(th) {
+  ensureOfflinePovRewriteUi();
   const stylePreset = document.getElementById("chat-offline-prose-style-preset");
   const lenPreset = document.getElementById("chat-offline-prose-length-preset");
   const charPovPreset = document.getElementById("chat-offline-prose-char-pov-preset");
@@ -69016,6 +69222,10 @@ async function runChatAssistantRoundBody(opts, btn) {
     removeChatRestoringPlaceholders(next);
     saveChatLogForMaskThread(roundMaskId, roundThreadId, next);
     scheduleChatUiRefreshForRound(roundMaskId, roundThreadId, { animateLatest: true, flush: true });
+    if (roundDmSurface === "offline" && committedAssistantEntry) {
+      const fixEnt = committedAssistantEntry;
+      setTimeout(() => void autoFixOfflineEntryPov(roundMaskId, roundThreadId, fixEnt), 400);
+    }
     finalizeCharThreadAvatarFromUserSentImage(
       firstParsed,
       next,
