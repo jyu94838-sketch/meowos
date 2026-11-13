@@ -8698,3 +8698,6 @@ html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-a
 .net-mychar b { font-size: 0.76rem; }
 .net-mychar .fun-av { width: 24px !important; height: 24px !important; }
 .net-charbar .net-mychar-x { border: 0 !important; background: none !important; padding: 0 4px !important; color: var(--text-sub) !important; font-size: 0.72rem !important; cursor: pointer; }
+/* 资源站暂停开放 */
+.sh-closed { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 48px 24px; gap: 6px; }
+.sh-closed .fun-note { line-height: 1.8; }

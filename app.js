@@ -17686,6 +17686,9 @@ function syncChatDetailFaceLockSelect(th) {
   ensureChatDetailAvatarFirstUi();
   const af = document.getElementById("chat-detail-avatar-first-toggle");
   if (af) af.setAttribute("aria-pressed", th && th.avatarFirstOnly ? "true" : "false");
+  ensureChatDetailAliveBoostUi();
+  const al = document.getElementById("chat-detail-alive-toggle");
+  if (al) al.setAttribute("aria-pressed", isThreadAliveBoostOn(th) ? "true" : "false");
   ensureChatDetailMusicShareUi();
   const mu = document.getElementById("chat-detail-music-share-toggle");
   if (mu) mu.setAttribute("aria-pressed", isThreadMomentsMusicShareOn(th) ? "true" : "false");
@@ -45114,13 +45117,108 @@ function buildImV3LifeCoreBlock(name, userCall, char, th, promptLog, heartOn, ti
 
 function buildImPromptCoreBlock(name, userCall, char, th, promptLog, heartOn, timeInfo) {
   const pack = resolveChatPromptPack(th);
-  if (pack === "thick") {
-    return buildImThickLifeCoreBlock(name, userCall, char, th, promptLog, heartOn, timeInfo);
+  let core;
+  if (pack === "thick") core = buildImThickLifeCoreBlock(name, userCall, char, th, promptLog, heartOn, timeInfo);
+  else if (pack === "v3") core = buildImV3LifeCoreBlock(name, userCall, char, th, promptLog, heartOn, timeInfo);
+  else core = buildImReferenceStyleCoreBlock(name, userCall, char, th, promptLog, heartOn, timeInfo);
+  if (isThreadAliveBoostOn(th)) core = [...core, ...buildImAliveBoostBlock(name, userCall, promptLog)];
+  return core;
+}
+
+/** 聊天设置「活人感加强」：默认开 */
+function isThreadAliveBoostOn(th) {
+  return !(th && th.aliveBoost === false);
+}
+
+/**
+ * 活人感加强：固定的「像真人」规则 + 看最近聊天记录给的具体提醒
+ * （连着几轮问句收尾、开头老一样、泡越写越长、对方隔了很久才回……）
+ * @param {string} name @param {string} userCall @param {readonly unknown[]} log
+ */
+function buildImAliveBoostBlock(name, userCall, log) {
+  const arr = Array.isArray(log) ? log.filter((m) => m && typeof m === "object") : [];
+  /** @type {string[][]} */
+  const turns = [];
+  for (let i = arr.length - 1; i >= 0 && turns.length < 4; i--) {
+    const m = arr[i];
+    if (m.role !== "assistant") continue;
+    const bubbles = String(m.content || "")
+      .split("|||")
+      .map((x) => x.trim())
+      .filter((x) => x && !/^\[(表情|语音|图片|撤回|通话)/.test(x));
+    if (bubbles.length) turns.push(bubbles);
   }
-  if (pack === "v3") {
-    return buildImV3LifeCoreBlock(name, userCall, char, th, promptLog, heartOn, timeInfo);
+  /** @type {string[]} */
+  const hints = [];
+  const qEnd = turns.filter((b) => /[?？]\s*$/.test(b[b.length - 1])).length;
+  if (qEnd >= 2) hints.push(`你最近 ${qEnd} 轮都是用问句收尾的——这轮别再用问句结尾，用陈述、吐槽、分享或者一个语气词收住。`);
+  const heads = turns.slice(0, 3).map((b) => b[0].replace(/^[「“"『(（]+/, "").slice(0, 2));
+  if (heads.length >= 3 && heads.every((h) => h && h === heads[0])) hints.push(`你最近几轮都用「${heads[0]}」开头，这轮换个开头。`);
+  const lens = turns.flat().map((x) => x.length);
+  const avg = lens.length ? lens.reduce((a, b) => a + b, 0) / lens.length : 0;
+  if (avg > 38) hints.push(`你最近的气泡偏长、偏工整，这轮短一点、碎一点，像随手打的。`);
+  else if (turns.length >= 3 && turns.slice(0, 3).every((b) => b.length === turns[0].length)) hints.push(`你最近几轮的条数都一样，这轮的节奏变一变（多发几条或者只回一两句都行）。`);
+  // 对方这条和上一条之间隔了多久
+  let lastUser = -1;
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (arr[i].role === "user") {
+      lastUser = i;
+      break;
+    }
   }
-  return buildImReferenceStyleCoreBlock(name, userCall, char, th, promptLog, heartOn, timeInfo);
+  if (lastUser > 0) {
+    const at = Number(arr[lastUser].at);
+    let prevAt = NaN;
+    for (let i = lastUser - 1; i >= 0; i--) {
+      const t = Number(arr[i].at);
+      if (Number.isFinite(t) && arr[i].role !== "user") {
+        prevAt = t;
+        break;
+      }
+    }
+    const gap = at - prevAt;
+    if (Number.isFinite(gap) && gap > 3 * 3600 * 1000) {
+      hints.push(`「${userCall}」隔了大约 ${Math.round(gap / 3600000)} 小时才回你。像真人一样对这段空白有自然的反应（可以不提，也可以小小吐槽一句或问一句去干嘛了），别装作是秒回。`);
+    }
+  }
+  return [
+    `[ALIVE+ · 活人感加强]`,
+    `不是每句都要接：对方一次说了好几件事，真人往往只挑最想回的那一点，其他的晚点再说或者干脆没注意到。`,
+    `别当捧哏：不复述对方的话，不先夸一句再回答，不总结对方的情绪（「你是不是……了」这种一轮最多一次）。`,
+    `不要轮轮都用提问收尾逼对方接话；真人更多是陈述、吐槽、分享、一个「嗯」「哈哈哈」就收住。`,
+    `有自己的生活：可以顺口带出此刻在做的普通小事（按现在的时间：吃饭、路上、躺着、刚洗完澡、在忙手头的事……要符合 ${name} 的身份），也可以主动分享刚遇到的小事、突然想到的事，不用等对方问。`,
+    `记性：对方之前随口提过的小事（考试、加班、不舒服、想吃的东西、要去的地方），合适时自然地追问或接上，像真的记得。`,
+    `情绪有惯性、有小脾气：被冷落会别扭，被逗会笑出声，会有懒得打字、敷衍一下的时候，不会每次都情绪稳定地给出完美回应。`,
+    `打字感：语气词（嗯/啊/欸/哦/hhh）、省略号、叠字、偶尔打错字再补一条改正——都只在 ${name} 平时会这么打时才用，别每轮都塞。`,
+    ...(hints.length ? [`这一轮特别注意：`, ...hints.map((h) => `· ${h}`)] : [])
+  ];
+}
+
+/** 聊天设置：「活人感加强」开关（从 JS 插，旧缓存页面也有） */
+function ensureChatDetailAliveBoostUi() {
+  if (document.getElementById("chat-detail-alive-toggle")) return;
+  const anchor =
+    document.getElementById("chat-detail-avatar-first-field") || document.getElementById("chat-detail-hide-avatars-toggle")?.closest(".chat-detail-field");
+  if (!anchor) return;
+  const field = document.createElement("div");
+  field.className = "chat-detail-field chat-detail-field--switch";
+  field.id = "chat-detail-alive-field";
+  field.innerHTML =
+    '<span class="chat-detail-field-k">活人感加强</span>' +
+    '<button type="button" class="chat-detail-switch" id="chat-detail-alive-toggle" aria-pressed="true"><span class="visually-hidden">活人感加强</span></button>' +
+    '<p class="chat-detail-lead chat-detail-lead--compact mx-hint">TA 回消息更像真人：不句句都接、不老用问句收尾、会带出自己在干嘛、记得你说过的小事，还会看最近的聊天提醒 TA 别重复自己。只对这个聊天生效。</p>';
+  anchor.insertAdjacentElement("afterend", field);
+  document.getElementById("chat-detail-alive-toggle")?.addEventListener("click", (e) => {
+    const btn = e.currentTarget;
+    if (!readActiveThread()) return;
+    const on = btn.getAttribute("aria-pressed") !== "true";
+    patchActiveThread((t) => {
+      if (on) delete t.aliveBoost;
+      else t.aliveBoost = false;
+    });
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    showToast(on ? "活人感加强已打开" : "活人感加强已关闭");
+  });
 }
 
 /**

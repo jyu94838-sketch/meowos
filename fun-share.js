@@ -2186,6 +2186,9 @@
   }
 
 
+  /** 资源站暂停开放：改成 false 就重新打开（代码和数据都还在） */
+  const SHARE_CLOSED = true;
+
   F.register("资源站", {
     title: "资源站",
     kicker: "SHARE / MXJ CARD",
@@ -2193,6 +2196,10 @@
       root = document.createElement("div");
       root.className = "sh-root";
       body.appendChild(root);
+      if (SHARE_CLOSED) {
+        root.innerHTML = `<div class="sh-closed"><div class="fun-hero">📦</div><h2 class="fun-h2">资源站暂停开放</h2><p class="fun-note">资源站暂时关闭，不能浏览、上传和下载。<br/>美化、角色卡、世界书还是可以用「导出 PNG / 导入 Meow 卡」发给朋友。</p></div>`;
+        return;
+      }
       renderShell();
     },
     unmount() {
