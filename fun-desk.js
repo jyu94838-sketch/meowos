@@ -81,6 +81,7 @@
     net: ["联机", "ph-globe-hemisphere-east", 200, "Online", fun("联机")],
     weather: ["天气", "ph-cloud-sun", 205, "Weather", fun("天气")],
     diet: ["饮食", "ph-bowl-food", 95, "Diet", fun("饮食")],
+    offline: ["线下", "ph-storefront", 25, "Meet", call("openOfflineFromDesktop")],
     news: ["更新公告", "ph-megaphone", 40, "News", call("openChangelog")]
   };
   const DEFAULT = [Object.keys(APPS)];

@@ -61221,6 +61221,10 @@ function persistChatOfflineProseFromForm() {
 function syncChatMoreOfflineTavernItem() {
   const btn = document.querySelector('#chat-more-drawer .chat-more-drawer-item[data-action="offline"]');
   if (!btn) return;
+  // 「线下」已经搬到桌面单独成了一个 App，加号面板里不再放
+  btn.hidden = true;
+  btn.style.display = "none";
+  return;
   const th = readActiveThread();
   const dm = Boolean(th && th.kind !== "group");
   const romanceOn = dm && isThreadOnlineRomanceEnabled(th);
@@ -74683,3 +74687,70 @@ window.mxOpenVideoPlayer = mxOpenVideoPlayer;
 window.mxResolveVideoSrc = mxResolveVideoSrc;
 window.mxVideoApiParts = mxVideoApiParts;
 window.mxFmtVideoDur = mxFmtVideoDur;
+
+
+/* ───────────────── 桌面「线下」App：选一个角色，直接进入和 TA 的线下 ───────────────── */
+async function openOfflineFromDesktop() {
+  const F = window.XXJ_FUN;
+  const maskId = String(getActiveMaskIdForInbox() || "").trim();
+  if (!maskId) {
+    showToast("请先创建并选择一个主控面具");
+    return;
+  }
+  let cast = [];
+  try {
+    cast = F ? await F.loadCast() : [];
+  } catch (_) {
+    cast = [];
+  }
+  if (!cast.length) {
+    showToast("角色库里还没有角色");
+    return;
+  }
+  // 最近聊过的角色排前面
+  const recent = new Map();
+  try {
+    const inbox = readChatInboxStore();
+    ensureMaskBucket(inbox, maskId);
+    for (const th of inbox.byMask[maskBucketKey(maskId)]?.threads || []) {
+      if (th && th.kind !== "group" && th.charId) recent.set(String(th.charId), Math.max(recent.get(String(th.charId)) || 0, Number(th.updatedAt) || 0));
+    }
+  } catch (_) {
+    /* ignore */
+  }
+  cast = cast.slice().sort((a, b) => (recent.get(String(b.id)) || 0) - (recent.get(String(a.id)) || 0));
+  const picked = F && typeof F.pickCast === "function" ? await F.pickCast(cast, { min: 1, max: 1, title: "和谁见面？" }) : null;
+  const ch = Array.isArray(picked) ? picked[0] : null;
+  if (!ch) return;
+  const threadId = await ensureDmThreadForChar(maskId, ch.id);
+  if (!threadId) {
+    showToast("打不开和 TA 的聊天");
+    return;
+  }
+  try {
+    activateCharPersonaById(ch.id);
+  } catch (_) {
+    /* ignore */
+  }
+  writeChatActiveThreadRef({ maskId, threadId });
+  try {
+    renderChatThreadList();
+  } catch (_) {
+    /* ignore */
+  }
+  if (typeof window.closeFunScreen === "function") window.closeFunScreen();
+  openChatScreen();
+  await new Promise((r) => setTimeout(r, 120));
+  const th = readActiveThread();
+  if (!th) return;
+  if (isThreadOnlineRomanceEnabled(th)) {
+    showToast("和 TA 开着异地模式，只能线上互动");
+    return;
+  }
+  if (isThreadOfflineMeetSummaryMode(th)) {
+    openChatOfflineMeetSummarySheet();
+    return;
+  }
+  if (!isChatOfflineScreenOpen()) openChatOfflineScreen();
+}
+window.openOfflineFromDesktop = openOfflineFromDesktop;

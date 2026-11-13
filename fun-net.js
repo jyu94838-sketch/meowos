@@ -48,6 +48,7 @@
     .filter(Boolean);
   for (const c of Object.values(S.convs)) {
     c.memberChars ||= {};
+    if (!Array.isArray(c.chars)) c.chars = c.char ? [c.char] : [];
     c.members ||= {};
     c.msgs ||= [];
     if (!c.joined) c.needJoin = true;
@@ -242,7 +243,10 @@
             c.needJoin = false;
             for (const row of r.msgs || []) handleRow(row, false);
             // 告诉大家我带着哪个角色（新设备 / 重新进会话时）
-            if (c.char) S.outbox.push({ id: rid(), type: "post", gid: c.gid, body: { t: "char", char: c.char } });
+            if (myChars(c).length) {
+              S.outbox.push({ id: rid(), type: "post", gid: c.gid, body: { t: "chars", chars: myChars(c) } });
+              S.outbox.push({ id: rid(), type: "post", gid: c.gid, body: { t: "char", char: myChars(c)[0], v2: true } });
+            }
             // 旧版（点对点）时自己发的消息没存到服务器：第一次进会话时补传，对方之前没收到的也能收到
             if (!c.legacyUp) {
               c.legacyUp = true;
@@ -439,7 +443,7 @@
   /* ───── 会话 ───── */
   const dmGid = (a, b) => "d" + [a, b].sort().join("_").toLowerCase();
   function newConv(gid, name, dm) {
-    return { gid, name, dm, members: { [S.mid]: { name: me().name, av: "" } }, memberChars: {}, msgs: [], unread: 0, lastAt: Date.now(), char: null, charAuto: true, joined: false, needJoin: true, legacyUp: true };
+    return { gid, name, dm, members: { [S.mid]: { name: me().name, av: "" } }, memberChars: {}, msgs: [], unread: 0, lastAt: Date.now(), char: null, chars: [], charAuto: true, joined: false, needJoin: true, legacyUp: true };
   }
   function ensureDm(mid) {
     const gid = dmGid(S.mid, mid);
@@ -515,8 +519,15 @@
         return;
       }
       receiveMsg(c, m, live);
+    } else if (b.t === "chars") {
+      const list = (Array.isArray(b.chars) ? b.chars : []).filter((x) => x && x.id && x.name).slice(0, 6);
+      if (list.length) c.memberChars[from] = list;
+      else delete c.memberChars[from];
+      if (root && V.open === c.gid) drawHead();
     } else if (b.t === "char") {
-      if (b.char) c.memberChars[from] = b.char;
+      // 新版会同时发 chars（多个角色）和 char（给旧版看的第一个），这里只认旧版发来的
+      if (b.v2) return;
+      if (b.char) c.memberChars[from] = [b.char];
       else delete c.memberChars[from];
     } else if (b.t === "rename") {
       if (!c.dm && b.name) c.name = String(b.name).slice(0, 20);
@@ -561,11 +572,44 @@
   }
 
   /* ───── 角色接话（用主人自己手机上的 AI） ───── */
-  async function charPersona(c) {
-    if (!c.char) return "";
+  /** 我带进这个会话的角色（可以好几个） */
+  function myChars(c) {
+    if (!Array.isArray(c.chars)) c.chars = c.char ? [c.char] : [];
+    // 旧数据里的角色可能没有 id：按名字补一个，同名的只留一个
+    const seen = new Set();
+    c.chars = c.chars.filter((x) => {
+      if (!x || !x.name) return false;
+      if (!x.id) x.id = "n:" + x.name;
+      if (seen.has(x.name)) return false;
+      seen.add(x.name);
+      return true;
+    });
+    c.char = c.chars[0] || null; // 给旧代码 / 旧备份兼容
+    return c.chars;
+  }
+  /** 某个成员带来的角色列表 */
+  function charsOf(c, mid) {
+    if (mid === S.mid) return myChars(c);
+    const v = c.memberChars[mid];
+    return Array.isArray(v) ? v : v ? [v] : [];
+  }
+  /** 一条角色消息是谁：先按角色 id，再按名字（旧消息没有 id） */
+  function charOfMsg(c, from) {
+    if (!from) return null;
+    const list = charsOf(c, from.mid);
+    return (from.cid && list.find((x) => x.id === from.cid)) || list.find((x) => x.name === from.name) || null;
+  }
+  function announceChars(c) {
+    const list = myChars(c);
+    post(c, { t: "chars", chars: list });
+    post(c, { t: "char", char: list[0] || null, v2: true });
+  }
+  async function charPersona(c, ch) {
+    ch = ch || myChars(c)[0];
+    if (!ch) return "";
     try {
       const cast = await F.loadCast();
-      return cast.find((x) => x.id === c.char.id)?.persona || "";
+      return cast.find((x) => x.id === ch.id)?.persona || "";
     } catch (_) {
       return "";
     }
@@ -593,24 +637,31 @@
       ? "可以在说话前用（）写一个很短的动作或神态（一小句以内），但重点是说出口的话；话要说完整，别说一半就断。"
       : "只写说出口的话：不要括号里的动作、神态、旁白，不要 *动作*，也不要描写自己在做什么；话要说完整，别说一半就断。";
   }
-  function sendAsChar(c, text) {
-    const ch = c.char;
+  function sendAsChar(c, text, ch) {
+    ch = ch || myChars(c)[0];
     if (!ch) return;
     const t = tidyCharLine(c, text, ch.name);
     if (!t) return;
-    sendMsg(c, { id: rid(), at: Date.now(), text: t, from: { mid: S.mid, name: ch.name, isChar: true, owner: me().name } });
+    sendMsg(c, { id: rid(), at: Date.now(), text: t, from: { mid: S.mid, name: ch.name, cid: ch.id, isChar: true, owner: me().name } });
   }
   async function maybeCharReply(c, m) {
-    const ch = c.char;
+    const list = myChars(c);
     const R = rt(c.gid);
-    if (!ch || !c.charAuto || R.charBusy || !F.hasApiKey()) return;
-    if (m.from && m.from.isChar && m.from.mid === S.mid) return;
+    if (!list.length || !c.charAuto || R.charBusy || !F.hasApiKey()) return;
     const text = String(m.text || "");
-    const called = text.includes(ch.name);
+    // 我自己带的角色之间偶尔也会接一句（不会一直聊下去）
+    const fromMine = !!(m.from && m.from.isChar && m.from.mid === S.mid);
+    if (fromMine && (list.length < 2 || Math.random() > 0.3)) return;
+    const pool = list.filter((x) => !(m.from?.isChar && x.name === m.from.name));
+    if (!pool.length) return;
+    let ch = pool.find((x) => text.includes(x.name));
+    const called = !!ch;
+    if (!ch) ch = pool[Math.floor(Math.random() * pool.length)];
     const now = Date.now();
     let chance = 0;
     if (called) chance = 1;
     else if (m.sys) chance = m.gameEnd && m.involves?.includes(ch.name) ? 0.8 : 0;
+    else if (fromMine) chance = 1;
     else if (m.from?.isChar) chance = now - R.charLast > 40000 ? 0.18 : 0;
     else if (c.dm) chance = now - R.charLast > 8000 ? 0.45 : 0.1;
     else chance = now - R.charLast > 15000 ? (m.from?.mid === S.mid ? 0.55 : 0.35) : 0.08;
@@ -618,7 +669,8 @@
     R.charBusy = true;
     try {
       await new Promise((r) => setTimeout(r, 900 + Math.random() * 1600));
-      const persona = await charPersona(c);
+      const persona = await charPersona(c, ch);
+      const mates = list.filter((x) => x !== ch).map((x) => x.name);
       const ctx = c.msgs
         .slice(-18)
         .map((x) => (x.sys ? `（${x.text}）` : `${x.from?.isChar ? `${x.from.name}（${x.from.owner}的角色）` : x.from?.name}：${x.text}`))
@@ -627,14 +679,14 @@
         [
           {
             role: "system",
-            content: `你是「${ch.name}」。${persona ? "人设：\n" + persona + "\n" : ""}你的主人是「${me().name}」，TA 把你带进了和其他 Meow 用户的${c.dm ? "好友私聊" : "群聊「" + c.name + "」"}，里面有别的真人和他们带来的角色。像在群聊里一样自然地说话：口语、简短（一到三句），符合人设，可以和别人互动、开玩笑。${charStyleRule(c)}不要替别人说话，不要加名字前缀，不要输出思考过程。`
+            content: `你是「${ch.name}」。${persona ? "人设：\n" + persona + "\n" : ""}你的主人是「${me().name}」，TA 把你带进了和其他 Meow 用户的${c.dm ? "好友私聊" : "群聊「" + c.name + "」"}，里面有别的真人和他们带来的角色。${mates.length ? `「${me().name}」还一起带了：${mates.join("、")}（你们认识）。` : ""}像在群聊里一样自然地说话：口语、简短（一到三句），符合人设，可以和别人互动、开玩笑。${charStyleRule(c)}不要替别人说话，不要加名字前缀，不要输出思考过程。`
           },
           { role: "user", content: `最近的消息：\n${ctx}\n\n现在轮到你说一句。` }
         ],
         { maxTokens: 1200, temperature: 0.95 }
       );
       R.charLast = Date.now();
-      sendAsChar(c, reply);
+      sendAsChar(c, reply, ch);
     } catch (_) {
       /* AI 失败就不说话 */
     } finally {
@@ -729,8 +781,7 @@
     const out = [];
     for (const mid of onlineIn(c)) {
       out.push({ pid: mid, name: nameOf(c, mid), owner: mid, isChar: false });
-      const ch = mid === S.mid ? c.char : c.memberChars[mid];
-      if (ch) out.push({ pid: `c:${mid}:${ch.id}`, name: ch.name, owner: mid, isChar: true, ownerName: nameOf(c, mid) });
+      for (const ch of charsOf(c, mid)) out.push({ pid: `c:${mid}:${ch.id}`, name: ch.name, owner: mid, isChar: true, ownerName: nameOf(c, mid) });
     }
     return out;
   }
@@ -1090,14 +1141,22 @@
   }
   const charTimers = new Map();
   const answered = new Set();
+  /** 游戏里轮到我带的角色时，每个角色各自行动 */
   async function charGameTurn(c) {
     const g = rt(c.gid).game;
-    const ch = c.char;
-    if (!g || !ch) return;
-    const mine = g.players.find((p) => p.isChar && p.owner === S.mid);
-    if (!mine) return;
-    clearTimeout(charTimers.get(c.gid));
-    const later = (fn, ms) => charTimers.set(c.gid, setTimeout(fn, ms));
+    if (!g) return;
+    for (const p of g.players.filter((x) => x.isChar && x.owner === S.mid)) {
+      const id = String(p.pid).split(":").slice(2).join(":");
+      const ch = myChars(c).find((x) => x.id === id) || myChars(c).find((x) => x.name === p.name);
+      if (ch) void charGameTurnFor(c, ch, p);
+    }
+  }
+  async function charGameTurnFor(c, ch, mine) {
+    const g = rt(c.gid).game;
+    if (!g || !ch || !mine) return;
+    const tk = c.gid + "|" + mine.pid;
+    clearTimeout(charTimers.get(tk));
+    const later = (fn, ms) => charTimers.set(tk, setTimeout(fn, ms));
     if (g.kind === "dice" && g.phase === "play" && !g.rolls?.[mine.pid]) later(() => act(c, "roll", null, mine.pid), 1200 + Math.random() * 1800);
     if (g.kind === "bomb" && g.phase === "play" && g.players[g.turn % g.players.length]?.pid === mine.pid)
       later(() => act(c, "guess", g.lo + Math.floor(Math.random() * (g.hi - g.lo + 1)), mine.pid), 1500 + Math.random() * 1500);
@@ -1105,9 +1164,9 @@
     const ansKey = g.id + ":" + g.q;
     if (g.kind === "td" && g.phase === "answer" && g.target === mine.pid && !answered.has(ansKey)) {
       answered.add(ansKey);
-      if (!F.hasApiKey()) return sendAsChar(c, g.choice === "dare" ? "……好吧，我做就是了。" : "这个嘛……秘密。");
+      if (!F.hasApiKey()) return sendAsChar(c, g.choice === "dare" ? "……好吧，我做就是了。" : "这个嘛……秘密。", ch);
       try {
-        const persona = await charPersona(c);
+        const persona = await charPersona(c, ch);
         const reply = await F.aiText(
           [
             { role: "system", content: `你是「${ch.name}」。${persona ? "人设：\n" + persona + "\n" : ""}你在和其他 Meow 用户的群里玩真心话大冒险。用你的人设回答，口语、简短（一到三句），可以害羞、耍赖或认真。${charStyleRule(c)}不要加名字前缀，不要输出思考过程。` },
@@ -1115,23 +1174,23 @@
           ],
           { maxTokens: 1200, temperature: 0.95 }
         );
-        sendAsChar(c, reply);
+        sendAsChar(c, reply, ch);
         rt(c.gid).charLast = Date.now();
       } catch (_) {
-        sendAsChar(c, "……这个我跳过！");
+        sendAsChar(c, "……这个我跳过！", ch);
       }
     }
     const k2 = (s) => `${g.id}:${s}`;
     if (g.kind === "spy") {
-      const myChars = g.players.filter((p) => p.isChar && p.owner === S.mid && g.alive.includes(p.pid));
-      for (const me2 of myChars) {
+      const mineAlive = g.alive.includes(mine.pid) ? [mine] : [];
+      for (const me2 of mineAlive) {
         if (g.phase === "desc" && g.alive[g.t] === me2.pid && !answered.has(k2(`d${g.round}${me2.pid}`))) {
           answered.add(k2(`d${g.round}${me2.pid}`));
           const word = g.words[me2.pid];
           let t = "";
           if (F.hasApiKey()) {
             try {
-              const persona = await charPersona(c);
+              const persona = await charPersona(c, ch);
               const prev = g.descs.map((d) => `${g.players.find((p) => p.pid === d.pid)?.name}：${d.text}`).join("\n");
               t = await F.aiText(
                 [
@@ -1172,8 +1231,8 @@
       }
     }
     if (g.kind === "draw") {
-      const mine2 = g.players.find((p) => p.isChar && p.owner === S.mid);
-      const key = k2(`g${g.di}`);
+      const mine2 = mine;
+      const key = k2(`g${g.di}${mine.pid}`);
       if (mine2 && !g.solved[mine2.pid] && !answered.has(key)) {
         answered.add(key);
         const tries = 2 + Math.floor(Math.random() * 2);
@@ -1188,7 +1247,7 @@
     }
     if (g.kind === "uno") {
       const cur = g.players[g.turn];
-      if (cur && cur.isChar && cur.owner === S.mid && !answered.has(k2(`u${g.top}${g.turn}${g.hands[cur.pid].length}${g.deck.length}`))) {
+      if (cur && cur.pid === mine.pid && !answered.has(k2(`u${g.top}${g.turn}${g.hands[cur.pid].length}${g.deck.length}`))) {
         answered.add(k2(`u${g.top}${g.turn}${g.hands[cur.pid].length}${g.deck.length}`));
         const hand = g.hands[cur.pid];
         let idx = hand.findIndex((k) => k[0] !== "w" && k[0] === g.color);
@@ -1202,7 +1261,7 @@
     }
     if (g.kind === "mines") {
       const cur = g.players[g.turn % g.players.length];
-      if (cur && cur.isChar && cur.owner === S.mid && !answered.has(k2(`m${g.turn}`))) {
+      if (cur && cur.pid === mine.pid && !answered.has(k2(`m${g.turn}`))) {
         answered.add(k2(`m${g.turn}`));
         const closed = [...Array(MN * MN).keys()].filter((i) => !g.open.includes(i));
         // 尽量挑旁边没有数字的格子
@@ -1211,7 +1270,7 @@
       }
     }
     if (isChal(g.kind)) {
-      for (const me2 of g.players.filter((p) => p.isChar && p.owner === S.mid)) {
+      for (const me2 of [mine]) {
         if (g.scores[me2.pid] != null || answered.has(k2("s" + me2.pid))) continue;
         answered.add(k2("s" + me2.pid));
         let n;
@@ -1510,14 +1569,16 @@
           ? ""
           : `<div class="net-mems">${mids
               .map((mid) => {
-                const ch = mid === S.mid ? c.char : c.memberChars[mid];
-                return `<span class="net-mem ${isOn(mid) ? "" : "is-off"}" data-mid="${esc(mid)}">${F.avHtml({ name: nameOf(c, mid), avatar: avOf(c, mid) }, "fun-av sm")}<b>${esc(nameOf(c, mid))}</b>${ch ? `<i>+ ${esc(ch.name)}</i>` : ""}</span>`;
+                const chs = charsOf(c, mid);
+                return `<span class="net-mem ${isOn(mid) ? "" : "is-off"}" data-mid="${esc(mid)}">${F.avHtml({ name: nameOf(c, mid), avatar: avOf(c, mid) }, "fun-av sm")}<b>${esc(nameOf(c, mid))}</b>${chs.length ? `<i>+ ${esc(chs.map((x) => x.name).join("、"))}</i>` : ""}</span>`;
               })
               .join("")}</div>`
       }
       <div class="net-charbar">${
-        c.char
-          ? `${F.avHtml({ name: c.char.name, avatar: c.char.av }, "fun-av sm")}<span>带着 <b>${esc(c.char.name)}</b>${F.hasApiKey() ? "" : "（没填 API Key，TA 只能玩游戏不能聊天）"}</span><label class="net-auto"><input type="checkbox" ${c.charAuto ? "checked" : ""} data-a="auto" />会主动接话</label><label class="net-auto"><input type="checkbox" ${c.charActions ? "checked" : ""} data-a="acts" />带动作旁白</label><button type="button" data-a="char">换</button>`
+        myChars(c).length
+          ? `<span class="net-mychars">带着 ${myChars(c)
+              .map((x) => `<span class="net-mychar">${F.avHtml({ name: x.name, avatar: x.av }, "fun-av sm")}<b>${esc(x.name)}</b><button type="button" class="net-mychar-x" data-rmchar="${esc(x.id)}" aria-label="让 ${esc(x.name)} 离开">✕</button></span>`)
+              .join("")}${F.hasApiKey() ? "" : "（没填 API Key，TA 们只能玩游戏不能聊天）"}</span><label class="net-auto"><input type="checkbox" ${c.charAuto ? "checked" : ""} data-a="auto" />会主动接话</label><label class="net-auto"><input type="checkbox" ${c.charActions ? "checked" : ""} data-a="acts" />带动作旁白</label><button type="button" data-a="char">＋ 带角色</button>`
           : `<span>还没带角色进来</span><button type="button" data-a="char">带上我的角色</button>`
       }</div>`;
   }
@@ -1723,7 +1784,7 @@
           if (m.sys) return `<div class="chat-time-divider net-sys-row"><span class="chat-time-divider-label net-sys mx-net-sys">${esc(m.text).replace(/\n/g, "<br/>")}</span></div>`;
           const mid = m.from?.mid || "";
           const mine = mid === S.mid && !m.from?.isChar;
-          const ch = m.from?.isChar ? (mid === S.mid ? c.char : c.memberChars[mid]) : null;
+          const ch = m.from?.isChar ? charOfMsg(c, { ...m.from, mid }) : null;
           const av = m.from?.isChar ? ch?.av || "" : avOf(c, mid);
           // 一对一聊天里不用每条都写名字；群聊、或者是谁带来的角色说话时才标出来
           const showName = !c.dm || m.from?.isChar;
@@ -1877,31 +1938,66 @@
   async function pickChar(c) {
     const cast = await F.loadCast();
     if (!cast.length) return toast("角色库里还没有角色");
+    const MAX = 4;
+    const draw = (sh) => {
+      const on = new Set(myChars(c).flatMap((x) => [x.id, "name:" + x.name]));
+      sh.body.querySelector(".mm-to").innerHTML = cast
+        .map((x) => `<button type="button" class="pt-person${on.has(x.id) || on.has("name:" + x.name) ? " is-on" : ""}" data-char="${esc(x.id)}">${F.avHtml(x, "fun-av")}<strong>${esc(x.name)}</strong>${on.has(x.id) || on.has("name:" + x.name) ? "<small>在里面了</small>" : ""}</button>`)
+        .join("");
+    };
     const sh = F.openSheet(
-      `<div class="mm-to">${cast.map((x) => `<button type="button" class="pt-person${c.char?.id === x.id ? " is-on" : ""}" data-char="${esc(x.id)}">${F.avHtml(x, "fun-av")}<strong>${esc(x.name)}</strong></button>`).join("")}</div>
-       ${c.char ? `<div class="fun-sheet-actions"><button type="button" class="fun-btn ghost" data-a2="nochar">不带角色了</button></div>` : ""}
-       <p class="fun-note">TA 会用你自己的 AI 在这里说话，别人看到的是 TA 的名字和头像（不会把人设发给别人）。</p>`,
-      { title: "带哪个角色？" }
+      `<p class="fun-note">点一下带进来，再点一下让 TA 离开。最多同时带 ${MAX} 个。</p>
+       <div class="mm-to"></div>
+       <div class="fun-sheet-actions">${myChars(c).length ? `<button type="button" class="fun-btn ghost" data-a2="nochar">全部离开</button>` : ""}<button type="button" class="fun-btn solid" data-a2="done">好了</button></div>
+       <p class="fun-note">TA 们会用你自己的 AI 在这里说话，别人看到的是名字和头像（不会把人设发给别人）。</p>`,
+      { title: "带哪些角色？" }
     );
+    draw(sh);
     sh.body.addEventListener("click", async (e) => {
-      if (e.target.closest("[data-a2=nochar]")) {
-        c.char = null;
+      const a2 = e.target.closest("[data-a2]")?.dataset.a2;
+      if (a2 === "done") return sh.close();
+      if (a2 === "nochar") {
+        const gone = myChars(c).map((x) => x.name);
+        c.chars = [];
+        myChars(c);
         save();
-        post(c, { t: "char", char: null });
+        announceChars(c);
         sh.close();
         drawHead();
+        if (gone.length) sysMsg(c, `${me().name} 让 ${gone.join("、")} 先离开了`);
         return;
       }
       const b = e.target.closest("[data-char]");
-      if (!b) return;
+      if (!b || b.disabled) return;
       const x = cast.find((y) => y.id === b.dataset.char);
-      sh.close();
-      c.char = { id: x.id, name: x.name, av: await thumb(x.avatar) };
-      save();
-      post(c, { t: "char", char: c.char });
-      drawHead();
-      sysMsg(c, `${me().name} 把 ${x.name} 带进来了`);
+      if (!x) return;
+      const list = myChars(c);
+      const old = list.find((y) => y.id === x.id || y.name === x.name);
+      if (old) {
+        removeMyChar(c, old.id);
+      } else {
+        if (list.length >= MAX) return toast(`最多同时带 ${MAX} 个角色`);
+        b.disabled = true;
+        list.push({ id: x.id, name: x.name, av: await thumb(x.avatar) });
+        myChars(c);
+        save();
+        announceChars(c);
+        drawHead();
+        sysMsg(c, `${me().name} 把 ${x.name} 带进来了`);
+      }
+      draw(sh);
     });
+  }
+  function removeMyChar(c, id) {
+    const list = myChars(c);
+    const x = list.find((y) => y.id === id);
+    if (!x) return;
+    c.chars = list.filter((y) => y.id !== id);
+    myChars(c);
+    save();
+    announceChars(c);
+    drawHead();
+    sysMsg(c, `${me().name} 让 ${x.name} 先离开了`);
   }
   function pickGame(c) {
     const R = rt(c.gid);
@@ -2050,6 +2146,8 @@
     if (a === "invite") return inviteToGroup(c);
     if (a === "gmenu") return groupMenu(c);
     if (a === "char") return void pickChar(c);
+    const rmc = e.target.closest("[data-rmchar]")?.dataset.rmchar;
+    if (rmc) return removeMyChar(c, rmc);
     if (a === "auto") {
       c.charAuto = e.target.checked;
       save();

@@ -8692,3 +8692,9 @@ html:not(#_):not(#__) body #chat-screen#chat-screen#chat-screen#chat-screen.mx-a
 .pt-office .ww-row .fun-btn { white-space: nowrap; padding-left: 8px; padding-right: 8px; }
 /* 联机：带着角色那一条，两个开关挤不下时换行 */
 .net-charbar { flex-wrap: wrap; row-gap: 4px; }
+/* 联机：可以带好几个角色 */
+.net-mychars { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 1 1 100%; min-width: 0; }
+.net-mychar { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 2px; border-radius: 999px; background: color-mix(in srgb, var(--text-main) 6%, transparent); }
+.net-mychar b { font-size: 0.76rem; }
+.net-mychar .fun-av { width: 24px !important; height: 24px !important; }
+.net-charbar .net-mychar-x { border: 0 !important; background: none !important; padding: 0 4px !important; color: var(--text-sub) !important; font-size: 0.72rem !important; cursor: pointer; }

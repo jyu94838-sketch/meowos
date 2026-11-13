@@ -42,6 +42,7 @@
     联机: fun("联机"),
     天气: fun("天气"),
     饮食: fun("饮食"),
+    线下: () => typeof window.openOfflineFromDesktop === "function" && window.openOfflineFromDesktop(),
     减脂: fun("饮食"),
     小馋猫: fun("小馋猫"),
     贪吃蛇: fun("小馋猫"),
