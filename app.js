@@ -28206,6 +28206,78 @@ function buildCharWorldBookBlockForPrompt(charItem, charDisplayName, userDisplay
   );
 }
 
+/**
+ * 从世界书里挑出「最近的对话提到了」的条目（按关键词 / 标题匹配），放到提示词最后提醒模型
+ * @param {string[]} volumeIds @param {string} recentText
+ */
+function pickRelevantWorldBookEntries(volumeIds, recentText, charDisplayName, userDisplayName, max) {
+  const text = String(recentText || "");
+  if (!text.trim()) return [];
+  const repl = (s) => replaceCharUserWorldBookPlaceholders(s, charDisplayName, userDisplayName);
+  /** @type {{ title: string, body: string, hit: number }[]} */
+  const out = [];
+  const ids = Array.from(new Set((volumeIds || []).map((x) => String(x || "").trim()).filter(Boolean))).slice(0, 8);
+  for (const id of ids) {
+    const vol = getWorldBookVolumeById(id);
+    if (!vol || !Array.isArray(vol.entries)) continue;
+    for (const e of vol.entries) {
+      if (!e || e.enabled === false) continue;
+      const bodyRaw = repl(String(e.content || "").trim());
+      if (!bodyRaw) continue;
+      const title = repl(String(e.title || "").trim());
+      const keys = repl(String(e.keywords || ""))
+        .split(/[,，、;；|\n/]+/)
+        .map((k) => k.trim())
+        .filter((k) => k.length >= 2 && k !== charDisplayName && k !== userDisplayName);
+      if (title.length >= 2 && title !== charDisplayName && title !== userDisplayName) keys.push(title);
+      let hit = -1;
+      for (const k of keys) {
+        const at = text.lastIndexOf(k);
+        if (at > hit) hit = at;
+      }
+      if (hit < 0) continue;
+      const body = proseContentLooksLikeHtml(bodyRaw) ? htmlToPlainTextForPrompt(bodyRaw) : bodyRaw;
+      out.push({ title: title || keys[0] || "条目", body: body.replace(/\s+/g, " ").slice(0, 360), hit });
+    }
+  }
+  // 越是最近提到的越靠前
+  return out.sort((a, b) => b.hit - a.hit).slice(0, max || 5);
+}
+
+/**
+ * 放在系统提示最后：人设要点 + 本轮聊到的世界书条目 + 去人机感硬规则（聊天、线下共用）
+ */
+function buildPersonaWorldbookAnchorBlock(name, userCall, char, promptLog, volumeIds, offline) {
+  const clip = (v, n) => String(v || "").replace(/\s+/g, " ").trim().slice(0, n);
+  const voice = clip(char?.voice, 200);
+  const bounds = clip(char?.boundaries, 160);
+  const summary = clip(char?.summary, 260);
+  const npc = clip(char?.npcRelations, 200);
+  const recent = (Array.isArray(promptLog) ? promptLog : [])
+    .filter((m) => m && (m.role === "user" || m.role === "assistant"))
+    .slice(-10)
+    .map((m) => String(m.content || "").replace(/\|\|\|/g, " "))
+    .join("\n");
+  const hits = pickRelevantWorldBookEntries(volumeIds, recent, name, userCall, 5);
+  const lines = [`[人设 & 世界书 · 写之前再对一遍]`];
+  if (summary) lines.push(`· ${name} 是谁：${summary}${String(char?.summary || "").length > 260 ? "…" : ""}`);
+  if (voice) lines.push(`· ${name} 怎么说话：${voice}`);
+  if (bounds) lines.push(`· ${name} 的边界 / 不会做的事：${bounds}`);
+  if (npc) lines.push(`· ${name} 身边的人：${npc}`);
+  if (hits.length) {
+    lines.push(`最近的对话提到了世界书里的这些设定——这一轮要**按它写、不能和它矛盾**（地名、称呼、规则、关系、时间线照原样用）：`);
+    for (const h of hits) lines.push(`  【${h.title}】${h.body}`);
+  }
+  lines.push(
+    `写之前在 thinking 里先对一遍：① 这句话放在 ${name} 的身份、经历、性格、说话方式下说得通吗？② 有没有和人设、世界书矛盾？③ 有没有凭空编出人设和世界书里没有的大背景（家人、工作、过去的事）？不确定就别编，含糊带过或者问。`,
+    `去人机感（硬禁）：不说「作为……」「我理解你的感受」「希望对你有帮助」「有什么需要随时找我」这类客服话；不列 1.2.3. 条目，不加粗不分标题；不总结陈词、不突然升华讲道理；不用万能安慰和万能夸奖；不把人设里的形容词原样念出来（「我是个温柔的人」），要靠说的话和做的事体现。`,
+    offline
+      ? `线下正文：动作、神态、环境细节都要从 ${name} 的人设和世界书里长出来（${name} 会有的小动作、这个世界里会有的东西），别用谁都能套的通用描写。`
+      : `线上消息：口气、用词、梗、称呼要是 ${name} 才会用的；换成别的角色也能发的话就重写。`
+  );
+  return lines.join("\n");
+}
+
 function buildWorldBookBlockForVolumeIds(volumeIds, charDisplayName, userDisplayName) {
   const ids = Array.isArray(volumeIds) ? volumeIds.map((x) => String(x || "").trim()).filter(Boolean) : [];
   if (!ids.length) return "";
@@ -46001,6 +46073,21 @@ function buildChatSystemPrompt(opts) {
           ]),
   ].filter(Boolean);
   let sys = roleBlock.join("\n\n");
+  if (th && th.kind !== "group" && !theaterSeparateGen) {
+    try {
+      const anchor = buildPersonaWorldbookAnchorBlock(
+        name,
+        userCall,
+        char,
+        promptLog,
+        getEffectiveThreadWorldBookVolumeIds(th, { surface: sceneOffline ? "offline" : "im" }),
+        sceneOffline
+      );
+      if (anchor) sys += "\n\n" + anchor;
+    } catch (err) {
+      console.warn("[persona anchor]", err);
+    }
+  }
   if (sceneOffline && th && th.kind !== "group" && !theaterSeparateGen) {
     const pv = resolveThreadOfflineDmCharUserPov(th);
     const ptx = getThreadOfflineDmPovText(th);
